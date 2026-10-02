@@ -1,0 +1,14 @@
+.venv/
+.env
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.idea/
+data/
+dist/
+*.egg-info/
+
+# Frontend build and local dependencies
+frontend/node_modules/
+frontend/.env.local
+frontend/*.tsbuildinfo

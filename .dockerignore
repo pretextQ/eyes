@@ -1,0 +1,13 @@
+.venv
+.env
+.git
+.idea
+.ruff_cache
+data
+dist
+**/__pycache__
+deploy/.env
+
+frontend/node_modules
+frontend/dist
+frontend/.env.local

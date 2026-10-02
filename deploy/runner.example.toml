@@ -1,0 +1,31 @@
+# Copy to runner.toml in the project root, then adapt addresses and local aliases.
+server_url = "http://127.0.0.1:8000"
+token_env = "EYES_RUNNER_TOKEN"
+name = "host-runner"
+state_dir = "data/runner"
+execution_slots = 1
+score_slots = 1
+allowed_http_origins = ["http://127.0.0.1:9000"]
+secret_env_allowlist = []
+max_score_input_bytes = 33554432 # Match the control API's scoring-input response limit.
+
+# Trusted local Python integration. Paths are relative to this configuration.
+# [python_agents.my_agent]
+# entry_point = "my_agent.eyes_bridge:execute"
+# python = "/absolute/path/to/agent/.venv/bin/python"
+# import_paths = ["/absolute/path/to/agent"]
+# prepare = "my_agent.eyes_bridge:prepare"
+# cleanup = "my_agent.eyes_bridge:cleanup"
+# execution_scope = "external"  # use "process" only when effects stay in this process group
+# session_isolation = true
+# environment_isolation = false
+# cancel = "my_agent.eyes_bridge:cancel"
+# reconcile = "my_agent.eyes_bridge:reconcile"
+# cpu_seconds = 300
+# memory_bytes = 2147483648
+
+# [python_scorers.business]
+# entry_point = "my_agent.eyes_scoring:score"
+# import_paths = ["/absolute/path/to/agent"]
+# cpu_seconds = 30
+# memory_bytes = 536870912
