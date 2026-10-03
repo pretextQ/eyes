@@ -8,6 +8,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { WorkspaceWelcome } from "../components/WorkspaceWelcome";
@@ -21,6 +22,7 @@ import {
   ErrorNotice,
   Field,
   Loading,
+  TableLoading,
   Metrics,
   PageHeading,
   Pagination,
@@ -41,7 +43,13 @@ export function ExperimentsPage() {
   const page =
     Number.isSafeInteger(pageValue) && pageValue >= 0 ? pageValue : 0;
   const search = params.get("q") || "";
-  const filter = params.get("status") || "all";
+  const filter = ["all", "active", "finished", "unresolved"].includes(
+    params.get("status") || "",
+  )
+    ? params.get("status")!
+    : "all";
+  const sort = params.get("sort") === "oldest" ? "oldest" : "newest";
+  const compact = params.get("density") === "compact";
   function update(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -74,18 +82,30 @@ export function ExperimentsPage() {
     enabled: !!api,
   });
   const items = query.data?.items.slice(0, 50) || [];
-  const shown = items.filter(
-    (e) =>
-      `${e.id} ${e.snapshot.target.content.name} ${e.snapshot.target.content.external_version || ""}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) &&
-      (filter === "all" ||
-        (filter === "active"
-          ? ["queued", "running", "cancel_requested"].includes(e.status)
-          : filter === "unresolved"
-            ? e.status === "completed_with_unresolved"
-            : ["completed", "cancelled"].includes(e.status))),
-  );
+  const shown = items
+    .filter(
+      (e) =>
+        `${e.id} ${e.snapshot.target.content.name} ${e.snapshot.target.content.external_version || ""}`
+          .toLowerCase()
+          .includes(search.toLowerCase()) &&
+        (filter === "all" ||
+          (filter === "active"
+            ? ["queued", "running", "cancel_requested"].includes(e.status)
+            : filter === "unresolved"
+              ? e.status === "completed_with_unresolved"
+              : ["completed", "cancelled"].includes(e.status))),
+    )
+    .sort((a, b) =>
+      sort === "oldest"
+        ? Date.parse(a.created_at) - Date.parse(b.created_at)
+        : Date.parse(b.created_at) - Date.parse(a.created_at),
+    );
+  function clearFilters() {
+    const next = new URLSearchParams(params);
+    next.delete("q");
+    next.delete("status");
+    setParams(next);
+  }
   const counts = operations.data?.work_counts;
   const count = (statuses: string[]) =>
     counts
@@ -144,7 +164,23 @@ export function ExperimentsPage() {
               retry={() => void operations.refetch()}
             />
           )}
-          <section className="panel experiments-panel">
+          <section
+            className={`panel experiments-panel ${compact ? "table-compact" : ""}`}
+            aria-label="实验列表"
+          >
+            <div className="list-heading">
+              <div>
+                <h2>全部实验</h2>
+                <span>固定配置与执行记录</span>
+              </div>
+              <span className="list-sync">
+                {query.isFetching
+                  ? "正在同步…"
+                  : query.isError
+                    ? "同步失败"
+                    : "每 10 秒自动更新"}
+              </span>
+            </div>
             <div className="panel-toolbar">
               <div className="tabs" aria-label="实验状态筛选">
                 {[
@@ -170,6 +206,7 @@ export function ExperimentsPage() {
                 <div className="search">
                   <Search size={15} />
                   <input
+                    type="search"
                     aria-label="搜索当前页实验"
                     placeholder="搜索当前页实验…"
                     value={search}
@@ -189,8 +226,43 @@ export function ExperimentsPage() {
                 </button>
               </div>
             </div>
+            <div className="list-controls">
+              <div className="list-result-count" role="status">
+                {query.data
+                  ? `本页显示 ${shown.length} / ${items.length} 场实验`
+                  : "正在读取实验"}
+                {(search || filter !== "all") && (
+                  <button className="text-button" onClick={clearFilters}>
+                    <X size={13} />
+                    清除筛选
+                  </button>
+                )}
+              </div>
+              <div className="list-view-options">
+                <label>
+                  <span className="sr-only">当前页排序</span>
+                  <select
+                    value={sort}
+                    onChange={(e) => update("sort", e.target.value)}
+                  >
+                    <option value="newest">本页最新创建</option>
+                    <option value="oldest">本页最早创建</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="sr-only">列表密度</span>
+                  <select
+                    value={compact ? "compact" : "comfortable"}
+                    onChange={(e) => update("density", e.target.value)}
+                  >
+                    <option value="comfortable">舒适视图</option>
+                    <option value="compact">紧凑视图</option>
+                  </select>
+                </label>
+              </div>
+            </div>
             {query.isPending ? (
-              <Loading />
+              <TableLoading label="正在读取实验" />
             ) : query.error ? (
               <ErrorNotice
                 error={query.error}
@@ -198,6 +270,7 @@ export function ExperimentsPage() {
               />
             ) : !items.length ? (
               <Empty
+                icon={FlaskConical}
                 title="你的第一场实验，从这里开始"
                 description="选择目标 Agent、测试集和评分口径，创建一份可追溯的执行记录。"
                 action={
@@ -211,25 +284,27 @@ export function ExperimentsPage() {
             ) : !shown.length ? (
               <Empty
                 compact
+                icon={Search}
                 title="没有匹配的实验"
                 description="试试其他关键词或状态；搜索范围为当前页。"
                 action={
-                  <button
-                    className="button"
-                    onClick={() => {
-                      const next = new URLSearchParams(params);
-                      next.delete("q");
-                      next.delete("status");
-                      setParams(next);
-                    }}
-                  >
+                  <button className="button" onClick={clearFilters}>
                     清除筛选
                   </button>
                 }
               />
             ) : (
-              <div className="table-scroll">
+              <div
+                className="table-scroll"
+                role="region"
+                aria-label="实验记录，可横向滚动"
+                tabIndex={0}
+              >
                 <table>
+                  <caption className="sr-only">
+                    当前页实验，按创建时间
+                    {sort === "newest" ? "从新到旧" : "从旧到新"}排列
+                  </caption>
                   <thead>
                     <tr>
                       <th>实验 / 目标</th>

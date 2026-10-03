@@ -19,7 +19,7 @@ import {
   ErrorNotice,
   Field,
   JsonBlock,
-  Loading,
+  TableLoading,
   PageHeading,
 } from "../components/ui";
 import type { CatalogKind, Payload, TargetContent, Version } from "../types";
@@ -121,7 +121,7 @@ function CatalogView({ kind }: { kind: CatalogKind }) {
         {!api ? (
           <Disconnected />
         ) : query.isPending ? (
-          <Loading />
+          <TableLoading label="正在读取版本目录" />
         ) : query.error ? (
           <ErrorNotice error={query.error} retry={() => void query.refetch()} />
         ) : !query.data.length ? (
@@ -147,7 +147,12 @@ function CatalogView({ kind }: { kind: CatalogKind }) {
             }
           />
         ) : (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label="版本目录，可横向滚动"
+            tabIndex={0}
+          >
             <table>
               <thead>
                 <tr>

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -147,21 +148,46 @@ export function Loading({ label = "正在读取数据" }: { label?: string }) {
     </div>
   );
 }
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <span aria-hidden="true" className={`skeleton ${className}`} />;
+}
+export function TableLoading({ label = "正在读取列表" }: { label?: string }) {
+  return (
+    <div className="table-loading" role="status" aria-label={label}>
+      <span className="sr-only">{label}</span>
+      <div aria-hidden="true">
+        {Array.from({ length: 5 }, (_, row) => (
+          <div className="skeleton-row" key={row}>
+            <div>
+              <Skeleton className="skeleton-title" />
+              <Skeleton className="skeleton-detail" />
+            </div>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 export function Empty({
   title,
   description,
   action,
   compact = false,
+  icon: Icon = Database,
 }: {
   title: string;
   description: string;
   action?: ReactNode;
   compact?: boolean;
+  icon?: LucideIcon;
 }) {
   return (
     <div className={`empty ${compact ? "compact" : ""}`}>
       <div className="empty-glyph">
-        <Database size={24} strokeWidth={1.3} />
+        <Icon size={24} strokeWidth={1.5} />
       </div>
       <h3>{title}</h3>
       <p>{description}</p>
@@ -173,6 +199,7 @@ export function Disconnected() {
   const { openConnection } = useConnection();
   return (
     <Empty
+      icon={Plug}
       title="连接你的实验空间"
       description="使用项目令牌连接控制 API，读取真实实验与执行证据。"
       action={
@@ -202,12 +229,15 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialog?.showModal();
+    dialog?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     return () => {
       dialog?.close();
       document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus();
     };
   }, []);
   return (
