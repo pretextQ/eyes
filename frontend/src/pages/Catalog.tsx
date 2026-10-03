@@ -80,10 +80,12 @@ function CatalogView({ kind }: { kind: CatalogKind }) {
         title={config.title}
         description={config.description}
         action={
-          <button className="button primary" onClick={publish}>
-            {kind === "datasets" ? <Upload size={16} /> : <Plus size={16} />}{" "}
-            {config.action}
-          </button>
+          api && (
+            <button className="button primary" onClick={publish}>
+              {kind === "datasets" ? <Upload size={16} /> : <Plus size={16} />}{" "}
+              {config.action}
+            </button>
+          )
         }
       />
       <div className="catalog-intro">
@@ -94,26 +96,28 @@ function CatalogView({ kind }: { kind: CatalogKind }) {
         <span className="mono">IMMUTABLE VERSIONS</span>
       </div>
       <section className="panel">
-        <div className="panel-toolbar">
-          <div className="toolbar-title">
-            版本目录{" "}
-            <span className="count">
-              {query.data ? query.data.length : "—"}
-            </span>
+        {api && (
+          <div className="panel-toolbar">
+            <div className="toolbar-title">
+              版本目录{" "}
+              <span className="count">
+                {query.data ? query.data.length : "—"}
+              </span>
+            </div>
+            <div className="search">
+              <Search size={15} />
+              <input
+                aria-label={`搜索${config.title}`}
+                placeholder="搜索名称或摘要…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
           </div>
-          <div className="search">
-            <Search size={15} />
-            <input
-              aria-label={`搜索${config.title}`}
-              placeholder="搜索名称或摘要…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-            />
-          </div>
-        </div>
+        )}
         {!api ? (
           <Disconnected />
         ) : query.isPending ? (
@@ -253,10 +257,12 @@ function CatalogView({ kind }: { kind: CatalogKind }) {
           </div>
         )}
       </section>
-      <div className="catalog-footnote">
-        <FileJson size={16} />
-        {config.text}
-      </div>
+      {!!query.data?.length && (
+        <div className="catalog-footnote">
+          <FileJson size={16} />
+          {config.text}
+        </div>
+      )}
       {open && <PublishDialog kind={kind} onClose={() => setOpen(false)} />}{" "}
       {selected && (
         <VersionDialog

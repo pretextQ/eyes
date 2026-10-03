@@ -1,6 +1,7 @@
 import { formatDate } from "../format";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, RefreshCw, Server } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useConnection } from "../connection";
 import {
   Disconnected,
@@ -57,31 +58,33 @@ export function OperationsPage() {
           </button>
         }
       />
-      <Metrics
-        items={[
-          {
-            label: "执行工作排队",
-            value: total("execute", "queued"),
-            note: "等待匹配 Runner",
-          },
-          {
-            label: "已领取执行",
-            value: total("execute", "claimed"),
-            note: "由 Runner 执行和续租",
-            accent: true,
-          },
-          {
-            label: "评分工作排队",
-            value: total("score", "queued"),
-            note: "使用独立评分容量",
-          },
-          {
-            label: "未知执行工作",
-            value: total("execute", "unknown"),
-            note: "仍可能占用目标额度",
-          },
-        ]}
-      />
+      {api && (
+        <Metrics
+          items={[
+            {
+              label: "执行工作排队",
+              value: total("execute", "queued"),
+              note: "等待匹配 Runner",
+            },
+            {
+              label: "已领取执行",
+              value: total("execute", "claimed"),
+              note: "由 Runner 执行和续租",
+              accent: true,
+            },
+            {
+              label: "评分工作排队",
+              value: total("score", "queued"),
+              note: "使用独立评分容量",
+            },
+            {
+              label: "未知执行工作",
+              value: total("execute", "unknown"),
+              note: "仍可能占用目标额度",
+            },
+          ]}
+        />
+      )}
       {!api ? (
         <section className="panel">
           <Disconnected />
@@ -137,6 +140,11 @@ export function OperationsPage() {
               <Empty
                 title="还没有注册的 Runner"
                 description="在目标宿主机配置 Runner 令牌与插件，启动后会显示最近一次心跳。"
+                action={
+                  <Link className="button primary" to="/guide">
+                    查看 Runner 接入步骤
+                  </Link>
+                }
               />
             ) : (
               <div className="table-scroll">

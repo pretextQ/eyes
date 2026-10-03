@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,13 +26,38 @@ import {
 } from "react-router-dom";
 import { Api } from "./api";
 import { ConnectionContext } from "./connection";
-import { Dialog, ErrorNotice, Eye, Field } from "./components/ui";
-import { ExperimentsPage } from "./pages/Experiments";
-import { ExperimentPage } from "./pages/Experiment";
-import { CatalogPage } from "./pages/Catalog";
-import { ComparisonPage } from "./pages/Comparison";
-import { OperationsPage } from "./pages/Operations";
-import { GuidePage } from "./pages/Guide";
+import { Dialog, ErrorNotice, Eye, Field, Loading } from "./components/ui";
+const ExperimentsPage = lazy(() =>
+  import("./pages/Experiments").then((module) => ({
+    default: module.ExperimentsPage,
+  })),
+);
+const ExperimentPage = lazy(() =>
+  import("./pages/Experiment").then((module) => ({
+    default: module.ExperimentPage,
+  })),
+);
+const CaseWorkspacePage = lazy(() =>
+  import("./pages/CaseWorkspace").then((module) => ({
+    default: module.CaseWorkspacePage,
+  })),
+);
+const CatalogPage = lazy(() =>
+  import("./pages/Catalog").then((module) => ({ default: module.CatalogPage })),
+);
+const ComparisonPage = lazy(() =>
+  import("./pages/Comparison").then((module) => ({
+    default: module.ComparisonPage,
+  })),
+);
+const OperationsPage = lazy(() =>
+  import("./pages/Operations").then((module) => ({
+    default: module.OperationsPage,
+  })),
+);
+const GuidePage = lazy(() =>
+  import("./pages/Guide").then((module) => ({ default: module.GuidePage })),
+);
 
 const nav = [
   { url: "/experiments", text: "实验", en: "Experiments", icon: FlaskConical },
@@ -97,6 +122,12 @@ export default function App() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const current = nav.find((n) => location.pathname.startsWith(n.url));
+  const pageName = location.pathname.includes("/cases/")
+    ? "执行审阅"
+    : current?.text || "接入指南";
+  useEffect(() => {
+    document.title = `${pageName} · Eyes`;
+  }, [pageName]);
   function connect(client: Api | null) {
     queryClient.clear();
     setApi(client);
@@ -205,7 +236,7 @@ export default function App() {
               </button>
               <span>工作空间</span>
               <span className="slash">/</span>
-              <strong>{current?.text || "接入指南"}</strong>
+              <strong>{pageName}</strong>
             </div>
             <div className="topbar-actions">
               <span className={`connection-status ${api ? "connected" : ""}`}>
@@ -213,6 +244,7 @@ export default function App() {
                 {api ? "已认证连接" : "尚未连接"}
               </span>
               <button
+                aria-label="连接设置"
                 className="button small connection-button"
                 onClick={() => setConnectionOpen(true)}
               >
@@ -222,34 +254,46 @@ export default function App() {
             </div>
           </div>
           <main id="main" tabIndex={-1}>
-            <Routes>
-              <Route
-                path="/"
-                element={<Navigate to="/experiments" replace />}
-              />
-              <Route path="/experiments" element={<ExperimentsPage />} />
-              <Route path="/experiments/:id" element={<ExperimentPage />} />
-              <Route path="/comparison" element={<ComparisonPage />} />
-              <Route path="/targets" element={<CatalogPage kind="targets" />} />
-              <Route
-                path="/datasets"
-                element={<CatalogPage kind="datasets" />}
-              />
-              <Route path="/scorers" element={<CatalogPage kind="scorers" />} />
-              <Route path="/operations" element={<OperationsPage />} />
-              <Route path="/guide" element={<GuidePage />} />
-              <Route
-                path="*"
-                element={
-                  <div className="not-found">
-                    <h1>页面不存在</h1>
-                    <NavLink className="button primary" to="/experiments">
-                      返回实验
-                    </NavLink>
-                  </div>
-                }
-              />
-            </Routes>
+            <Suspense fallback={<Loading label="正在打开页面" />}>
+              <Routes>
+                <Route
+                  path="/"
+                  element={<Navigate to="/experiments" replace />}
+                />
+                <Route path="/experiments" element={<ExperimentsPage />} />
+                <Route path="/experiments/:id" element={<ExperimentPage />} />
+                <Route
+                  path="/experiments/:id/cases/:runId"
+                  element={<CaseWorkspacePage />}
+                />
+                <Route path="/comparison" element={<ComparisonPage />} />
+                <Route
+                  path="/targets"
+                  element={<CatalogPage kind="targets" />}
+                />
+                <Route
+                  path="/datasets"
+                  element={<CatalogPage kind="datasets" />}
+                />
+                <Route
+                  path="/scorers"
+                  element={<CatalogPage kind="scorers" />}
+                />
+                <Route path="/operations" element={<OperationsPage />} />
+                <Route path="/guide" element={<GuidePage />} />
+                <Route
+                  path="*"
+                  element={
+                    <div className="not-found">
+                      <h1>页面不存在</h1>
+                      <NavLink className="button primary" to="/experiments">
+                        返回实验
+                      </NavLink>
+                    </div>
+                  }
+                />
+              </Routes>
+            </Suspense>
           </main>
           <footer className="page-footer">
             <span>
@@ -282,40 +326,45 @@ function ConnectionDialog({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
   async function submit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     const client = new Api(token.trim());
+    const controller = new AbortController();
+    pending.current?.abort();
+    pending.current = controller;
     try {
       await client.request("/v1/operations", {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(15000),
+        ]),
       });
+      if (controller.signal.aborted) return;
       onConnect(client);
     } catch (e) {
-      setError(e);
+      if (!controller.signal.aborted) setError(e);
     } finally {
       setBusy(false);
     }
   }
   return (
     <Dialog
-      title="连接控制后端"
+      title="连接实验空间"
       subtitle="用项目令牌打开你的实验空间。"
       onClose={onClose}
     >
       <form onSubmit={submit} className="form">
-        <div className="endpoint">
-          <span className="status-dot" />
-          <span>同源 API 代理</span>
-          <code>/api → 控制后端</code>
-        </div>
         <Field
           label="项目令牌"
           hint="支持 read 与 manage 令牌。令牌仅保留在当前页面内存中，刷新后需重新连接。"
         >
           <input
             type="password"
+            disabled={busy}
             required
             autoComplete="off"
             placeholder="输入 Bearer 令牌"
@@ -323,14 +372,14 @@ function ConnectionDialog({
             onChange={(e) => setToken(e.target.value)}
           />
         </Field>
-        <div className="notice">
-          <CircleHelp size={17} />
+        <details className="connection-help">
+          <summary>如何获取项目令牌？</summary>
           <p>
             先启动 PostgreSQL、迁移和 API，再用{" "}
             <code>eyes-admin bootstrap</code> 获取令牌。开发代理默认连接{" "}
             <code>127.0.0.1:8000</code>。
           </p>
-        </div>
+        </details>
         {error != null && <ErrorNotice error={error} />}
         <div className="form-actions">
           {current && (
