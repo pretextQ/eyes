@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from eyes.server.config import Settings
-from eyes.server.storage.database import database
+from eyes.server.storage.database import database, maintenance_lock
 from eyes.server.storage.models import Credential, Project, TargetVersion
 
 
@@ -49,6 +49,7 @@ def main():
     engine, sessions = database(Settings())
     try:
         with sessions() as session, session.begin():
+            maintenance_lock(session)
             if args.command == "bootstrap":
                 if args.execution_limit < 1 or args.score_limit < 1:
                     parser.error("capacity limits must be positive")

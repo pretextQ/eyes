@@ -24,6 +24,8 @@ eyes-server = "eyes.server.main:main"
 eyes-scheduler = "eyes.server.scheduling.worker:main"
 eyes-admin = "eyes.server.admin:main"
 eyes-runner = "eyes.runner.main:main"
+eyes = "eyes.cli.main:main"
+eyes-ops = "eyes.server.operations.main:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]

@@ -1,4 +1,5 @@
 import secrets
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -12,15 +13,41 @@ from eyes.server.storage.models import (
     Attempt,
     CaseRun,
     CaseVersion,
+    EvidenceWait,
     Experiment,
     Manifest,
     ScoreRun,
     ScorerVersion,
     WorkItem,
+    now,
 )
 
 
-def enqueue(session: Session, attempt: Attempt, manifest: Manifest, scorer_ids=None):
+def missing_evidence(attempt, manifest, scorer):
+    evidence = manifest.content
+    available = {"input"}
+    if (evidence.get("result") or {}).get("output") is not None:
+        available.add("output")
+    if evidence["event_ids"]:
+        available.add("events")
+    if evidence["artifact_ids"]:
+        available.add("artifacts")
+    if evidence["status"] == "sealed" and evidence["dropped_events"] == 0:
+        available.add("sealed")
+    return set(scorer["required_evidence"]) - available
+
+
+def enqueue(
+    session: Session,
+    attempt: Attempt,
+    manifest: Manifest,
+    scorer_ids=None,
+    *,
+    allow_wait=False,
+    skipped=False,
+):
+    if attempt.evidence_expired_at:
+        raise DomainError(410, "evidence_expired", "expired evidence cannot be scored")
     run = session.get(CaseRun, attempt.case_run_id)
     experiment = session.get(Experiment, run.experiment_id)
     created = []
@@ -29,17 +56,17 @@ def enqueue(session: Session, attempt: Attempt, manifest: Manifest, scorer_ids=N
         if scorer_ids is not None and scorer_id not in scorer_ids:
             continue
         scorer = snapshot["content"]
-        evidence = manifest.content
-        available = {"input"}
-        if attempt.result and attempt.result.get("output") is not None:
-            available.add("output")
-        if evidence["event_ids"]:
-            available.add("events")
-        if evidence["artifact_ids"]:
-            available.add("artifacts")
-        if evidence["status"] == "sealed" and evidence["dropped_events"] == 0:
-            available.add("sealed")
-        missing = set(scorer["required_evidence"]) - available
+        missing = missing_evidence(attempt, manifest, scorer)
+        wait_seconds = experiment.snapshot["request"].get("evidence_wait_seconds", 0)
+        if missing and allow_wait and wait_seconds:
+            session.add(
+                EvidenceWait(
+                    attempt_id=attempt.id,
+                    scorer_id=scorer_id,
+                    deadline=now() + timedelta(seconds=wait_seconds),
+                )
+            )
+            continue
         score = ScoreRun(
             attempt_id=attempt.id,
             scorer_id=scorer_id,
@@ -47,7 +74,12 @@ def enqueue(session: Session, attempt: Attempt, manifest: Manifest, scorer_ids=N
             trace_id=secrets.token_hex(16),
             root_span_id=secrets.token_hex(8),
         )
-        if missing:
+        if skipped:
+            score.status = "skipped"
+            score.result = ScoreOutput(
+                status="skipped", reason="experiment cancelled while waiting for evidence"
+            ).model_dump(mode="json")
+        elif missing:
             score.status = "insufficient_evidence"
             score.result = ScoreOutput(
                 status="insufficient_evidence",
@@ -55,7 +87,7 @@ def enqueue(session: Session, attempt: Attempt, manifest: Manifest, scorer_ids=N
             ).model_dump(mode="json")
         session.add(score)
         session.flush()
-        if not missing:
+        if not missing and not skipped:
             session.add(
                 WorkItem(
                     project_id=experiment.project_id,
@@ -78,6 +110,8 @@ def score_input(session: Session, score: ScoreRun):
     attempt = session.get(Attempt, score.attempt_id)
     run = session.get(CaseRun, attempt.case_run_id)
     manifest = session.get(Manifest, score.manifest_id)
+    if attempt.evidence_expired_at:
+        raise DomainError(410, "evidence_expired", "evidence payloads have expired")
     return {
         "schema_version": "1.0",
         "score_run_id": score.id,
@@ -132,6 +166,12 @@ def complete(session: Session, score: ScoreRun, output: ScoreOutput, store: Arti
 
 
 def rescore(session: Session, attempt: Attempt):
+    if session.scalar(
+        select(EvidenceWait.id).where(
+            EvidenceWait.attempt_id == attempt.id, EvidenceWait.status == "waiting"
+        )
+    ):
+        raise DomainError(409, "evidence_waiting", "initial scoring is still waiting for evidence")
     if attempt.status != "succeeded":
         raise DomainError(409, "execution_not_successful", "ordinary re-scoring requires success")
     manifest = session.scalar(
@@ -143,3 +183,53 @@ def rescore(session: Session, attempt: Attempt):
     if manifest is None:
         raise DomainError(409, "missing_manifest", "evidence manifest is not available")
     return enqueue(session, attempt, manifest)
+
+
+def advance_waits(session, *, experiment_id=None, cancel=False):
+    query = select(EvidenceWait).join(Attempt).join(CaseRun).where(EvidenceWait.status == "waiting")
+    if experiment_id is not None:
+        query = query.where(CaseRun.experiment_id == experiment_id)
+    changed = set()
+    for wait in session.scalars(
+        query.order_by(EvidenceWait.deadline, EvidenceWait.id).with_for_update(of=EvidenceWait)
+    ):
+        attempt = session.scalar(
+            select(Attempt).where(Attempt.id == wait.attempt_id).with_for_update()
+        )
+        manifest = session.scalar(
+            select(Manifest)
+            .where(
+                Manifest.attempt_id == attempt.id,
+                Manifest.created_at <= (now() if cancel else min(now(), wait.deadline)),
+            )
+            .order_by(Manifest.version.desc())
+            .limit(1)
+        )
+        scorer = session.get(ScorerVersion, wait.scorer_id)
+        if (
+            cancel
+            or wait.deadline <= now()
+            or not missing_evidence(attempt, manifest, scorer.content)
+        ):
+            enqueue(session, attempt, manifest, [wait.scorer_id], skipped=cancel)
+            wait.status = "cancelled" if cancel else "completed"
+            changed.add(session.get(CaseRun, attempt.case_run_id).experiment_id)
+    session.flush()
+    return changed
+
+
+def retry(session, project_id, score_id):
+    original = session.scalar(
+        select(ScoreRun)
+        .join(Attempt)
+        .where(ScoreRun.id == score_id, Attempt.project_id == project_id)
+    )
+    if original is None:
+        raise DomainError(404, "not_found", "score not found in this project")
+    if original.status != "error":
+        raise DomainError(409, "score_not_failed", "only scorer errors can be retried")
+    attempt = session.get(Attempt, original.attempt_id)
+    manifest = session.get(Manifest, original.manifest_id)
+    # A retry keeps precisely the same evidence; explicit rescore selects newer evidence.
+    scores = enqueue(session, attempt, manifest, [original.scorer_id])
+    return scores[0]

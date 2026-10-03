@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,15 @@ bearer = HTTPBearer(auto_error=False)
 def db_session(request: Request):
     try:
         with request.app.state.sessions() as session, session.begin():
+            # Acquire only when a database transaction actually starts. Requests
+            # missing a bearer token can still fail with 401 while DB is offline.
+            event.listen(
+                session,
+                "after_begin",
+                lambda session, transaction, connection: connection.exec_driver_sql(
+                    "SELECT pg_advisory_xact_lock_shared(74000)"
+                ),
+            )
             yield session
     except OperationalError as exc:
         raise DomainError(503, "database_unavailable", "database is not available") from exc

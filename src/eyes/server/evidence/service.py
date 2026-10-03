@@ -22,6 +22,7 @@ from eyes.server.storage.models import (
     Runner,
     ScoreRun,
     WorkItem,
+    now,
 )
 
 
@@ -54,6 +55,8 @@ def authorize_attempt(session: Session, credential: Credential, attempt_id: UUID
 
 
 def seal(session: Session, attempt: Attempt) -> Manifest:
+    if attempt.evidence_expired_at:
+        raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
     run = session.get(CaseRun, attempt.case_run_id)
     events = session.scalars(
         select(Event).where(Event.attempt_id == attempt.id).order_by(Event.created_at, Event.id)
@@ -110,6 +113,8 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
     changed = set()
     for event in batch.events:
         attempt = attempts[event.attempt_id]
+        if attempt.evidence_expired_at:
+            raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
         if event.trace_id != attempt.trace_id and attempt.trace_id not in event.linked_trace_ids:
             raise DomainError(
                 422, "missing_trace_link", "external trace must explicitly link to attempt trace"
@@ -161,6 +166,8 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
 
 
 def view(session: Session, manifest: Manifest):
+    if manifest.expired_at:
+        raise DomainError(410, "evidence_expired", "evidence payloads have expired")
     content = manifest.content
     events = [session.get(Event, UUID(eid)).content for eid in content["event_ids"]]
     artifacts = [public_record(session.get(Artifact, UUID(aid))) for aid in content["artifact_ids"]]
@@ -217,8 +224,11 @@ def publish_artifact(
     content: bytes,
     store: ArtifactStore,
 ):
-    artifact = scoped(session, Artifact, artifact_id, credential.project_id, lock=True)
+    artifact = scoped(session, Artifact, artifact_id, credential.project_id)
     attempt = authorize_attempt(session, credential, artifact.attempt_id, lock=True)
+    session.refresh(artifact, with_for_update=True)
+    if attempt.evidence_expired_at or artifact.status == "expired":
+        raise DomainError(410, "evidence_expired", "expired artifact cannot be republished")
     metadata = artifact.metadata_content
     if (
         len(content) != metadata["size"]
@@ -242,7 +252,9 @@ def initiate_artifact(
     metadata: ArtifactMetadata,
     max_bytes: int,
 ):
-    authorize_attempt(session, credential, attempt_id, lock=True)
+    attempt = authorize_attempt(session, credential, attempt_id, lock=True)
+    if attempt.evidence_expired_at:
+        raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
     if metadata.size > max_bytes:
         raise DomainError(413, "artifact_too_large", "artifact exceeds configured size limit")
     content = metadata.model_dump(mode="json")
@@ -296,3 +308,34 @@ def download_path(
     if artifact.status != "ready" or not path.is_file():
         raise DomainError(410, "artifact_unavailable", "artifact is pending, missing or expired")
     return path
+
+
+def close(session, credential, attempt_id, request):
+    attempt = authorize_attempt(session, credential, attempt_id, lock=True)
+    if attempt.evidence_expired_at:
+        raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
+    if attempt.finished_at is None or attempt.status == "unknown":
+        raise DomainError(
+            409, "execution_unresolved", "finish or reconcile execution before closing evidence"
+        )
+    if request.status == "sealed" and session.scalar(
+        select(Artifact.id)
+        .where(Artifact.attempt_id == attempt_id, Artifact.status == "pending")
+        .limit(1)
+    ):
+        raise DomainError(409, "uploads_pending", "pending uploads prevent sealing evidence")
+    update = {
+        "evidence_status": request.status,
+        "dropped_events": request.dropped_events,
+        "evidence_details": redact(request.details),
+    }
+    if all((attempt.result or {}).get(k) == v for k, v in update.items()):
+        return session.scalar(
+            select(Manifest)
+            .where(Manifest.attempt_id == attempt.id)
+            .order_by(Manifest.version.desc())
+            .limit(1)
+        )
+    attempt.result = {**(attempt.result or {}), **update, "evidence_closed_at": now().isoformat()}
+    attempt.evidence_status = request.status
+    return seal(session, attempt)

@@ -139,6 +139,7 @@ class Attempt(Record):
     cleanup_status: Mapped[str] = mapped_column(String(30), default="pending")
     evidence_status: Mapped[str] = mapped_column(String(30), default="collecting")
     result: Mapped[dict | None] = mapped_column(JSONB)
+    evidence_expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Manifest(Record):
@@ -148,6 +149,7 @@ class Manifest(Record):
     version: Mapped[int]
     content: Mapped[dict] = mapped_column(JSONB)
     digest: Mapped[str] = mapped_column(String(64))
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ScoreRun(Record):
@@ -160,6 +162,7 @@ class ScoreRun(Record):
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(30), default="queued")
     result: Mapped[dict | None] = mapped_column(JSONB)
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WorkItem(Record):
@@ -209,6 +212,7 @@ class Event(Record):
     event_id: Mapped[UUID]
     digest: Mapped[str] = mapped_column(String(64))
     content: Mapped[dict] = mapped_column(JSONB)
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Artifact(Record):
@@ -226,3 +230,24 @@ class ResolutionRecord(Record):
     credential_id: Mapped[UUID] = mapped_column(ForeignKey("credentials.id"))
     previous_status: Mapped[str] = mapped_column(String(30))
     content: Mapped[dict] = mapped_column(JSONB)
+
+
+class EvidenceWait(Record):
+    __tablename__ = "evidence_waits"
+    __table_args__ = (UniqueConstraint("attempt_id", "scorer_id"),)
+    attempt_id: Mapped[UUID] = mapped_column(ForeignKey("attempts.id"), index=True)
+    scorer_id: Mapped[UUID] = mapped_column(ForeignKey("scorer_versions.id"))
+    deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="waiting")
+
+
+class ComparisonReport(Record):
+    __tablename__ = "comparison_reports"
+    __table_args__ = (UniqueConstraint("project_id", "request_key"),)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
+    baseline_id: Mapped[UUID] = mapped_column(ForeignKey("experiments.id"))
+    candidate_id: Mapped[UUID] = mapped_column(ForeignKey("experiments.id"))
+    request_key: Mapped[str] = mapped_column(String(200))
+    request_digest: Mapped[str] = mapped_column(String(64))
+    content: Mapped[dict] = mapped_column(JSONB)
+    digest: Mapped[str] = mapped_column(String(64))

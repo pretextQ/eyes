@@ -3,11 +3,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import func, select
+from starlette.background import BackgroundTask
 
+from eyes.contracts.comparison import ComparisonCreate
 from eyes.contracts.dataset import CaseDefinition, DatasetImport
-from eyes.contracts.evidence import ArtifactMetadata, EventBatch, ExecutionEvent
+from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose, ExecutionEvent
 from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput, ScorerPublish
 from eyes.contracts.target import (
     ExecutionInput,
@@ -32,13 +34,17 @@ from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.database import scheduling_lock
 from eyes.server.storage.models import (
     Attempt,
+    CaseRun,
+    ComparisonReport,
     Credential,
     DatasetVersion,
     Event,
+    EvidenceWait,
     Experiment,
     Manifest,
     ResolutionRecord,
     Runner,
+    ScoreRun,
     ScorerVersion,
     TargetVersion,
     WorkItem,
@@ -250,7 +256,6 @@ def rescore_attempt(attempt_id: UUID, session: Database, user: Manager):
     scheduling_lock(session)
     attempt = scoped(session, Attempt, attempt_id, user.project_id, lock=True)
     scores = evaluation.rescore(session, attempt)
-    from eyes.server.storage.models import CaseRun
 
     scheduling.refresh_experiment(session, session.get(CaseRun, attempt.case_run_id).experiment_id)
     return collection(scores)
@@ -261,6 +266,14 @@ def get_attempt(attempt_id: UUID, session: Database, user: Reader):
     attempt = scoped(session, Attempt, attempt_id, user.project_id)
     return {
         **record(attempt),
+        "evidence_waits": [
+            public_record(w)
+            for w in session.scalars(
+                select(EvidenceWait)
+                .where(EvidenceWait.attempt_id == attempt.id)
+                .order_by(EvidenceWait.created_at, EvidenceWait.id)
+            )
+        ],
         "resolutions": [
             public_record(r)
             for r in session.scalars(
@@ -345,10 +358,22 @@ async def upload_artifact(
 @router.get("/artifacts/{artifact_id}/content")
 def download_artifact(artifact_id: UUID, session: Database, user: ArtifactReader, request: Request):
     path = evidence.download_path(session, user, artifact_id, request.app.state.artifacts)
-    return FileResponse(
-        path,
+    # Open while the transaction's maintenance lock still protects the path.
+    # POSIX keeps this descriptor valid if retention unlinks after authorization.
+    stream = path.open("rb")
+
+    def chunks():
+        try:
+            while chunk := stream.read(64 * 1024):
+                yield chunk
+        finally:
+            stream.close()
+
+    return StreamingResponse(
+        chunks(),
         media_type="application/octet-stream",
         headers={"Content-Disposition": "attachment", "X-Content-Type-Options": "nosniff"},
+        background=BackgroundTask(stream.close),
     )
 
 
@@ -362,6 +387,12 @@ def operations(session: Database, user: Reader):
     runners = session.scalars(
         select(Runner).join(Credential).where(Credential.project_id == user.project_id)
     ).all()
+    dropped = Attempt.result["dropped_events"].as_integer()
+    drop_summary = session.execute(
+        select(func.sum(dropped), func.count(Attempt.id).filter(dropped.is_(None))).where(
+            Attempt.project_id == user.project_id
+        )
+    ).one()
     return {
         "schema_version": "1.0",
         "observed_at": now(),
@@ -369,12 +400,32 @@ def operations(session: Database, user: Reader):
             {"kind": kind, "status": status, "count": count} for kind, status, count in counts
         ],
         "runners": [public_record(r) for r in runners],
+        "event_drops": {"reported_total": drop_summary[0], "unknown_attempts": drop_summary[1]},
+        "waiting_evidence": session.scalar(
+            select(func.count())
+            .select_from(EvidenceWait)
+            .join(Attempt)
+            .where(Attempt.project_id == user.project_id, EvidenceWait.status == "waiting")
+        ),
+        "oldest_queued_at": session.scalar(
+            select(func.min(WorkItem.created_at)).where(
+                WorkItem.project_id == user.project_id, WorkItem.status == "queued"
+            )
+        ),
+        "score_errors": session.scalar(
+            select(func.count())
+            .select_from(ScoreRun)
+            .join(Attempt)
+            .where(Attempt.project_id == user.project_id, ScoreRun.status == "error")
+        ),
     }
 
 
 @router.get("/contracts")
 def contract_schemas(user: Reader):
     models = [
+        ComparisonCreate,
+        EvidenceClose,
         TargetPublish,
         ExecutionInput,
         ExecutionResult,
@@ -391,3 +442,70 @@ def contract_schemas(user: Reader):
         "schema_version": "1.0",
         "schemas": {model.__name__: model.model_json_schema() for model in models},
     }
+
+
+@router.post("/comparisons", status_code=201)
+def create_comparison(
+    body: ComparisonCreate,
+    session: Database,
+    user: Manager,
+    key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)],
+):
+    from eyes.server.comparison import service
+
+    return record(service.create(session, user.project_id, key, body))
+
+
+@router.get("/comparisons")
+def list_comparisons(session: Database, user: Reader, limit: Limit = 50, offset: Offset = 0):
+    return collection(
+        session.scalars(
+            select(ComparisonReport)
+            .where(ComparisonReport.project_id == user.project_id)
+            .order_by(ComparisonReport.created_at.desc(), ComparisonReport.id)
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+
+
+@router.get("/comparisons/{report_id}")
+def get_comparison(report_id: UUID, session: Database, user: Reader):
+    return record(scoped(session, ComparisonReport, report_id, user.project_id))
+
+
+@router.get("/comparisons/{report_id}/gate")
+def comparison_gate(report_id: UUID, session: Database, user: Reader):
+    report = scoped(session, ComparisonReport, report_id, user.project_id)
+    return {
+        "schema_version": "1.0",
+        "report_id": report.id,
+        "report_digest": report.digest,
+        **report.content["gate"],
+    }
+
+
+@router.post("/attempts/{attempt_id}/evidence-close")
+def close_evidence(
+    attempt_id: UUID, body: EvidenceClose, session: Database, runner: RunnerIdentity
+):
+    scheduling_lock(session)
+    manifest = evidence.close(session, runner, attempt_id, body)
+    from eyes.server.storage.models import CaseRun
+
+    attempt = session.get(Attempt, attempt_id)
+    run = session.get(CaseRun, attempt.case_run_id)
+    for experiment_id in evaluation.advance_waits(session, experiment_id=run.experiment_id):
+        scheduling.refresh_experiment(session, experiment_id)
+    return record(manifest)
+
+
+@router.post("/score-runs/{score_id}/retry", status_code=201)
+def retry_score(score_id: UUID, session: Database, user: Manager):
+    from eyes.server.storage.models import CaseRun
+
+    scheduling_lock(session)
+    score = evaluation.retry(session, user.project_id, score_id)
+    attempt = session.get(Attempt, score.attempt_id)
+    scheduling.refresh_experiment(session, session.get(CaseRun, attempt.case_run_id).experiment_id)
+    return record(score)

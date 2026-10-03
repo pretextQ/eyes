@@ -2,7 +2,7 @@
 
 Eyes 的产品目标是成为 Agent 测试与执行观测平台，支持外部测试集、自定义评分、并发执行和过程追踪，并通过版本记录、回归对比及评分证据帮助开发者验证修改效果。
 
-当前已实现控制后端基础、独立 Runner、通用 HTTP 与本地 Python 接入、独立规则/Python 评分进程、SDK 采集和 Web 控制台。前端已实现独立执行审阅、配置对比与状态引导，类型、lint 与构建检查通过；本地真实 API 的认证、版本发布、JSONL 导入和实验入队已通过浏览器检查，含执行事件和评分的完整流程尚未验收。API 基础运行、静态检查与 Runner CLI 已验证；按本次要求暂缓两个真实 Agent 联调，PostgreSQL 事务和 M0/M1 验收仍未完成。下文记录完整产品目标，并不表示所有能力已经交付。
+当前已实现控制后端、独立 Runner、HTTP/Python 接入、独立评分进程、SDK 与 Web 控制台。平台现已加入持久化回归报告、CI 门槛与开发者 CLI、服务端证据等待、评分取消/重试、证据保留清理，以及存储审计和备份恢复工具。当前迁移为 `0002_platform`。真实 Agent 接入和联调按要求放在最后，执行/评分、并发故障恢复及容量验收仍待完成。实现范围见 [平台功能说明](docs/platform.md)，本轮实际验证见 [平台验证记录](docs/platform-validation.md)。下文的完整产品目标不等同于全部验收通过。
 
 系统边界、技术选择、接入契约、故障处理和交付阶段见 [首版架构方案](docs/architecture.md)。当前实现、启动命令、API 清单和 Runner 接入约定见 [后端开发说明](docs/backend.md)，HTTP 协议、本地入口、SDK、评分器与恢复说明见 [Agent 接入文档](docs/agent-integration.md)，验证记录见 [后端验证记录](docs/backend-validation.md)。
 
@@ -31,7 +31,7 @@ npm run dev
 
 打开 `http://127.0.0.1:5173/`，在右上角“连接设置”输入项目令牌。控制台包含实验、用例执行证据、目标接入、JSONL 测试集、评分口径、结果并列核对与运行状态；未连接时显示连接引导。开发请求经 `/api` 代理到控制 API，令牌仅在当前页面内存中保存。
 
-完整前端启动、配置、Compose 部署及验证边界见 [Web 控制台说明](docs/frontend.md)，本轮优化、截图和剩余差距见 [前端质量记录](docs/frontend-quality.md)。结果并列核对尚不提供服务端回归报告和 CI 门槛。Compose 已配置前端入口 `http://127.0.0.1:8080/`，容器启动仍待验证。
+完整前端启动、配置、Compose 部署及验证边界见 [Web 控制台说明](docs/frontend.md)，本轮优化、截图和剩余差距见 [前端质量记录](docs/frontend-quality.md)。Web 当前保留结果并列审阅；固定回归报告和 CI 门槛通过 API/CLI 使用。Compose 默认前端入口为 `http://127.0.0.1:8080/`，部署验证范围见平台验证记录。
 
 ## 启动 Agent Runner
 
@@ -114,7 +114,7 @@ uv run eyes-runner --config runner.toml run
 
 ## 建议的数据对象
 
-以下关联已进入公共契约与控制端基础模型；完整产品查询和回归对比仍需后续实现。
+以下关联已进入公共契约与控制端模型，固定回归报告通过 API/CLI 提供。
 
 | 对象 | 职责 |
 | --- | --- |
@@ -138,8 +138,20 @@ uv run eyes-runner --config runner.toml run
 
 这些是完整流程的验收要求。当前检查证据见 [验证记录](docs/backend-validation.md)，真实 Agent 执行、评分和故障恢复按本次要求暂缓验收。
 
-## 下一步实现
+## 后续验收
 
-公共契约、数据库迁移、控制 API、独立 Runner、HTTP/Python 适配器和独立评分进程已有实现。后续在可运行的 PostgreSQL 环境验证事务与状态流转，并在恢复联调时用两个真实 Agent 验收完整流程；Web 控制台已检查连接、配置发布、入队、独立审阅空状态及配置对比，真实事件、评分引用定位和完整交互验收仍待完成；服务端回归报告与质量门槛继续按架构阶段推进。
+先完成平台能力，再接入两个真实 Agent 验证执行、评分、证据等待、取消及故障恢复。Web 新增回归报告和运维交互可继续基于公开 API 接入；真实事件、评分引用定位及完整产品交互仍需实际任务验收。
+
+## 回归与运维命令
+
+```sh
+uv run eyes --help
+uv run eyes compare --file comparison.json --key release-comparison
+uv run eyes gate REPORT_UUID
+uv run eyes-ops audit
+uv run eyes-ops maintain
+```
+
+`eyes gate` 以 0/1/2/3 区分通过、失败、无法判定和配置/服务错误。`eyes-ops maintain` 默认只预览，`--apply` 执行清理。请求格式、升级边界、备份恢复和保留配置见 [平台功能说明](docs/platform.md)。
 
 优先使用真实项目验证这些契约。首版暂不扩展攻击样例库、Agent 构建器、自动修复或大规模框架适配；这些能力需要另行评估和确认范围。

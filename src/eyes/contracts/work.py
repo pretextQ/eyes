@@ -15,6 +15,7 @@ class ExperimentCreate(Contract):
     concurrency: int = Field(default=1, ge=1, le=1000)
     timeout_seconds: int = Field(default=300, ge=1, le=86400)
     repetitions: int = Field(default=1, ge=1, le=100)
+    evidence_wait_seconds: int = Field(default=60, ge=0, le=86400)
     attempt_selection: Literal["first_success"] = "first_success"
     parent_experiment_id: UUID | None = None
 

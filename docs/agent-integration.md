@@ -255,3 +255,10 @@ Runner 使用服务端 deadline 控制墙钟超时；心跳只续租，不延长
 此前给 `ExecutionResult` 增加可选 `evidence_details`，给 `ScoreInput` 增加可选 `execution_root_span_id` 和 `deadline`，给 `ExecutionInput` 增加可选 `artifact_requirements`。本次审查修复增加注册字段 `python_agents/http_origins`、结果字段 `completed_at`、契约 `ScoreAssignment` 和读取完整评分输入的接口，改变评分领取 payload 的结构。它们使用已有 JSON 字段和截止时间，不需要数据库迁移。协议仍是未发布原型的 1.0，控制端、scheduler 与 Runner 必须同步升级到本源码版本。旧注册缺少别名或 origin 时，不会获得相应 Python/HTTP 工作；持有额度时不能改变注册能力，应在升级前结束或核对旧工作。
 
 已实现的通用接口不意味着目标已通过验证。HTTP/Python 两个真实 Agent 的完整执行、评分、证据查询以及 PostgreSQL 并发、故障和恢复验收按用户要求暂缓。前端已有实现与未连接状态的浏览器验证，见 [前端记录](frontend.md)。回归报告、CI 质量门槛、完整保留删除和部署验收仍属于后续工作。
+
+
+## 2026-10-03：证据等待和封存
+
+平台迁移升级到 `0002_platform`。新实验的 `evidence_wait_seconds` 默认为 60，历史实验缺省按 0 处理；该等待发生在服务端，独立于 Runner 本地上传等待配置。Runner 将执行完成上报与证据上传分别确认，迟到证据清空后持久化提交 evidence-close，收到确认再清理正常工作目录。真实采集缺口不会因上传成功被改成 sealed。
+
+`POST /v1/attempts/{id}/evidence-close` 使用执行 Runner 令牌及原 Attempt 授权，提交 status、dropped_events、details；不会改变已发布评分。服务端等待截止之后的证据需显式 rescore。评分 retry 保留原清单，rescore 选择最新清单。升级顺序、取消行为及接口说明见 [平台说明](platform.md)。真实 Agent 联调仍按要求放在最后。

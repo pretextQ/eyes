@@ -54,3 +54,9 @@ class ArtifactMetadata(Contract):
     media_type: str = Field(default="application/octet-stream", max_length=120)
     size: int = Field(ge=0)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class EvidenceClose(Contract):
+    status: Literal["sealed", "partial", "unavailable"]
+    dropped_events: int = Field(ge=0)
+    details: Payload = Field(default_factory=dict)

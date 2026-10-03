@@ -15,9 +15,9 @@
 | 部署 | Alembic 初始迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移服务 |
 | 实际执行组件 | 宿主机 Runner、HTTP/Python 适配器、独立规则/Python 评分进程、SDK、插件摘要与本地状态 CLI 已实现；真实目标联调暂缓 |
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，结果比较为事实并列视图；验证边界见 [前端说明](frontend.md) |
-| 完整产品与运维 | 回归比较、质量门槛、服务端自动等待证据策略、保留删除与文件回收自动化、完整备份恢复验收待实现 |
+| 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
 
-代码实现的调度和持久化能力尚需 PostgreSQL 实测。当前已运行的检查不证明多 Runner 并发、任务取消或故障恢复可靠。
+本轮 PostgreSQL 验证覆盖迁移、报告持久化、排队取消和数据库备份恢复，见 [平台验证记录](platform-validation.md)。多 Runner、活动任务取消、含执行证据的恢复及真实 Agent 链路仍待验收。
 
 ## 本机运行
 
@@ -52,7 +52,7 @@ API 默认监听 `127.0.0.1:8000`。更改监听参数可直接运行：
 uv run uvicorn eyes.server.api.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-`/docs` 和 `/openapi.json` 提供接口说明。`/health/live` 检查进程；`/health/ready` 检查数据库连接和迁移版本，未就绪返回 503。就绪检查目前不校验产物卷的可写性。
+`/docs` 和 `/openapi.json` 提供接口说明。`/health/live` 检查进程；`/health/ready` 检查数据库连接和迁移版本，未就绪返回 503。就绪检查同时验证产物卷可写性。
 
 ## Compose
 
@@ -70,7 +70,7 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml exec api eyes-admin
 
 Compose 等待 PostgreSQL 健康后执行迁移，再启动 API 和调度进程。相关依赖条件见 [Docker Compose 文档](https://docs.docker.com/compose/how-tos/startup-order)。PostgreSQL 18 的持久卷挂载在 `/var/lib/postgresql`，与 [官方镜像的目录约定](https://hub.docker.com/_/postgres)一致。
 
-数据库和 API 端口都只映射到本机。数据库与证据分别使用独立数据卷。当前 Compose 包含控制端和 Web 控制台，本机前端端口为 8080；Runner 在目标宿主机独立运行。容器构建和启动尚未验证。
+数据库和 API 端口都只映射到本机。数据库与证据分别使用独立数据卷。当前 Compose 包含控制端和 Web 控制台，本机前端端口为 8080；Runner 在目标宿主机独立运行。本轮部署的实际验证范围见 [平台验证记录](platform-validation.md)。
 
 ## 令牌及项目范围
 
@@ -179,28 +179,28 @@ ScorerVersion 冻结插件标识、实现摘要、配置、证据要求、超时
 
 领取、额度判断、令牌及恢复使用同一组按固定顺序获取的 PostgreSQL 事务 advisory lock。额度从 `reserved` 工作项计算；未知执行仍计入全局、项目和稳定目标的执行容量。符合条件的队列使用 `FOR UPDATE OF work_items SKIP LOCKED` 领取。初版将这些事务串行协调，吞吐需实测；不承诺公平性或外部副作用恰好一次执行。
 
-完整评分输入读取只校验项目、身份、工作范围、有效租约与计算期限，不持有全局调度锁；只读取已分配的固定清单。`EYES_MAX_SCORE_INPUT_BYTES` 控制响应大小，Runner 使用相同的 `max_score_input_bytes`。API 与 scheduler 的 `EYES_SCORE_SUBMISSION_GRACE_SECONDS` 必须一致；提交宽限不延长计算期限，也不恢复已失效租约。完成结果与证据在 Runner 中分别发送，证据的重试不会阻塞结果发送锁。此次协议变化要求三类进程同步升级，无新增数据库迁移，详见 [接入兼容性](agent-integration.md#6-兼容性与验收边界)。
+完整评分输入读取只校验项目、身份、工作范围、有效租约与计算期限，不持有全局调度锁；只读取已分配的固定清单。`EYES_MAX_SCORE_INPUT_BYTES` 控制响应大小，Runner 使用相同的 `max_score_input_bytes`。API 与 scheduler 的 `EYES_SCORE_SUBMISSION_GRACE_SECONDS` 必须一致；提交宽限不延长计算期限，也不恢复已失效租约。完成结果与证据在 Runner 中分别发送，证据的重试不会阻塞结果发送锁。上述评分输入协议变更要求三类进程同步升级；最新平台功能另需 `0002_platform`，详见 [平台升级说明](platform.md) 及 [接入兼容性](agent-integration.md#6-兼容性与验收边界)。
 
-数据库触发器保护版本、事件、清单、核对记录、实验配置和已发布评分的不可变内容。Attempt 的核对会保留先前结果及来源，已固定清单保存自己的执行结果副本。
+数据库触发器保护版本、事件、清单、核对记录、实验配置、已发布评分和回归报告；事件与清单仅允许按严格过期规则清除载荷，保留原摘要与标识。Attempt 的核对会保留先前结果及来源，已固定清单保存自己的执行结果副本。
 
-实验 `completed` 表示调度工作已结束；可能仍有执行失败、评分错误或证据不足。存在未知工作时为 `completed_with_unresolved`。结果查询同时展示计划运行数、成功数、评分数、通过数及未解决数，比例返回明确的 numerator/denominator。初版汇总选首个成功 Attempt 和其最早的 ScoreRun；重新评分的完整历史在用例详情中读取，汇总不会自动换成新分数。可选择固定评分快照的回归报告将在 comparison 模块实现。
+实验 `completed` 表示调度工作已结束；可能仍有执行失败、评分错误或证据不足。存在未知工作时为 `completed_with_unresolved`。结果查询同时展示计划运行数、成功数、评分数、通过数及未解决数，比例返回明确的 numerator/denominator。初版汇总选首个成功 Attempt 和其最早的 ScoreRun；重新评分的完整历史在用例详情中读取，汇总不会自动换成新分数。comparison 模块可选择固定 ScoreRun 并生成不可变回归报告。
 
 ## 证据、产物与敏感内容
 
 事件按项目、生产者和 event_id 去重，对原始规范化内容计算摘要。相同 ID、不同内容返回 409 并记录不含载荷的诊断。输入输出、事件、产物均通过清单引用关联；清单冻结执行结果。后到事件或产物产生新清单，原评分继续引用原清单。未报告的丢弃数量为未知，不能默认当作零。
 
-完成执行时按当前清单检查评分前置证据。缺少必需证据则记录 `insufficient_evidence`；Runner 在封存前按配置期限等待上传，待确认或被拒绝的证据标为 partial；服务端自动等候补齐并调度的策略仍待实现。需要纳入迟到证据时显式创建新 ScoreRun。评分的引用必须属于其清单，引用的产物还需可读取。`sealed` 仅表示声明的采集范围封存。
+完成执行时按当前清单检查评分前置证据。新实验按 `evidence_wait_seconds` 等候缺失证据，到期仍不足则记录 `insufficient_evidence`。Runner 将待确认或被拒绝的证据标为 partial，迟到上传完成后通过 evidence-close 追加封存清单。超过服务端等待期的证据需显式重新评分。评分的引用必须属于其清单，引用的产物还需可读取。`sealed` 仅表示声明的采集范围封存。
 
-产物以 Attempt 和完整元数据的摘要确定稳定 UUID，同内容登记重传复用已有记录；先以名称、大小和 SHA-256 登记为 pending，再向服务端指定的 UUID 上传二进制内容。服务端验证大小和摘要，写临时文件、fsync、发布后才登记 ready。原始文件名不参与存储路径，下载采用附件形式。文件已发布但事务未提交时可重传同一 pending 上传；未登记文件、遗留临时文件和长期 pending 的定期回收仍待实现，当前应保留卷并检查上传状态。
+产物以 Attempt 和完整元数据的摘要确定稳定 UUID，同内容登记重传复用已有记录；先以名称、大小和 SHA-256 登记为 pending，再向服务端指定的 UUID 上传二进制内容。服务端验证大小和摘要，写临时文件、fsync、发布后才登记 ready。原始文件名不参与存储路径，下载采用附件形式。文件已发布但事务未提交时可重传同一 pending 上传；`eyes-ops maintain` 提供未登记文件、遗留临时文件和长期 pending 的预览与回收，执行前保护活动工作和证据等待。
 
-目标与评分器配置拒绝已知密钥字段及 URL 内嵌凭据，改用 `secret_refs` 保存运行环境引用。执行结果和事件递归掩码已知敏感字段。自由文本、用例输入和二进制产物需要生产者在上传前脱敏；当前没有通用秘密识别器。JSON 请求默认上限 8 MiB，产物默认 32 MiB。保留与删除策略尚未实现。
+目标与评分器配置拒绝已知密钥字段及 URL 内嵌凭据，改用 `secret_refs` 保存运行环境引用。执行结果和事件递归掩码已知敏感字段。自由文本、用例输入和二进制产物需要生产者在上传前脱敏；当前没有通用秘密识别器。JSON 请求默认上限 8 MiB，产物默认 32 MiB。保留与删除策略由 `eyes-ops` 执行，默认不按年龄删除完整证据；范围见 [平台说明](platform.md)。
 
 API 使用 OTel SDK 创建实际 HTTP 请求 span，接收 W3C Trace Context，并返回 `X-Eyes-Trace-Id`。设置 `EYES_TRACE_CONSOLE_EXPORT=true` 可将这些 span 输出到控制台。Attempt 和 ScoreRun 各有独立 trace context，Runner 创建实际执行根 span，评分根通过 OTel Link 关联执行。执行 span 进入证据接口，评分 trace 当前保留在本机。当前没有 OTLP exporter、查询后端或完整 Agent 内部链路证明。
 
 ## 迁移、备份与后续验收
 
-迁移入口是 `alembic.ini` 和 `migrations/versions/0001_control_plane.py`。迁移只在显式命令/Compose migrate 服务中运行，API 启动不自动建表。升级前备份数据库和证据卷，并记录应用版本与迁移版本。恢复时需要检查每个 ready 产物的路径、大小和摘要，以及评分引用的清单。完整备份恢复命令与演练将在 M4 提供。
+迁移入口是 `alembic.ini` 和 `migrations/versions/`，当前 head 为 `0002_platform`。迁移只在显式命令/Compose migrate 服务中运行，API 启动不自动建表。升级前备份数据库和证据卷，并记录应用版本与迁移版本。恢复时需要检查每个 ready 产物的路径、大小和摘要，以及评分引用的清单。`eyes-ops backup/restore/audit` 提供可执行流程，命令和验证边界见 [平台说明](platform.md)。
 
-已提供的命令为 `eyes-server`、`eyes-scheduler` 和 `eyes-admin`。开发者 CLI 的导入、创建、查询、比较和 CI 门槛清单保持为计划，当前不提供这些可执行命令。
+已提供 `eyes-server`、`eyes-scheduler`、`eyes-admin`、`eyes-runner`、开发者 CLI `eyes` 和运维 CLI `eyes-ops`。新增回归、封存和评分重试端点见 [平台说明](platform.md)。
 
 HTTP 与 Python 通用接入功能已有实现，按本次要求暂缓真实 Agent 联调。后续恢复验收时，在可运行的 PostgreSQL 环境执行迁移，接入两个真实 Agent，运行导入、领取、执行、证据查询和独立评分。之后再验证多 Runner 限额、租约过期、取消、迟到上报和评分故障。原始结果须按 [AGENT.md](../AGENT.md) 的阶段要求保存。

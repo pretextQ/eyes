@@ -199,6 +199,8 @@ class RunnerService:
                 continue
             work = json.loads((directory / "assignment.json").read_bytes())
             self.collect(directory, work)
+            if (directory / "ack.json").exists():
+                self.queue_evidence_close(directory, work)
             if (directory / "result.json").exists() and not (directory / "ack.json").exists():
                 try:
                     self.queue_completion(
@@ -212,6 +214,68 @@ class RunnerService:
                     directory / "quarantine.json",
                     {"reason": "Runner restarted; reconcile the missing result through the API"},
                 )
+
+    def queue_evidence_close(self, directory, work):
+        if work["kind"] != "execute" or (directory / "evidence-ack.json").exists():
+            return
+        result = json.loads((directory / "result.json").read_bytes())["result"]
+        if result["status"] == "unknown":
+            return
+        pending, rejected = self.outbox.evidence(work["work_item_id"])
+        if (
+            pending
+            or rejected
+            or any((directory / "capture" / "events").glob("*.json"))
+            or any((directory / "capture" / "artifacts").glob("*/metadata.json"))
+        ):
+            return
+        # collect() retains source files on transfer failure. With no local files,
+        # pending uploads or rejections, that backlog has now been acknowledged.
+        # Keep the completion-time count for diagnosis without treating it as loss.
+        details = {
+            **result.get("evidence_details", {}),
+            "local_transfer_failures_at_completion": result.get("evidence_details", {}).get(
+                "local_transfer_failures", 0
+            ),
+            "local_transfer_failures": 0,
+            "pending_uploads": 0,
+            "rejected_uploads": 0,
+        }
+        status = result["evidence_status"]
+        if (
+            details.get("producer_evidence_status") == "sealed"
+            and not any(
+                details.get(key)
+                for key in (
+                    "capture_failures",
+                    "truncated_events",
+                    "pending_events",
+                    "artifact_capture_failures",
+                    "local_transfer_failures",
+                    "execution_fact_persistence_failed",
+                )
+            )
+            and result["dropped_events"] == 0
+        ):
+            status = "sealed"
+        try:
+            self.outbox.enqueue(
+                f"evidence-close-{work['work_item_id']}",
+                {
+                    "kind": "evidence_close",
+                    "work_id": work["work_item_id"],
+                    "path": f"v1/attempts/{work['payload']['attempt_id']}/evidence-close",
+                    "journal_dir": str(directory),
+                    "body": {
+                        "schema_version": "1.0",
+                        "status": status,
+                        "dropped_events": result["dropped_events"],
+                        "details": details,
+                    },
+                },
+            )
+        except ValueError:
+            logger.warning("evidence_close_waiting_for_outbox_space work=%s", work["work_item_id"])
 
     async def complete(self, directory, work, lease, result):
         body = {**lease.body, "result": result.model_dump(mode="json")}
@@ -352,6 +416,7 @@ class RunnerService:
         result.evidence_details.update(
             {
                 **capture,
+                "producer_evidence_status": result.evidence_status,
                 "local_transfer_failures": gaps,
                 "execution_fact_persistence_failed": journal_gap,
                 "pending_uploads": pending,
@@ -542,7 +607,8 @@ class RunnerService:
                 )["kind"] == "score":
                     shutil.rmtree(directory / "workspace", ignore_errors=True)
                     continue
-                shutil.rmtree(directory)
+                if (directory / "evidence-ack.json").exists():
+                    shutil.rmtree(directory)
 
     async def run(self, once=False):
         self.recover()
@@ -623,4 +689,7 @@ class RunnerService:
                 *(task for tasks in self.active.values() for task in tasks), return_exceptions=True
             )
             await self.outbox.flush(self.client)
+            self.recover(restarting=False)
+            await self.outbox.flush(self.client)
+            self.reap()
             await self.client.close()
