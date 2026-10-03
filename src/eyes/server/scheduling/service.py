@@ -18,6 +18,7 @@ from eyes.server.storage.models import (
     CaseRun,
     CaseVersion,
     Credential,
+    EvidenceWait,
     Experiment,
     Project,
     ResolutionRecord,
@@ -338,7 +339,10 @@ def heartbeat(
     stop_requested = (
         attempt.status == "cancel_requested" or attempt.deadline <= now()
         if work.kind == "execute"
-        else session.get(ScoreRun, work.score_run_id).deadline <= now()
+        else (
+            session.get(ScoreRun, work.score_run_id).deadline <= now()
+            or session.get(ScoreRun, work.score_run_id).cancel_requested_at is not None
+        )
     )
     return {
         "schema_version": "1.0",
@@ -382,9 +386,16 @@ def refresh_experiment(session: Session, experiment_id: UUID):
     states = session.scalars(
         select(WorkItem.status).where(WorkItem.experiment_id == experiment_id)
     ).all()
-    if any(state in {"queued", "claimed"} for state in states):
+    waiting = session.scalar(
+        select(EvidenceWait.id)
+        .join(Attempt)
+        .join(CaseRun)
+        .where(CaseRun.experiment_id == experiment_id, EvidenceWait.status == "waiting")
+        .limit(1)
+    )
+    if waiting or any(state in {"queued", "claimed"} for state in states):
         if experiment.status != "cancel_requested":
-            experiment.status = "running" if "claimed" in states else "queued"
+            experiment.status = "running" if waiting or "claimed" in states else "queued"
     else:
         experiment.status = "completed_with_unresolved" if "unknown" in states else "completed"
 
@@ -424,7 +435,13 @@ def finish(
         run.status = result.status
         manifest = evidence.seal(session, attempt)
         if result.status == "succeeded":
-            evaluation.enqueue(session, attempt, manifest)
+            evaluation.enqueue(
+                session,
+                attempt,
+                manifest,
+                allow_wait=session.get(Experiment, work.experiment_id).status != "cancel_requested",
+                skipped=session.get(Experiment, work.experiment_id).status == "cancel_requested",
+            )
         work.status = "unknown" if result.status == "unknown" else "completed"
         work.reserved = result.status == "unknown"
     elif work.kind == "score" and isinstance(result, ScoreOutput):
@@ -434,6 +451,10 @@ def finish(
         if result.status == "completed" and (result.completed_at or now()) > score.deadline:
             raise DomainError(
                 409, "score_deadline", "scoring completed after its computation deadline"
+            )
+        if score.cancel_requested_at:
+            result = ScoreOutput(
+                status="skipped", reason="scoring cancelled", completed_at=result.completed_at
             )
         evaluation.complete(session, score, result, store)
         work.status = "completed"
@@ -472,6 +493,25 @@ def cancel(session: Session, project_id: UUID, experiment_id: UUID):
             if attempt.status != "cancel_requested":
                 attempt.status = "cancel_requested"
                 attempt.cancel_requested_at = now()
+    evaluation.advance_waits(session, experiment_id=experiment.id, cancel=True)
+    for work in session.scalars(
+        select(WorkItem)
+        .where(
+            WorkItem.experiment_id == experiment.id,
+            WorkItem.kind == "score",
+            WorkItem.status.in_(["queued", "claimed"]),
+        )
+        .with_for_update()
+    ):
+        score = session.get(ScoreRun, work.score_run_id)
+        if work.status == "queued":
+            score.status = "skipped"
+            score.result = ScoreOutput(status="skipped", reason="experiment cancelled").model_dump(
+                mode="json"
+            )
+            work.status = "cancelled"
+        elif score.cancel_requested_at is None:
+            score.cancel_requested_at = now()
     refresh_experiment(session, experiment.id)
     return experiment
 
@@ -517,7 +557,13 @@ def resolve(session: Session, credential: Credential, attempt_id: UUID, resoluti
     work.lease_expires_at = None
     manifest = evidence.seal(session, attempt)
     if resolution.status == "succeeded":
-        evaluation.enqueue(session, attempt, manifest)
+        evaluation.enqueue(
+            session,
+            attempt,
+            manifest,
+            allow_wait=session.get(Experiment, work.experiment_id).status != "cancel_requested",
+            skipped=session.get(Experiment, work.experiment_id).status == "cancel_requested",
+        )
     refresh_experiment(session, work.experiment_id)
     return attempt
 
@@ -537,7 +583,13 @@ def sweep(session: Session, settings: Settings):
             submission_deadline = score.deadline + timedelta(
                 seconds=settings.score_submission_grace_seconds
             )
-            if expired or submission_deadline <= current_time:
+            cancelled = (
+                score.cancel_requested_at
+                and score.cancel_requested_at
+                + timedelta(seconds=settings.cancellation_grace_seconds)
+                <= current_time
+            )
+            if expired or submission_deadline <= current_time or cancelled:
                 score.status = "error"
                 score.result = ScoreOutput(
                     status="error", reason="score lease lost or submission window ended"
@@ -606,6 +658,7 @@ def sweep(session: Session, settings: Settings):
             mark_unknown(session, work, attempt, "stop request was not confirmed")
             counts["unknown"] += 1
             changed.add(work.experiment_id)
+    changed.update(evaluation.advance_waits(session))
     for experiment_id in changed:
         refresh_experiment(session, experiment_id)
     session.flush()

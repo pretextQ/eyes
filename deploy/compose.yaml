@@ -1,6 +1,7 @@
 name: eyes
 
 x-control: &control
+  image: ${EYES_CONTROL_IMAGE:-eyes-control:local}
   build:
     context: ..
     dockerfile: deploy/Dockerfile
@@ -10,6 +11,9 @@ x-control: &control
     EYES_GLOBAL_EXECUTION_LIMIT: ${EYES_GLOBAL_EXECUTION_LIMIT:-16}
     EYES_GLOBAL_SCORE_LIMIT: ${EYES_GLOBAL_SCORE_LIMIT:-4}
     EYES_SCORE_SUBMISSION_GRACE_SECONDS: ${EYES_SCORE_SUBMISSION_GRACE_SECONDS:-60}
+    EYES_EVIDENCE_RETENTION_DAYS: ${EYES_EVIDENCE_RETENTION_DAYS:-0}
+    EYES_PENDING_ARTIFACT_TTL_HOURS: ${EYES_PENDING_ARTIFACT_TTL_HOURS:-24}
+    EYES_ORPHAN_ARTIFACT_GRACE_HOURS: ${EYES_ORPHAN_ARTIFACT_GRACE_HOURS:-24}
     EYES_MAX_SCORE_INPUT_BYTES: ${EYES_MAX_SCORE_INPUT_BYTES:-33554432}
   volumes:
     - artifacts:/app/data/artifacts
@@ -22,7 +26,7 @@ services:
       POSTGRES_USER: eyes
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${EYES_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres:/var/lib/postgresql
     healthcheck:
@@ -42,7 +46,7 @@ services:
   api:
     <<: *control
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${EYES_API_PORT:-8000}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -58,7 +62,7 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:${EYES_WEB_PORT:-8080}:80"
     depends_on:
       api:
         condition: service_healthy
@@ -67,6 +71,15 @@ services:
   scheduler:
     <<: *control
     command: ["eyes-scheduler"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  maintenance:
+    <<: *control
+    profiles: [maintenance]
+    command: ["eyes-ops", "maintain", "--apply", "--interval", "3600"]
     depends_on:
       migrate:
         condition: service_completed_successfully

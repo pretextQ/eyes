@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from eyes.server.config import Settings
 from eyes.server.scheduling.service import sweep
-from eyes.server.storage.database import database
+from eyes.server.storage.database import database, maintenance_lock
 
 
 def main():
@@ -25,6 +25,7 @@ def main():
         while not stop.is_set():
             try:
                 with sessions() as session, session.begin():
+                    maintenance_lock(session)
                     result = sweep(session, settings)
                 logging.info("scheduling_sweep %s", json.dumps(result))
             except SQLAlchemyError:

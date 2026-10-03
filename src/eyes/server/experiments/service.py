@@ -33,7 +33,15 @@ def create(
         select(Experiment).where(Experiment.project_id == project_id, Experiment.request_key == key)
     )
     if previous:
-        if previous.request_digest != request_digest:
+        retry_digest = request_digest
+        if (
+            "evidence_wait_seconds" not in previous.snapshot["request"]
+            and "evidence_wait_seconds" not in request.model_fields_set
+        ):
+            retry_digest = digest(
+                {k: v for k, v in content.items() if k != "evidence_wait_seconds"}
+            )
+        if previous.request_digest != retry_digest:
             raise DomainError(409, "idempotency_conflict", "same key has different parameters")
         return previous
     if len(set(request.scorer_version_ids)) != len(request.scorer_version_ids):
@@ -153,7 +161,7 @@ def summary(session: Session, experiment: Experiment):
         )
     return {
         "schema_version": "1.0",
-        "experiment_id": experiment.id,
+        "experiment_id": str(experiment.id),
         "status": experiment.status,
         "planned_runs": planned,
         "execution_successes": succeeded,

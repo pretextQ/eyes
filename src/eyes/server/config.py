@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     cancellation_grace_seconds: int = Field(default=60, ge=1)
     score_submission_grace_seconds: int = Field(default=60, ge=1, le=3600)
     scheduler_interval_seconds: float = Field(default=5, ge=0.1)
+    evidence_retention_days: int = Field(default=0, ge=0)
+    pending_artifact_ttl_hours: int = Field(default=24, ge=1)
+    orphan_artifact_grace_hours: int = Field(default=24, ge=1)
     trace_console_export: bool = False
 
     @field_validator("database_url")

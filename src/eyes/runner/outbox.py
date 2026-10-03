@@ -53,7 +53,7 @@ class Outbox:
         for directory in [self.pending, self.rejected]:
             for path in directory.glob("*.json"):
                 job = json.loads(path.read_bytes())
-                if job.get("work_id") == work_id and job["kind"] != "completion":
+                if job.get("work_id") == work_id and job["kind"] in {"events", "artifact"}:
                     if directory == self.pending:
                         pending += 1
                     else:
@@ -101,6 +101,10 @@ class Outbox:
                         await client.request("POST", job["path"], json=job["body"])
                     if job["kind"] == "completion":
                         write_json(Path(job["journal_dir"]) / "ack.json", {"acknowledged": True})
+                    if job["kind"] == "evidence_close":
+                        write_json(
+                            Path(job["journal_dir"]) / "evidence-ack.json", {"acknowledged": True}
+                        )
                     path.unlink()
                     (self.pending / f"{job['key']}.content").unlink(missing_ok=True)
                     sent += 1
