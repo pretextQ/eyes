@@ -16,6 +16,7 @@ import {
   ErrorNotice,
   Field,
   Loading,
+  JsonBlock,
   PageHeading,
 } from "../components/ui";
 import type { CaseRun, Experiment, Summary } from "../types";
@@ -26,6 +27,7 @@ export function ComparisonPage() {
   const baseline = params.get("baseline") || "";
   const candidate = params.get("candidate") || "";
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(0);
   const experiments = useQuery({
     queryKey: ["comparison-experiments"],
@@ -86,8 +88,25 @@ export function ComparisonPage() {
   const bMap = new Map(
     br.data?.map((run) => [`${run.case.case_id}::${run.repetition}`, run]),
   );
-  const keys = [...new Set([...aMap.keys(), ...bMap.keys()])]
-    .filter((k) => k.toLowerCase().includes(search.toLowerCase()))
+  const allKeys = [...new Set([...aMap.keys(), ...bMap.keys()])];
+  const keys = allKeys
+    .filter((k) => {
+      const left = aMap.get(k),
+        right = bMap.get(k);
+      const matches = k.toLowerCase().includes(search.toLowerCase());
+      return (
+        matches &&
+        (filter === "all" ||
+          (filter === "content"
+            ? !!left && !!right && left.case.digest !== right.case.digest
+            : filter === "missing"
+              ? !left || !right
+              : !!left &&
+                !!right &&
+                (left.attempts.at(-1)?.status || left.status) !==
+                  (right.attempts.at(-1)?.status || right.status)))
+      );
+    })
     .sort();
   function select(which: string, value: string) {
     const next = new URLSearchParams(params);
@@ -131,7 +150,7 @@ export function ComparisonPage() {
             error={experiments.error}
             retry={() => void experiments.refetch()}
           />
-        ) : !experiments.data.length ? (
+        ) : experiments.data.length < 2 ? (
           <Empty
             title="先运行实验，再审阅变化"
             description="创建至少两次实验，保留各自的目标、用例和评分版本。"
@@ -180,13 +199,15 @@ export function ComparisonPage() {
           </div>
         )}
       </section>
-      <div className="notice comparison-notice">
-        <GitCompareArrows size={17} />
-        <p>
-          当前提供结果并列核对，不生成回归报告或 CI
-          门槛。按用例标识与重复序号排列；内容、评分口径、环境或采集能力不同时，需要单独核对可比性。
-        </p>
-      </div>
+      {api && (
+        <div className="notice comparison-notice">
+          <GitCompareArrows size={17} />
+          <p>
+            当前提供结果并列核对，不生成回归报告或 CI
+            门槛。按用例标识与重复序号排列；内容、评分口径、环境或采集能力不同时，需要单独核对可比性。
+          </p>
+        </div>
+      )}
       {error && (
         <ErrorNotice
           error={error}
@@ -200,7 +221,7 @@ export function ComparisonPage() {
           }}
         />
       )}
-      {!api || !ready ? (
+      {!api ? null : !ready ? (
         <div className="comparison-placeholder">
           <div className="comparison-line" />
           <GitCompareArrows size={32} strokeWidth={1.2} />
@@ -220,6 +241,7 @@ export function ComparisonPage() {
         as.data &&
         bs.data && (
           <>
+            <ConfigurationReview left={a.data} right={b.data} />
             <div className="comparison-summaries">
               <ComparisonSummary
                 label="A / BASELINE"
@@ -250,6 +272,29 @@ export function ComparisonPage() {
                   />
                 </div>
               </div>
+              <div className="comparison-filters" aria-label="筛选原始记录差异">
+                {[
+                  { id: "all", label: "全部记录" },
+                  { id: "content", label: "用例内容不同" },
+                  { id: "status", label: "执行状态不同" },
+                  { id: "missing", label: "仅单侧存在" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    aria-pressed={filter === item.id}
+                    className={filter === item.id ? "selected" : ""}
+                    onClick={() => {
+                      setFilter(item.id);
+                      setPage(0);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                <span>
+                  {keys.length} / {allKeys.length} 条
+                </span>
+              </div>
               {!resultsReady ? (
                 <Empty
                   compact
@@ -260,7 +305,19 @@ export function ComparisonPage() {
                 <Empty
                   compact
                   title="没有匹配的用例"
-                  description="检查搜索词或实验是否包含用例。"
+                  description="调整搜索词或差异筛选，查看其他原始记录。"
+                  action={
+                    <button
+                      className="button"
+                      onClick={() => {
+                        setSearch("");
+                        setFilter("all");
+                        setPage(0);
+                      }}
+                    >
+                      清除筛选
+                    </button>
+                  }
                 />
               ) : (
                 <div className="table-scroll">
@@ -282,6 +339,15 @@ export function ComparisonPage() {
                             <td>
                               <strong>{run.case.case_id}</strong>
                               <small>第 {run.repetition + 1} 次重复</small>
+                              {!left || !right ? (
+                                <span className="record-difference">
+                                  仅{left ? "基线" : "候选"}存在
+                                </span>
+                              ) : left.case.digest !== right.case.digest ? (
+                                <span className="record-difference">
+                                  用例内容不同
+                                </span>
+                              ) : null}
                               <small className="mono">
                                 A: {left?.case.digest.slice(0, 10) || "不存在"}
                                 <br />
@@ -289,10 +355,26 @@ export function ComparisonPage() {
                               </small>
                             </td>
                             <td>
-                              <ComparisonCase run={left} id={baseline} />
+                              <ComparisonCase
+                                run={left}
+                                id={baseline}
+                                page={
+                                  left
+                                    ? Math.floor(ar.data!.indexOf(left) / 50)
+                                    : 0
+                                }
+                              />
                             </td>
                             <td>
-                              <ComparisonCase run={right} id={candidate} />
+                              <ComparisonCase
+                                run={right}
+                                id={candidate}
+                                page={
+                                  right
+                                    ? Math.floor(br.data!.indexOf(right) / 50)
+                                    : 0
+                                }
+                              />
                             </td>
                           </tr>
                         );
@@ -413,7 +495,15 @@ function ComparisonSummary({
     </div>
   );
 }
-function ComparisonCase({ run, id }: { run?: CaseRun; id: string }) {
+function ComparisonCase({
+  run,
+  id,
+  page,
+}: {
+  run?: CaseRun;
+  id: string;
+  page: number;
+}) {
   if (!run) return <span className="muted">该实验中不存在</span>;
   const latest = run.attempts.at(-1);
   return (
@@ -430,10 +520,128 @@ function ComparisonCase({ run, id }: { run?: CaseRun; id: string }) {
         {run.attempts.length} 次尝试 · 证据{" "}
         {latest?.evidence_status || "未开始"}
       </small>
-      <Link className="text-button" to={`/experiments/${id}`}>
-        审阅实验
+      {latest?.result?.output != null && (
+        <details className="comparison-output">
+          <summary>查看最新尝试输出</summary>
+          <JsonBlock
+            title={`${run.case.case_id} / 最新输出`}
+            value={latest.result.output}
+          />
+        </details>
+      )}
+      <Link
+        className="text-button"
+        to={`/experiments/${id}/cases/${run.id}?page=${page}`}
+      >
+        审阅执行证据
         <ArrowUpRight size={13} />
       </Link>
     </div>
+  );
+}
+
+function ConfigurationReview({
+  left,
+  right,
+}: {
+  left: Experiment;
+  right: Experiment;
+}) {
+  const rows = [
+    {
+      label: "测试集摘要",
+      a: left.snapshot.dataset_digest,
+      b: right.snapshot.dataset_digest,
+    },
+    {
+      label: "评分口径摘要",
+      a: left.snapshot.scorers
+        .map((s) => s.digest)
+        .sort()
+        .join(" / "),
+      b: right.snapshot.scorers
+        .map((s) => s.digest)
+        .sort()
+        .join(" / "),
+    },
+    {
+      label: "观测能力声明",
+      a: left.snapshot.target.content.capabilities.observation
+        .slice()
+        .sort()
+        .join(" / "),
+      b: right.snapshot.target.content.capabilities.observation
+        .slice()
+        .sort()
+        .join(" / "),
+    },
+    {
+      label: "重复 / 并发 / 超时",
+      a: `${left.snapshot.request.repetitions} / ${left.snapshot.request.concurrency} / ${left.snapshot.request.timeout_seconds}s`,
+      b: `${right.snapshot.request.repetitions} / ${right.snapshot.request.concurrency} / ${right.snapshot.request.timeout_seconds}s`,
+    },
+  ];
+  const differences = rows.filter((row) => row.a !== row.b).length;
+  return (
+    <section
+      className="configuration-review"
+      aria-labelledby="configuration-title"
+    >
+      <div className="configuration-heading">
+        <div>
+          <span className="section-label">BEFORE YOU COMPARE</span>
+          <h2 id="configuration-title">先核对条件，再审阅变化。</h2>
+        </div>
+        <span
+          className={`configuration-status ${differences ? "changed" : ""}`}
+        >
+          {differences ? `${differences} 项配置不同` : "已列配置一致"}
+        </span>
+      </div>
+      <div className="configuration-column-labels" aria-hidden="true">
+        <span>核对项</span>
+        <span>A / 基线</span>
+        <span>B / 待审阅</span>
+        <span>状态</span>
+      </div>
+      <div className="configuration-rows">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <span>{row.label}</span>
+            <code
+              title={row.a}
+              aria-label={`A / 基线 ${row.label}: ${row.a || "未提供"}`}
+            >
+              {row.a || "未提供"}
+            </code>
+            <code
+              title={row.b}
+              aria-label={`B / 待审阅 ${row.label}: ${row.b || "未提供"}`}
+            >
+              {row.b || "未提供"}
+            </code>
+            <span
+              className={row.a === row.b ? "config-same" : "config-changed"}
+            >
+              {row.a === row.b ? "一致" : "不同"}
+            </span>
+          </div>
+        ))}
+      </div>
+      <details className="configuration-full">
+        <summary>查看完整配置摘要</summary>
+        <JsonBlock
+          title="A / 基线配置摘要"
+          value={Object.fromEntries(rows.map((row) => [row.label, row.a]))}
+        />
+        <JsonBlock
+          title="B / 待审阅配置摘要"
+          value={Object.fromEntries(rows.map((row) => [row.label, row.b]))}
+        />
+      </details>
+      <p>
+        这里只核对已记录的配置；外部环境、实际采集覆盖和服务端尝试选择仍需确认。逐用例展示最新尝试，汇总采用后端选择口径。
+      </p>
+    </section>
   );
 }

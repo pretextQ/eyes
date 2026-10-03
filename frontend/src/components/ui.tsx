@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
   Check,
+  Copy,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -201,8 +202,13 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = overflow;
+    };
   }, []);
   return (
     <dialog
@@ -256,10 +262,66 @@ export function JsonBlock({
   value: unknown;
   title?: string;
 }) {
+  const content = value == null ? "暂无记录" : JSON.stringify(value, null, 2);
+  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const long = content.length > 900;
+  const lines = content.split("\n");
+  const matches = search
+    ? lines.filter((line) => line.toLowerCase().includes(search.toLowerCase()))
+    : lines;
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      setFeedback("已复制完整内容");
+    } catch {
+      setFeedback("复制失败，请选择内容手动复制");
+    }
+  }
   return (
-    <div className="json-block">
-      {title && <div className="section-label">{title}</div>}
-      <pre>{value == null ? "暂无记录" : JSON.stringify(value, null, 2)}</pre>
+    <div
+      className={`json-block ${long && !expanded && !search ? "collapsed" : ""}`}
+    >
+      <div className="json-toolbar">
+        <span className="section-label">{title || "JSON 内容"}</span>
+        <button
+          className="icon-button"
+          aria-label={`复制${title || "JSON 内容"}`}
+          onClick={() => void copy()}
+        >
+          <Copy size={14} />
+        </button>
+      </div>
+      {long && (
+        <div className="json-search">
+          <input
+            aria-label={`搜索${title || "JSON 内容"}`}
+            type="search"
+            placeholder="查找内容，显示匹配行…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && <span>{matches.length} 行匹配</span>}
+        </div>
+      )}
+      <pre tabIndex={0} aria-label={title || "JSON 内容"}>
+        {matches.length ? matches.join("\n") : "没有匹配的内容"}
+      </pre>
+      {long && !search && (
+        <button
+          className="json-expand"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "收起内容" : `展开完整内容 · ${lines.length} 行`}
+        </button>
+      )}
+      {feedback && (
+        <div className="json-feedback" role="status">
+          {feedback}
+        </div>
+      )}
     </div>
   );
 }
