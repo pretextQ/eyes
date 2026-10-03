@@ -1,6 +1,6 @@
 # Eyes Web 控制台
 
-控制台位于 `frontend/`，使用 React、TypeScript、Vite、React Router、TanStack Query 和 Lucide 图标。设计采用暖灰背景、纸白内容区、朱红主操作、细边框和表格布局；颜色、字体、圆角与间距集中于 `src/styles.css`。字体通过 npm 依赖打包，不需要访问外部字体服务。
+控制台位于 `frontend/`，使用 React、TypeScript、Vite、React Router、TanStack Query 和 Lucide 图标。基础组件采用 shadcn 的 Base UI 版本与 Tailwind CSS 4，配置位于 `components.json`。设计采用白色画布、浅灰侧栏、深色主操作、细边框和表格布局；颜色、字体、圆角与间距集中于 `src/styles.css`。字体通过 npm 依赖打包，不需要访问外部字体服务。
 
 ## 本地启动
 
@@ -22,7 +22,7 @@ npm run dev
 
 | 页面 | 路由 | 当前实现 |
 | --- | --- | --- |
-| 实验工作台 | `/experiments` | 服务端分页、当前页搜索与状态筛选、工作数量、创建实验 |
+| 实验工作台 | `/experiments` | 服务端分页、当前页搜索与状态筛选、当前页排序、列表密度、创建实验 |
 | 实验详情 | `/experiments/:id` | 执行汇总、明确分母的评分汇总、固定快照、分页用例、关联重跑、取消请求 |
 | 执行审阅 | `/experiments/:id/cases/:runId` | 独立审阅页、本页用例导航、历史尝试、事件列表与详情、输入/输出、评分引用定位、证据清单和产物下载 |
 | 结果对比 | `/comparison` | 固定配置差异核对、两次实验的 API 汇总、逐用例原始记录差异筛选和直达审阅 |
@@ -146,3 +146,14 @@ ESLint、Prettier 和生产构建（含 TypeScript）均通过。检查了手机
 - [纯白首页（手机）](frontend-quality/white-welcome-mobile.jpg)
 - [实验列表（桌面）](frontend-quality/white-list-desktop.jpg)
 - [实验列表（手机）](frontend-quality/white-list-mobile.jpg)
+
+## 2026-10-03：shadcn 审美升级第一批
+
+正式接入 shadcn Base UI 的 `base-nova` 样式与 Tailwind CSS 4，保留 Eyes 的 DM Sans / IBM Plex Mono 字体、白色画布和业务状态色。新增组件通过官方 CLI 安装到 `src/components/ui/`，公共业务组件继续作为状态语义与现有页面的适配入口。旧样式置于独立 CSS layer，避免覆盖 shadcn 控件的尺寸与交互状态。
+
+- 全局导航使用 Sidebar / Sheet / Breadcrumb，桌面支持收起，手机使用模态抽屉；接入指南只保留一个导航入口，移除装饰性页脚。
+- 未连接首页使用 Empty，以“连接项目”为主操作，保留接入指南链接；移除重复流程分区和宣传文案。
+- 实验页移除首屏统计卡片；筛选使用 ToggleGroup，搜索使用 InputGroup，排序和密度进入 DropdownMenu，数据行使用 Table 和 Badge。标准/紧凑行高为 56/40px；排序、搜索、密度与返回条件继续保存在 URL / 路由状态中。
+- 首次实验空状态根据真实目录决定下一步配置入口；骨架屏、错误提示和无结果恢复操作使用公共组件。已有业务表单通过 Dialog 适配，表单内部尚未全部迁移。
+
+ESLint、Prettier、独立 TypeScript 检查和生产构建通过。浏览器读取已有项目的两条排队实验，验证筛选恢复、当前页排序、密度、详情返回、导航和连接错误；检查 390、768、1024、1440px 布局及 390×700 长表单滚动。Safari 补查连接弹窗与快速导航。没有提交业务表单、修改测试或运行 Agent。本批不是全站迁移或完整业务验收；详细证据见 [前端质量记录](frontend-quality.md#shadcn-审美升级第一批)。

@@ -1,9 +1,34 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Badge as StatusBadge } from "@/components/ui/badge";
+import {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertAction,
+} from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Skeleton as SkeletonPrimitive } from "@/components/ui/skeleton";
+import {
+  Empty as EmptyPrimitive,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+  EmptyMedia,
+} from "@/components/ui/empty";
+import {
+  Dialog as DialogPrimitive,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
-  ArrowUpRight,
   Check,
   Copy,
   ChevronLeft,
@@ -14,7 +39,6 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { ApiError } from "../api";
 import { useConnection } from "../connection";
 
@@ -37,7 +61,6 @@ export function Eye({ className = "" }: { className?: string }) {
   );
 }
 export function PageHeading({
-  eyebrow,
   title,
   description,
   action,
@@ -50,7 +73,6 @@ export function PageHeading({
   return (
     <header className="page-heading">
       <div>
-        <div className="eyebrow">{eyebrow}</div>
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
@@ -102,12 +124,22 @@ export function Badge({ status }: { status: string }) {
     status,
   );
   return (
-    <span
-      className={`badge ${good ? "good" : bad ? "bad" : warning ? "warning" : active ? "active" : ""}`}
+    <StatusBadge
+      variant={
+        good
+          ? "success"
+          : bad
+            ? "destructive"
+            : warning
+              ? "warning"
+              : active
+                ? "active"
+                : "secondary"
+      }
     >
-      <span className="status-dot" />
+      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
       {labels[status] || status}
-    </span>
+    </StatusBadge>
   );
 }
 export function ErrorNotice({
@@ -118,26 +150,34 @@ export function ErrorNotice({
   retry?: () => void;
 }) {
   return (
-    <div className="notice error" role="alert">
-      <AlertCircle size={17} />
-      <div>
-        <strong>
-          {error instanceof Error ? error.message : "数据读取失败"}
-        </strong>
-        {error instanceof ApiError && error.details != null && (
+    <Alert variant="destructive" className="mb-4">
+      <AlertCircle />
+      <AlertTitle>
+        {error instanceof Error ? error.message : "数据读取失败"}
+      </AlertTitle>
+      {error instanceof ApiError && error.details != null && (
+        <AlertDescription>
           <details>
             <summary>查看校验详情</summary>
-            <pre>{JSON.stringify(error.details, null, 2)}</pre>
+            <pre
+              className="max-h-[260px] overflow-auto"
+              tabIndex={0}
+              aria-label="校验错误详情"
+            >
+              {JSON.stringify(error.details, null, 2)}
+            </pre>
           </details>
-        )}
-      </div>
-      {retry && (
-        <button className="button small" onClick={retry}>
-          <RefreshCw size={14} />
-          重试
-        </button>
+        </AlertDescription>
       )}
-    </div>
+      {retry && (
+        <AlertAction>
+          <Button variant="outline" size="sm" onClick={retry}>
+            <RefreshCw data-icon="inline-start" />
+            重试
+          </Button>
+        </AlertAction>
+      )}
+    </Alert>
   );
 }
 export function Loading({ label = "正在读取数据" }: { label?: string }) {
@@ -149,7 +189,12 @@ export function Loading({ label = "正在读取数据" }: { label?: string }) {
   );
 }
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <span aria-hidden="true" className={`skeleton ${className}`} />;
+  return (
+    <SkeletonPrimitive
+      aria-hidden="true"
+      className={className || "h-2.5 w-3/4"}
+    />
+  );
 }
 export function TableLoading({ label = "正在读取列表" }: { label?: string }) {
   return (
@@ -185,14 +230,16 @@ export function Empty({
   icon?: LucideIcon;
 }) {
   return (
-    <div className={`empty ${compact ? "compact" : ""}`}>
-      <div className="empty-glyph">
-        <Icon size={24} strokeWidth={1.5} />
-      </div>
-      <h3>{title}</h3>
-      <p>{description}</p>
-      {action}
-    </div>
+    <EmptyPrimitive className={cn("py-14", compact && "py-8")}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
+    </EmptyPrimitive>
   );
 }
 export function Disconnected() {
@@ -200,14 +247,13 @@ export function Disconnected() {
   return (
     <Empty
       icon={Plug}
-      title="连接你的实验空间"
-      description="使用项目令牌连接控制 API，读取真实实验与执行证据。"
+      title="连接项目"
+      description="输入项目令牌，查看实验和执行记录。"
       action={
-        <button className="button primary" onClick={openConnection}>
-          <Plug size={16} />
-          连接后端
-          <ArrowUpRight size={16} />
-        </button>
+        <Button onClick={openConnection}>
+          <Plug data-icon="inline-start" />
+          连接项目
+        </Button>
       }
     />
   );
@@ -225,49 +271,46 @@ export function Dialog({
   onClose: () => void;
   wide?: boolean;
 }) {
-  const titleId = useId();
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog?.showModal();
-    dialog?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
-    return () => {
-      dialog?.close();
-      document.body.style.overflow = overflow;
-      if (previous?.isConnected) previous.focus();
-    };
-  }, []);
+  const returnFocus = useRef(document.activeElement as HTMLElement | null);
   return (
-    <dialog
-      aria-labelledby={titleId}
-      ref={ref}
-      className={`dialog ${wide ? "wide" : ""}`}
-      onCancel={onClose}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+    <DialogPrimitive
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
-      <div className="dialog-heading">
-        <div>
-          <div className="eyebrow">EYES / WORKSPACE</div>
-          <h2 id={titleId}>{title}</h2>
-          {subtitle && <p>{subtitle}</p>}
+      <DialogContent
+        className={cn(
+          "console-dialog max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 sm:max-w-[480px]",
+          wide && "sm:max-w-[760px]",
+        )}
+        showCloseButton={false}
+        finalFocus={returnFocus}
+        initialFocus={() =>
+          document.querySelector<HTMLElement>(
+            '[data-slot="dialog-content"] [data-autofocus]',
+          ) || true
+        }
+      >
+        <div className="console-dialog-header flex items-start justify-between gap-4 border-b px-6 py-5">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            {subtitle && <DialogDescription>{subtitle}</DialogDescription>}
+          </DialogHeader>
+          <DialogClose
+            render={
+              <Button variant="ghost" size="icon-sm" aria-label="关闭对话框" />
+            }
+          >
+            <X />
+          </DialogClose>
         </div>
-        <button
-          className="icon-button"
-          onClick={onClose}
-          aria-label="关闭对话框"
-        >
-          <X size={20} />
-        </button>
-      </div>
-      {children}
-    </dialog>
+        {children}
+      </DialogContent>
+    </DialogPrimitive>
   );
 }
+
 export function Field({
   label,
   hint,
@@ -388,59 +431,25 @@ export function Pagination({
     <div className="pagination">
       <span>第 {page + 1} 页 · 每页 50 条</span>
       <div>
-        <button
-          className="icon-button"
+        <Button
+          variant="ghost"
+          size="icon"
           disabled={page === 0}
           aria-label="上一页"
           onClick={() => onPage(page - 1)}
         >
-          <ChevronLeft size={16} />
-        </button>
-        <button
-          className="icon-button"
+          <ChevronLeft />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           disabled={!next}
           aria-label="下一页"
           onClick={() => onPage(page + 1)}
         >
-          <ChevronRight size={16} />
-        </button>
+          <ChevronRight />
+        </Button>
       </div>
-    </div>
-  );
-}
-export function SetupSteps() {
-  return (
-    <div className="setup-steps">
-      <div className="section-label">从接入到结果</div>
-      {[
-        {
-          n: "01",
-          title: "接入目标 Agent",
-          text: "声明接入方式与观测范围",
-          url: "/targets",
-        },
-        {
-          n: "02",
-          title: "准备测试与评分",
-          text: "发布不可变的用例和口径",
-          url: "/datasets",
-        },
-        {
-          n: "03",
-          title: "运行并审阅证据",
-          text: "从用例结果追溯执行过程",
-          url: "/experiments",
-        },
-      ].map((s) => (
-        <Link key={s.n} to={s.url}>
-          <span className="step-number">{s.n}</span>
-          <div>
-            <strong>{s.title}</strong>
-            <small>{s.text}</small>
-          </div>
-          <ArrowUpRight size={16} />
-        </Link>
-      ))}
     </div>
   );
 }
