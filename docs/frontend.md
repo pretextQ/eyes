@@ -103,3 +103,46 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml up --build -d
 本次通过本地独立 PostgreSQL 项目完成实际认证、配置发布、JSONL 导入、实验入队及配置对比的浏览器检查。未启动 Scheduler 或 Runner，全部实验保持排队状态。按用户要求继续暂缓真实 Agent 联调，因此有真实事件与评分的完整审阅验收仍未完成。
 
 ESLint、Prettier 和生产构建（含 TypeScript）均通过。检查了手机、平板、桌面和宽屏布局，并在 Safari 补查认证、原生弹窗和长表单滚动。详细范围、修复循环、截图与未通过项目见 [前端质量记录](frontend-quality.md)。历史记录中的数据库不可用为此前状态，本次隔离项目就绪。
+
+## 2026-10-03：组件模板参考与工作台优化
+
+本轮参考 [21st 的 App Dashboard Layout](https://21st.dev/@shadcnstore/components/app-1)、[Sidebar 集合](https://21st.dev/community/components/s/sidebar)，以及 shadcn 的 [Sidebar](https://ui.shadcn.com/docs/components/base/sidebar)、[Command](https://ui.shadcn.com/docs/components/base/command)、[Empty](https://ui.shadcn.com/docs/components/base/empty)、[Skeleton](https://ui.shadcn.com/docs/components/base/skeleton) 和 [Table](https://ui.shadcn.com/docs/components/base/table) 的结构与交互。继续使用 Eyes 现有颜色、字体和基础组件；快速导航直接使用 `cmdk`，通过独立代码块按需加载。
+
+- 侧栏分为实验与审阅、版本与配置、工作空间；桌面与平板可收起成图标栏，手机沿用抽屉导航。
+- 顶部快速导航支持中文名称、英文别名和用途搜索；`⌘ K` / `Ctrl K` 打开，方向键选择，回车跳转，Escape 关闭。业务表单打开时不响应导航快捷键。
+- 未连接首页改为连接入口、三步配置清单与证据审阅路径，不显示虚构实验或完成进度。
+- 实验列表增加当前页结果数、清除筛选、创建时间排序、舒适/紧凑视图和同步反馈。排序仅针对服务端返回的当前页；`sort`、`density` 随筛选条件保存在 URL 中，从实验详情返回时恢复。
+- 实验、版本目录、用例列表使用共用骨架屏；空状态按用途显示图标。弹窗支持指定初始焦点并恢复触发点；表格可聚焦并局部横向滚动。
+
+### 本轮验证
+
+`npm run lint`、`npm run format:check`、`npm run build`（含 TypeScript）以及 `git diff --check` 通过。未新增或修改测试文件、用例、fixtures、mocks 或自动化 snapshots。
+
+浏览器以已有 Eyes UI Review 项目的只读令牌连接真实 API，读取原有两场排队实验，验证当前页排序、密度切换、筛选无结果与清除、详情返回条件，以及桌面侧栏收起。恢复了该项目已停止的独立 PostgreSQL 容器；当前运行的 API 报告迁移版本为 `0001_control_plane`，本轮没有迁移数据库、修改业务记录或启动 Runner/Scheduler。本次不能作为当前 `0002_platform` 部署验收或真实 Agent 执行验收。
+
+实验列表检查 390、768、1024、1440px，页面无水平溢出；宽表格使用内部滚动。修复了表头无障碍文本脱离表格滚动容器造成的页面溢出。未连接首页检查手机和桌面；手机导航、快速导航初始焦点、英文搜索、无结果、Escape 恢复焦点与跳转已实际操作。Safari 补查原生对话框、搜索焦点和回车跳转。完整读屏、真实事件与评分数据、大数据性能及全部页面的所有状态仍未覆盖。
+
+新增快速导航块 49.54 kB / gzip 17.02 kB，主 JS 315.88 kB / gzip 100.81 kB；这些是构建产物大小，不是首屏性能测量。
+
+### 界面截图
+
+- [未连接工作台](frontend-quality/components-welcome-desktop.jpg)
+- [真实实验列表（桌面）](frontend-quality/components-list-desktop.jpg)
+- [真实实验列表（手机）](frontend-quality/components-list-mobile.jpg)
+- [快速导航](frontend-quality/components-navigation.jpg)
+
+## 2026-10-03：纯白主题与版式调整
+
+根据用户对米白底色的反馈，改为纯白主画布与表面、浅灰侧栏和边线、深色主要操作。参考 [Vercel Geist](https://vercel.com/geist/introduction) 的中性色与分隔层次，以及 [shadcn Dashboard](https://ui.shadcn.com/view/new-york-v4/dashboard-01) 的导航和表格排版；同时查阅 Linear 与 21st 的页面参考。保留 Eyes 现有字体、图标和组件结构。
+
+- 清理表格、输入框、提示、空状态和弹窗中的暖色硬编码，统一使用颜色变量。
+- 调整标题和说明文字字号；简化品牌与侧栏帮助区域，空状态图标去掉倾斜装饰。
+- 未连接首页改成开放式连接入口、配置清单和证据说明，增加内容区之间的留白。
+- 实验统计、列表筛选、表格行和表单保持统一的中性色层次，状态色继续表达成功、警告与失败。
+
+验证：ESLint、Prettier、生产构建（含 TypeScript）与 `git diff --check` 通过。浏览器检查 390、768、1024、1440px 布局，没有页面级水平溢出；宽表保留内部滚动。实际查看已有实验列表、评分目录、目标目录及接入表单，检查手机导航和快速导航打开/关闭。未连接首页检查手机和桌面，浏览器无 warn/error。没有提交业务表单、修改测试或启动 Agent 执行；本轮验证范围为样式和相关基础交互。
+
+- [纯白首页（桌面）](frontend-quality/white-welcome-desktop.jpg)
+- [纯白首页（手机）](frontend-quality/white-welcome-mobile.jpg)
+- [实验列表（桌面）](frontend-quality/white-list-desktop.jpg)
+- [实验列表（手机）](frontend-quality/white-list-mobile.jpg)

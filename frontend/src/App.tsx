@@ -2,18 +2,14 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Activity,
   ArrowUpRight,
   ChevronDown,
-  CircleHelp,
-  FlaskConical,
-  GitCompareArrows,
-  Layers3,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
   Plug,
   Plus,
-  SlidersHorizontal,
-  Target,
   Unplug,
   X,
 } from "lucide-react";
@@ -26,6 +22,7 @@ import {
 } from "react-router-dom";
 import { Api } from "./api";
 import { ConnectionContext } from "./connection";
+import { navigation, navigationGroups } from "./navigation";
 import { Dialog, ErrorNotice, Eye, Field, Loading } from "./components/ui";
 const ExperimentsPage = lazy(() =>
   import("./pages/Experiments").then((module) => ({
@@ -59,24 +56,37 @@ const GuidePage = lazy(() =>
   import("./pages/Guide").then((module) => ({ default: module.GuidePage })),
 );
 
-const nav = [
-  { url: "/experiments", text: "实验", en: "Experiments", icon: FlaskConical },
-  {
-    url: "/comparison",
-    text: "结果对比",
-    en: "Comparison",
-    icon: GitCompareArrows,
-  },
-  { url: "/targets", text: "目标 Agent", en: "Targets", icon: Target },
-  { url: "/datasets", text: "测试集", en: "Datasets", icon: Layers3 },
-  { url: "/scorers", text: "评分口径", en: "Scorers", icon: SlidersHorizontal },
-  { url: "/operations", text: "运行状态", en: "Operations", icon: Activity },
-];
+const QuickNavigation = lazy(() =>
+  import("./components/QuickNavigation").then((module) => ({
+    default: module.QuickNavigation,
+  })),
+);
 
 export default function App() {
   const [api, setApi] = useState<Api | null>(null);
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  useEffect(() => {
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k" &&
+        !event.isComposing
+      ) {
+        if (
+          mobileOpen ||
+          (!quickOpen && document.querySelector("dialog[open]"))
+        )
+          return;
+        event.preventDefault();
+        setQuickOpen((open) => !open);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen, quickOpen]);
   const [isMobile, setIsMobile] = useState(
     () => window.matchMedia("(max-width: 700px)").matches,
   );
@@ -121,7 +131,7 @@ export default function App() {
   }
   const queryClient = useQueryClient();
   const location = useLocation();
-  const current = nav.find((n) => location.pathname.startsWith(n.url));
+  const current = navigation.find((n) => location.pathname.startsWith(n.url));
   const pageName = location.pathname.includes("/cases/")
     ? "执行审阅"
     : current?.text || "接入指南";
@@ -140,7 +150,7 @@ export default function App() {
       <a className="skip-link" href="#main">
         跳转到主内容
       </a>
-      <div className="app-shell">
+      <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
         {mobileOpen && (
           <button
             className="nav-overlay"
@@ -158,16 +168,18 @@ export default function App() {
           <NavLink
             to="/experiments"
             className="brand"
+            aria-label="Eyes 实验工作台"
             onClick={() => setMobileOpen(false)}
           >
             <Eye />
             <span>
               eyes<span className="brand-dot">.</span>
             </span>
-            <span className="brand-caption">AGENT LAB</span>
           </NavLink>
           <button
             className="workspace-switch"
+            aria-label="连接实验空间"
+            title="连接实验空间"
             onClick={() => {
               setMobileOpen(false);
               setConnectionOpen(true);
@@ -180,40 +192,38 @@ export default function App() {
             </span>
             <ChevronDown size={14} />
           </button>
-          <div className="nav-label">工作空间</div>
           <nav aria-label="主导航">
-            {nav.map((n, i) => (
-              <NavLink
-                key={n.url}
-                to={n.url}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? "selected" : ""} ${i === 2 ? "nav-separator" : ""}`
-                }
-              >
-                <n.icon size={18} strokeWidth={1.6} />
-                <span>{n.text}</span>
-                {i === 0 && <span className="nav-shortcut">01</span>}
-              </NavLink>
+            {navigationGroups.map((group) => (
+              <div className="nav-group" key={group}>
+                <div className="nav-label">{group}</div>
+                {navigation
+                  .filter((item) => item.group === group)
+                  .map((item) => (
+                    <NavLink
+                      key={item.url}
+                      to={item.url}
+                      title={item.text}
+                      aria-label={item.text}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `nav-item ${isActive ? "selected" : ""}`
+                      }
+                    >
+                      <item.icon size={18} strokeWidth={1.7} />
+                      <span>{item.text}</span>
+                    </NavLink>
+                  ))}
+              </div>
             ))}
           </nav>
           <div className="sidebar-bottom">
-            <div className="lab-note">
-              <span className="section-label">EVIDENCE FIRST</span>
-              <p>
-                看见执行过程，
-                <br />
-                让结果有据可查。
-              </p>
-              <div className="lab-line" />
-            </div>
             <NavLink
+              className="sidebar-help"
               to="/guide"
-              className="nav-item"
               onClick={() => setMobileOpen(false)}
             >
-              <CircleHelp size={18} />
-              接入指南
+              <Plug size={16} />
+              <span>接入与使用帮助</span>
               <ArrowUpRight size={14} />
             </NavLink>
             <div className="sidebar-version">
@@ -225,6 +235,20 @@ export default function App() {
         <div className="main-shell" inert={isMobile && mobileOpen}>
           <div className="topbar">
             <div className="breadcrumb">
+              <button
+                className="icon-button sidebar-toggle"
+                onClick={() => setCollapsed(!collapsed)}
+                aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+                title={collapsed ? "展开侧栏" : "收起侧栏"}
+                aria-expanded={!collapsed}
+                aria-controls="sidebar"
+              >
+                {collapsed ? (
+                  <PanelLeftOpen size={18} />
+                ) : (
+                  <PanelLeftClose size={18} />
+                )}
+              </button>
               <button
                 className="icon-button mobile-menu"
                 onClick={() => setMobileOpen(true)}
@@ -239,6 +263,17 @@ export default function App() {
               <strong>{pageName}</strong>
             </div>
             <div className="topbar-actions">
+              <button
+                className="quick-trigger"
+                onClick={() => setQuickOpen(true)}
+                aria-label="快速导航"
+                aria-keyshortcuts="Meta+k Control+k"
+                title="快速导航（⌘ K / Ctrl K）"
+              >
+                <Search size={15} />
+                <span>快速导航</span>
+                <kbd>⌘ K</kbd>
+              </button>
               <span className={`connection-status ${api ? "connected" : ""}`}>
                 <i />
                 {api ? "已认证连接" : "尚未连接"}
@@ -304,6 +339,17 @@ export default function App() {
           </footer>
         </div>
       </div>
+      {quickOpen && (
+        <Suspense fallback={<Loading label="正在打开快速导航" />}>
+          <QuickNavigation
+            onClose={() => setQuickOpen(false)}
+            onConnect={() => {
+              setQuickOpen(false);
+              setConnectionOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
       {connectionOpen && (
         <ConnectionDialog
           current={api}

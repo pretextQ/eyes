@@ -25,6 +25,7 @@ import {
   ErrorNotice,
   JsonBlock,
   Loading,
+  TableLoading,
   Metrics,
   PageHeading,
   Pagination,
@@ -260,7 +261,7 @@ function ExperimentView({ id }: { id: string }) {
               </div>
               {tab === "cases" ? (
                 runs.isPending ? (
-                  <Loading />
+                  <TableLoading label="正在读取用例" />
                 ) : runs.error ? (
                   <ErrorNotice
                     error={runs.error}
@@ -278,7 +279,12 @@ function ExperimentView({ id }: { id: string }) {
                   />
                 ) : (
                   <>
-                    <div className="table-scroll">
+                    <div
+                      className="table-scroll"
+                      role="region"
+                      aria-label="用例记录，可横向滚动"
+                      tabIndex={0}
+                    >
                       <table>
                         <thead>
                           <tr>
