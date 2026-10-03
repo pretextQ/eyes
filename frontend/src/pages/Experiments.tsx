@@ -7,10 +7,41 @@ import {
   FlaskConical,
   Plus,
   RefreshCw,
+  SlidersHorizontal,
+  Check,
+  Target,
+  Layers3,
+  ClipboardCheck,
   Search,
   X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  InputGroup,
+  InputGroupInput,
+  InputGroupAddon,
+} from "@/components/ui/input-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
 import { WorkspaceWelcome } from "../components/WorkspaceWelcome";
 import { useConnection } from "../connection";
 import {
@@ -23,17 +54,10 @@ import {
   Field,
   Loading,
   TableLoading,
-  Metrics,
   PageHeading,
   Pagination,
-  SetupSteps,
 } from "../components/ui";
-import type {
-  Experiment,
-  ExperimentRequest,
-  Operations,
-  TargetContent,
-} from "../types";
+import type { Experiment, ExperimentRequest, TargetContent } from "../types";
 
 export function ExperimentsPage() {
   const { api, openConnection } = useConnection();
@@ -69,13 +93,6 @@ export function ExperimentsPage() {
     enabled: !!api,
     refetchInterval: 10000,
   });
-  const operations = useQuery({
-    queryKey: ["operations"],
-    queryFn: ({ signal }) =>
-      api!.request<Operations>("/v1/operations", { signal }),
-    enabled: !!api,
-    refetchInterval: 10000,
-  });
   const datasets = useQuery({
     queryKey: ["catalog", "datasets"],
     queryFn: ({ signal }) => api!.catalog("datasets", signal),
@@ -106,286 +123,388 @@ export function ExperimentsPage() {
     next.delete("status");
     setParams(next);
   }
-  const counts = operations.data?.work_counts;
-  const count = (statuses: string[]) =>
-    counts
-      ?.filter((w) => statuses.includes(w.status))
-      .reduce((n, w) => n + w.count, 0) ?? "—";
   const create = () => (api ? setCreateOpen(true) : openConnection());
   return (
     <>
       <PageHeading
-        eyebrow="01 / EXPERIMENTS"
-        title="实验工作台"
-        description="固定版本，运行测试，从每一条结果回到执行证据。"
+        eyebrow=""
+        title="实验"
+        description="查看固定配置、执行状态和用例结果。"
         action={
           api && (
-            <button className="button primary" onClick={create}>
-              <Plus size={17} />
+            <Button onClick={create}>
+              <Plus data-icon="inline-start" />
               创建实验
-            </button>
+            </Button>
           )
         }
       />
       {!api ? (
         <WorkspaceWelcome />
       ) : (
-        <>
-          <Metrics
-            items={[
-              {
-                label: "本页实验",
-                value: query.data
-                  ? items.length.toString().padStart(2, "0")
-                  : "—",
-                note: "按创建时间排列",
-              },
-              {
-                label: "已领取工作",
-                value: count(["claimed"]),
-                note: "执行与评分工作合计",
-                accent: true,
-              },
-              {
-                label: "等待调度",
-                value: count(["queued"]),
-                note: "项目内排队工作",
-              },
-              {
-                label: "结果未知",
-                value: count(["unknown"]),
-                note: "需核对实际执行状态",
-              },
-            ]}
-          />
-          {operations.error && (
+        <section className="experiment-list" aria-label="实验列表">
+          {(query.isPending || query.isError || items.length > 0) && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
+                <ToggleGroup
+                  value={[filter]}
+                  onValueChange={(values) => {
+                    if (values[0]) setFilter(values[0]);
+                  }}
+                  aria-label="实验状态筛选"
+                  disabled={query.isPending}
+                  spacing={1}
+                >
+                  {[
+                    { id: "all", text: "全部" },
+                    { id: "active", text: "进行中" },
+                    { id: "finished", text: "已结束" },
+                    { id: "unresolved", text: "未解决" },
+                  ].map((item) => (
+                    <ToggleGroupItem key={item.id} value={item.id}>
+                      {item.text}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <InputGroup className="min-w-0 flex-1 sm:w-56">
+                    <InputGroupInput
+                      type="search"
+                      aria-label="搜索当前页实验"
+                      placeholder="搜索当前页实验…"
+                      value={search}
+                      disabled={query.isPending}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <InputGroupAddon>
+                      <Search />
+                    </InputGroupAddon>
+                  </InputGroup>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button variant="outline" />}>
+                      <SlidersHorizontal data-icon="inline-start" />
+                      显示
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>当前页排序</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={sort}
+                          onValueChange={(value) => update("sort", value)}
+                        >
+                          <DropdownMenuRadioItem value="newest">
+                            最新创建优先
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="oldest">
+                            最早创建优先
+                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuGroup>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>列表密度</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={compact ? "compact" : "comfortable"}
+                          onValueChange={(value) => update("density", value)}
+                        >
+                          <DropdownMenuRadioItem value="comfortable">
+                            标准
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="compact">
+                            紧凑
+                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={query.isFetching}
+                    aria-label="刷新实验"
+                    onClick={() => void query.refetch()}
+                  >
+                    <RefreshCw className={cn(query.isFetching && "spin")} />
+                  </Button>
+                </div>
+              </div>
+              {(search || filter !== "all") && shown.length > 0 && (
+                <div className="experiment-filter-note" role="status">
+                  <span>
+                    本页匹配 {shown.length} / {items.length} 条
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X data-icon="inline-start" />
+                    清除筛选
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+          {datasets.error && items.length > 0 && (
             <ErrorNotice
-              error={operations.error}
-              retry={() => void operations.refetch()}
+              error={datasets.error}
+              retry={() => void datasets.refetch()}
             />
           )}
-          <section
-            className={`panel experiments-panel ${compact ? "table-compact" : ""}`}
-            aria-label="实验列表"
-          >
-            <div className="list-heading">
-              <div>
-                <h2>全部实验</h2>
-                <span>固定配置与执行记录</span>
-              </div>
-              <span className="list-sync">
+          {query.isPending ? (
+            <TableLoading label="正在读取实验" />
+          ) : query.error ? (
+            <ErrorNotice
+              error={query.error}
+              retry={() => void query.refetch()}
+            />
+          ) : !items.length ? (
+            page > 0 ? (
+              <Empty
+                title="本页没有实验"
+                description="返回上一页查看实验记录。"
+                action={
+                  <Button variant="outline" onClick={() => setPage(page - 1)}>
+                    上一页
+                  </Button>
+                }
+              />
+            ) : (
+              <ExperimentSetup onCreate={create} />
+            )
+          ) : !shown.length ? (
+            <Empty
+              compact
+              icon={Search}
+              title="没有匹配的实验"
+              description="搜索范围为当前页，试试其他关键词或状态。"
+              action={
+                <Button variant="outline" onClick={clearFilters}>
+                  清除筛选
+                </Button>
+              }
+            />
+          ) : (
+            <div
+              className="experiment-table-region"
+              data-density={compact ? "compact" : "comfortable"}
+            >
+              <Table
+                containerProps={{
+                  role: "region",
+                  "aria-label": "实验记录，可横向滚动",
+                  tabIndex: 0,
+                }}
+              >
+                <caption className="sr-only">
+                  当前页实验，按创建时间
+                  {sort === "newest" ? "从新到旧" : "从旧到新"}排列
+                </caption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>实验 / 目标</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>测试集</TableHead>
+                    <TableHead>执行配置</TableHead>
+                    <TableHead>创建时间</TableHead>
+                    <TableHead>
+                      <span className="sr-only">查看详情</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shown.map((exp) => (
+                    <TableRow
+                      key={exp.id}
+                      className={cn("h-14", compact && "h-10 [&>td]:py-1")}
+                    >
+                      <TableCell>
+                        <Link
+                          className="experiment-name"
+                          to={`/experiments/${exp.id}`}
+                          state={{ experimentList: params.toString() }}
+                        >
+                          {exp.snapshot.target.content.name}
+                        </Link>
+                        <span className="experiment-subline">
+                          <code>{shortId(exp.id)}</code>
+                          <span>·</span>
+                          <span>
+                            {exp.snapshot.target.content.external_version ||
+                              "外部版本未知"}
+                          </span>
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge status={exp.status} />
+                      </TableCell>
+                      <TableCell>
+                        <span className="experiment-dataset">
+                          {datasets.data?.find(
+                            (item) => item.id === exp.dataset_id,
+                          )?.name || shortId(exp.dataset_id)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="experiment-config">
+                          {exp.snapshot.request.concurrency} 并发<span>·</span>
+                          {exp.snapshot.request.repetitions} 次重复
+                          <span>·</span>
+                          {exp.snapshot.request.timeout_seconds}s
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="experiment-date">
+                          {formatDate(exp.created_at)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size={compact ? "icon-xs" : "icon"}
+                          nativeButton={false}
+                          render={
+                            <Link
+                              to={`/experiments/${exp.id}`}
+                              state={{ experimentList: params.toString() }}
+                            />
+                          }
+                          aria-label={`查看实验 ${shortId(exp.id)}`}
+                        >
+                          <ArrowRight />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {query.data && items.length > 0 && (
+            <div className="experiment-list-footer">
+              <span className="experiment-sync">
+                本页 {shown.length} 条 ·{" "}
                 {query.isFetching
                   ? "正在同步…"
                   : query.isError
                     ? "同步失败"
-                    : "每 10 秒自动更新"}
+                    : "每 10 秒更新"}
               </span>
-            </div>
-            <div className="panel-toolbar">
-              <div className="tabs" aria-label="实验状态筛选">
-                {[
-                  { id: "all", text: "全部实验" },
-                  { id: "active", text: "进行中" },
-                  { id: "finished", text: "已结束" },
-                  { id: "unresolved", text: "未解决" },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    aria-pressed={filter === f.id}
-                    className={filter === f.id ? "selected" : ""}
-                    onClick={() => setFilter(f.id)}
-                  >
-                    {f.text}
-                    {f.id === "all" && query.data && (
-                      <span>{items.length}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="toolbar-tools">
-                <div className="search">
-                  <Search size={15} />
-                  <input
-                    type="search"
-                    aria-label="搜索当前页实验"
-                    placeholder="搜索当前页实验…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <button
-                  className="icon-button"
-                  disabled={!api || query.isFetching}
-                  aria-label="刷新实验"
-                  onClick={() => void query.refetch()}
-                >
-                  <RefreshCw
-                    size={16}
-                    className={query.isFetching ? "spin" : ""}
-                  />
-                </button>
-              </div>
-            </div>
-            <div className="list-controls">
-              <div className="list-result-count" role="status">
-                {query.data
-                  ? `本页显示 ${shown.length} / ${items.length} 场实验`
-                  : "正在读取实验"}
-                {(search || filter !== "all") && (
-                  <button className="text-button" onClick={clearFilters}>
-                    <X size={13} />
-                    清除筛选
-                  </button>
-                )}
-              </div>
-              <div className="list-view-options">
-                <label>
-                  <span className="sr-only">当前页排序</span>
-                  <select
-                    value={sort}
-                    onChange={(e) => update("sort", e.target.value)}
-                  >
-                    <option value="newest">本页最新创建</option>
-                    <option value="oldest">本页最早创建</option>
-                  </select>
-                </label>
-                <label>
-                  <span className="sr-only">列表密度</span>
-                  <select
-                    value={compact ? "compact" : "comfortable"}
-                    onChange={(e) => update("density", e.target.value)}
-                  >
-                    <option value="comfortable">舒适视图</option>
-                    <option value="compact">紧凑视图</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-            {query.isPending ? (
-              <TableLoading label="正在读取实验" />
-            ) : query.error ? (
-              <ErrorNotice
-                error={query.error}
-                retry={() => void query.refetch()}
-              />
-            ) : !items.length ? (
-              <Empty
-                icon={FlaskConical}
-                title="你的第一场实验，从这里开始"
-                description="选择目标 Agent、测试集和评分口径，创建一份可追溯的执行记录。"
-                action={
-                  <button className="button primary" onClick={create}>
-                    <FlaskConical size={16} />
-                    创建第一场实验
-                    <ArrowRight size={16} />
-                  </button>
-                }
-              />
-            ) : !shown.length ? (
-              <Empty
-                compact
-                icon={Search}
-                title="没有匹配的实验"
-                description="试试其他关键词或状态；搜索范围为当前页。"
-                action={
-                  <button className="button" onClick={clearFilters}>
-                    清除筛选
-                  </button>
-                }
-              />
-            ) : (
-              <div
-                className="table-scroll"
-                role="region"
-                aria-label="实验记录，可横向滚动"
-                tabIndex={0}
-              >
-                <table>
-                  <caption className="sr-only">
-                    当前页实验，按创建时间
-                    {sort === "newest" ? "从新到旧" : "从旧到新"}排列
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>实验 / 目标</th>
-                      <th>测试集</th>
-                      <th>状态</th>
-                      <th>执行配置</th>
-                      <th>创建时间</th>
-                      <th>
-                        <span className="sr-only">查看详情</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shown.map((exp) => (
-                      <tr key={exp.id}>
-                        <td>
-                          <Link
-                            className="table-title"
-                            to={`/experiments/${exp.id}`}
-                            state={{ experimentList: params.toString() }}
-                          >
-                            {exp.snapshot.target.content.name}
-                            <ArrowUpRight size={14} />
-                          </Link>
-                          <small className="mono">
-                            {shortId(exp.id)} ·{" "}
-                            {exp.snapshot.target.content.external_version ||
-                              "外部版本未知"}
-                          </small>
-                        </td>
-                        <td>
-                          {datasets.data?.find((d) => d.id === exp.dataset_id)
-                            ?.name || shortId(exp.dataset_id)}
-                          <small className="mono">
-                            {exp.snapshot.dataset_digest.slice(0, 10)}
-                          </small>
-                        </td>
-                        <td>
-                          <Badge status={exp.status} />
-                        </td>
-                        <td>
-                          {exp.snapshot.request.concurrency} 并发
-                          <small>
-                            {exp.snapshot.request.repetitions} 次重复 ·{" "}
-                            {exp.snapshot.request.timeout_seconds}s 超时
-                          </small>
-                        </td>
-                        <td className="date-cell">
-                          {formatDate(exp.created_at)}
-                        </td>
-                        <td>
-                          <Link
-                            className="icon-button"
-                            to={`/experiments/${exp.id}`}
-                            state={{ experimentList: params.toString() }}
-                            aria-label={`查看实验 ${shortId(exp.id)}`}
-                          >
-                            <ArrowRight size={17} />
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {api && query.data && (
               <Pagination
                 page={page}
                 next={query.data.items.length > 50}
                 onPage={setPage}
               />
-            )}
-          </section>
-          <SetupSteps />
-        </>
+            </div>
+          )}
+        </section>
       )}
       {createOpen && <CreateExperiment onClose={() => setCreateOpen(false)} />}
     </>
   );
 }
+
+function ExperimentSetup({ onCreate }: { onCreate: () => void }) {
+  const { api } = useConnection();
+  const targets = useQuery({
+    queryKey: ["catalog", "targets"],
+    queryFn: ({ signal }) => api!.catalog("targets", signal),
+    enabled: !!api,
+  });
+  const datasets = useQuery({
+    queryKey: ["catalog", "datasets"],
+    queryFn: ({ signal }) => api!.catalog("datasets", signal),
+    enabled: !!api,
+  });
+  const scorers = useQuery({
+    queryKey: ["catalog", "scorers"],
+    queryFn: ({ signal }) => api!.catalog("scorers", signal),
+    enabled: !!api,
+  });
+  if (targets.isPending || datasets.isPending || scorers.isPending)
+    return <Loading label="正在检查实验配置" />;
+  if (targets.error || datasets.error || scorers.error)
+    return (
+      <ErrorNotice
+        error={targets.error || datasets.error || scorers.error}
+        retry={() => {
+          void targets.refetch();
+          void datasets.refetch();
+          void scorers.refetch();
+        }}
+      />
+    );
+  const steps = [
+    {
+      name: "目标 Agent",
+      description: "发布 HTTP 或 Python 接入版本",
+      to: "/targets",
+      count: targets.data.length,
+      icon: Target,
+    },
+    {
+      name: "测试集",
+      description: "导入 JSONL 测试用例",
+      to: "/datasets",
+      count: datasets.data.length,
+      icon: Layers3,
+    },
+    {
+      name: "评分口径",
+      description: "发布规则或 Python 评分器",
+      to: "/scorers",
+      count: scorers.data.length,
+      icon: ClipboardCheck,
+    },
+  ];
+  const next = steps.find((step) => step.count === 0);
+  return (
+    <div className="experiment-setup">
+      <Empty
+        icon={FlaskConical}
+        title="尚无实验"
+        description={
+          next
+            ? "先准备目标、测试集和评分口径，再创建实验。"
+            : "目标、测试集和评分口径已就绪。"
+        }
+        action={
+          next ? (
+            <Button nativeButton={false} render={<Link to={next.to} />}>
+              配置{next.name}
+            </Button>
+          ) : (
+            <Button onClick={onCreate}>
+              <Plus data-icon="inline-start" />
+              创建实验
+            </Button>
+          )
+        }
+      />
+      <ul className="experiment-setup-list">
+        {steps.map((step) => (
+          <li key={step.to}>
+            <Link to={step.to}>
+              <step.icon />
+              <span>
+                <strong>{step.name}</strong>
+                <small>{step.description}</small>
+              </span>
+              <span className="setup-availability">
+                {step.count > 0 ? (
+                  <>
+                    <Check />
+                    {step.count} 个版本
+                  </>
+                ) : (
+                  "待配置"
+                )}
+              </span>
+              <ArrowRight />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function CreateExperiment({
   onClose,
   source,

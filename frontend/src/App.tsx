@@ -1,18 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowUpRight,
-  ChevronDown,
-  Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Search,
-  Plug,
-  Plus,
-  Unplug,
-  X,
-} from "lucide-react";
+import { ChevronDown, Search, Plug, Unplug, X } from "lucide-react";
 import {
   NavLink,
   Navigate,
@@ -23,7 +12,39 @@ import {
 import { Api } from "./api";
 import { ConnectionContext } from "./connection";
 import { navigation, navigationGroups } from "./navigation";
-import { Dialog, ErrorNotice, Eye, Field, Loading } from "./components/ui";
+import { Dialog, ErrorNotice, Eye, Loading } from "./components/ui";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
+
 const ExperimentsPage = lazy(() =>
   import("./pages/Experiments").then((module) => ({
     default: module.ExperimentsPage,
@@ -55,7 +76,6 @@ const OperationsPage = lazy(() =>
 const GuidePage = lazy(() =>
   import("./pages/Guide").then((module) => ({ default: module.GuidePage })),
 );
-
 const QuickNavigation = lazy(() =>
   import("./components/QuickNavigation").then((module) => ({
     default: module.QuickNavigation,
@@ -65,76 +85,15 @@ const QuickNavigation = lazy(() =>
 export default function App() {
   const [api, setApi] = useState<Api | null>(null);
   const [connectionOpen, setConnectionOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
-  useEffect(() => {
-    function onKeyDown(event: globalThis.KeyboardEvent) {
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === "k" &&
-        !event.isComposing
-      ) {
-        if (
-          mobileOpen ||
-          (!quickOpen && document.querySelector("dialog[open]"))
-        )
-          return;
-        event.preventDefault();
-        setQuickOpen((open) => !open);
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [mobileOpen, quickOpen]);
-  const [isMobile, setIsMobile] = useState(
-    () => window.matchMedia("(max-width: 700px)").matches,
-  );
-  const sidebarRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 700px)");
-    const update = () => setIsMobile(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  useEffect(() => {
-    if (!mobileOpen || !isMobile) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    sidebarRef.current?.querySelector<HTMLElement>("a, button")?.focus();
-    return () => {
-      document.body.style.overflow = overflow;
-      previous?.focus();
-    };
-  }, [mobileOpen, isMobile]);
-  function handleNavKey(event: KeyboardEvent<HTMLElement>) {
-    if (!mobileOpen || !isMobile) return;
-    if (event.key === "Escape") {
-      setMobileOpen(false);
-      return;
-    }
-    if (event.key !== "Tab") return;
-    const elements = sidebarRef.current?.querySelectorAll<HTMLElement>(
-      "a[href], button:not(:disabled)",
-    );
-    if (!elements?.length) return;
-    const first = elements[0],
-      last = elements[elements.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
   const queryClient = useQueryClient();
   const location = useLocation();
-  const current = navigation.find((n) => location.pathname.startsWith(n.url));
+  const current = navigation.find((item) =>
+    location.pathname.startsWith(item.url),
+  );
   const pageName = location.pathname.includes("/cases/")
     ? "执行审阅"
-    : current?.text || "接入指南";
+    : current?.text || "Eyes";
   useEffect(() => {
     document.title = `${pageName} · Eyes`;
   }, [pageName]);
@@ -143,152 +102,28 @@ export default function App() {
     setApi(client);
     setConnectionOpen(false);
   }
+  const openConnection = () => setConnectionOpen(true);
   return (
-    <ConnectionContext.Provider
-      value={{ api, openConnection: () => setConnectionOpen(true) }}
-    >
-      <a className="skip-link" href="#main">
-        跳转到主内容
-      </a>
-      <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
-        {mobileOpen && (
-          <button
-            className="nav-overlay"
-            aria-label="关闭导航"
-            onClick={() => setMobileOpen(false)}
-          />
-        )}
-        <aside
-          id="sidebar"
-          ref={sidebarRef}
-          inert={isMobile && !mobileOpen}
-          onKeyDown={handleNavKey}
-          className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}
+    <ConnectionContext.Provider value={{ api, openConnection }}>
+      <TooltipProvider>
+        <a className="skip-link" href="#main">
+          跳转到主内容
+        </a>
+        <SidebarProvider
+          style={
+            {
+              "--sidebar-width": "14rem",
+              "--sidebar-width-icon": "3.5rem",
+            } as CSSProperties
+          }
         >
-          <NavLink
-            to="/experiments"
-            className="brand"
-            aria-label="Eyes 实验工作台"
-            onClick={() => setMobileOpen(false)}
+          <WorkspaceShell
+            api={api}
+            pageName={pageName}
+            openConnection={openConnection}
+            quickOpen={quickOpen}
+            setQuickOpen={setQuickOpen}
           >
-            <Eye />
-            <span>
-              eyes<span className="brand-dot">.</span>
-            </span>
-          </NavLink>
-          <button
-            className="workspace-switch"
-            aria-label="连接实验空间"
-            title="连接实验空间"
-            onClick={() => {
-              setMobileOpen(false);
-              setConnectionOpen(true);
-            }}
-          >
-            <span className="workspace-mark">E</span>
-            <span>
-              <strong>实验空间</strong>
-              <small>{api ? "已连接项目" : "本地控制台"}</small>
-            </span>
-            <ChevronDown size={14} />
-          </button>
-          <nav aria-label="主导航">
-            {navigationGroups.map((group) => (
-              <div className="nav-group" key={group}>
-                <div className="nav-label">{group}</div>
-                {navigation
-                  .filter((item) => item.group === group)
-                  .map((item) => (
-                    <NavLink
-                      key={item.url}
-                      to={item.url}
-                      title={item.text}
-                      aria-label={item.text}
-                      onClick={() => setMobileOpen(false)}
-                      className={({ isActive }) =>
-                        `nav-item ${isActive ? "selected" : ""}`
-                      }
-                    >
-                      <item.icon size={18} strokeWidth={1.7} />
-                      <span>{item.text}</span>
-                    </NavLink>
-                  ))}
-              </div>
-            ))}
-          </nav>
-          <div className="sidebar-bottom">
-            <NavLink
-              className="sidebar-help"
-              to="/guide"
-              onClick={() => setMobileOpen(false)}
-            >
-              <Plug size={16} />
-              <span>接入与使用帮助</span>
-              <ArrowUpRight size={14} />
-            </NavLink>
-            <div className="sidebar-version">
-              <span>Eyes Console</span>
-              <span>v0.1</span>
-            </div>
-          </div>
-        </aside>
-        <div className="main-shell" inert={isMobile && mobileOpen}>
-          <div className="topbar">
-            <div className="breadcrumb">
-              <button
-                className="icon-button sidebar-toggle"
-                onClick={() => setCollapsed(!collapsed)}
-                aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
-                title={collapsed ? "展开侧栏" : "收起侧栏"}
-                aria-expanded={!collapsed}
-                aria-controls="sidebar"
-              >
-                {collapsed ? (
-                  <PanelLeftOpen size={18} />
-                ) : (
-                  <PanelLeftClose size={18} />
-                )}
-              </button>
-              <button
-                className="icon-button mobile-menu"
-                onClick={() => setMobileOpen(true)}
-                aria-label="打开导航"
-                aria-expanded={mobileOpen}
-                aria-controls="sidebar"
-              >
-                <Menu size={20} />
-              </button>
-              <span>工作空间</span>
-              <span className="slash">/</span>
-              <strong>{pageName}</strong>
-            </div>
-            <div className="topbar-actions">
-              <button
-                className="quick-trigger"
-                onClick={() => setQuickOpen(true)}
-                aria-label="快速导航"
-                aria-keyshortcuts="Meta+k Control+k"
-                title="快速导航（⌘ K / Ctrl K）"
-              >
-                <Search size={15} />
-                <span>快速导航</span>
-                <kbd>⌘ K</kbd>
-              </button>
-              <span className={`connection-status ${api ? "connected" : ""}`}>
-                <i />
-                {api ? "已认证连接" : "尚未连接"}
-              </span>
-              <button
-                aria-label="连接设置"
-                className="button small connection-button"
-                onClick={() => setConnectionOpen(true)}
-              >
-                <Plug size={14} />
-                <span>连接设置</span>
-              </button>
-            </div>
-          </div>
-          <main id="main" tabIndex={-1}>
             <Suspense fallback={<Loading label="正在打开页面" />}>
               <Routes>
                 <Route
@@ -329,35 +164,214 @@ export default function App() {
                 />
               </Routes>
             </Suspense>
-          </main>
-          <footer className="page-footer">
-            <span>
-              <span className="footer-dot" /> EYES · AGENT TESTING &
-              OBSERVABILITY
-            </span>
-            <span>执行 · 证据 · 迭代</span>
-          </footer>
-        </div>
-      </div>
-      {quickOpen && (
-        <Suspense fallback={<Loading label="正在打开快速导航" />}>
-          <QuickNavigation
-            onClose={() => setQuickOpen(false)}
-            onConnect={() => {
-              setQuickOpen(false);
-              setConnectionOpen(true);
-            }}
+          </WorkspaceShell>
+        </SidebarProvider>
+        {quickOpen && (
+          <Suspense fallback={<Loading label="正在打开快速导航" />}>
+            <QuickNavigation
+              onClose={() => setQuickOpen(false)}
+              onConnect={() => {
+                setQuickOpen(false);
+                setConnectionOpen(true);
+              }}
+            />
+          </Suspense>
+        )}
+        {connectionOpen && (
+          <ConnectionDialog
+            current={api}
+            onClose={() => setConnectionOpen(false)}
+            onConnect={connect}
           />
-        </Suspense>
-      )}
-      {connectionOpen && (
-        <ConnectionDialog
-          current={api}
-          onClose={() => setConnectionOpen(false)}
-          onConnect={connect}
-        />
-      )}
+        )}
+      </TooltipProvider>
     </ConnectionContext.Provider>
+  );
+}
+
+function WorkspaceShell({
+  api,
+  pageName,
+  openConnection,
+  quickOpen,
+  setQuickOpen,
+  children,
+}: {
+  api: Api | null;
+  pageName: string;
+  openConnection: () => void;
+  quickOpen: boolean;
+  setQuickOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  children: ReactNode;
+}) {
+  const { isMobile, open, openMobile, setOpenMobile } = useSidebar();
+  const location = useLocation();
+  useEffect(() => {
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k" &&
+        !event.isComposing
+      ) {
+        if (
+          openMobile ||
+          (!quickOpen &&
+            document.querySelector('[role="dialog"], dialog[open]'))
+        )
+          return;
+        event.preventDefault();
+        setQuickOpen((value) => !value);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [openMobile, quickOpen, setQuickOpen]);
+  function connect() {
+    setOpenMobile(false);
+    openConnection();
+  }
+  return (
+    <>
+      <Sidebar collapsible="icon" aria-label="工作空间导航">
+        <SidebarHeader className="gap-4 px-3 py-4 group-data-[collapsible=icon]:px-2">
+          <div className="flex items-center justify-between gap-2">
+            <NavLink
+              to="/experiments"
+              className="console-brand"
+              aria-label="Eyes 实验工作台"
+              onClick={() => setOpenMobile(false)}
+            >
+              <Eye />
+              <span className="group-data-[collapsible=icon]:hidden">
+                eyes.
+              </span>
+            </NavLink>
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="关闭导航"
+                onClick={() => setOpenMobile(false)}
+              >
+                <X />
+              </Button>
+            )}
+          </div>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                variant="outline"
+                tooltip="项目连接"
+                onClick={connect}
+                aria-label="项目连接"
+              >
+                <Plug />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span>项目连接</span>
+                  <span className="console-project-note">
+                    {api ? "已认证" : "尚未连接"}
+                  </span>
+                </span>
+                <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <nav aria-label="主导航">
+            {navigationGroups.map((group) => (
+              <SidebarGroup key={group}>
+                <SidebarGroupLabel>{group}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {navigation
+                      .filter((item) => item.group === group)
+                      .map((item) => (
+                        <SidebarMenuItem key={item.url}>
+                          <SidebarMenuButton
+                            render={<NavLink to={item.url} />}
+                            isActive={location.pathname.startsWith(item.url)}
+                            tooltip={item.text}
+                            onClick={() => setOpenMobile(false)}
+                          >
+                            <item.icon />
+                            <span>{item.text}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
+          </nav>
+        </SidebarContent>
+        <SidebarFooter className="px-4 py-4 group-data-[collapsible=icon]:hidden">
+          <div className="console-version">
+            <span>Eyes Console</span>
+            <span>v0.1</span>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="console-topbar flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <SidebarTrigger
+              aria-label={
+                isMobile ? "打开导航" : open ? "收起侧栏" : "展开侧栏"
+              }
+              aria-expanded={isMobile ? openMobile : open}
+            />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden sm:block">
+                  工作空间
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden sm:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{pageName}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="快速导航"
+              title="快速导航（⌘ K / Ctrl K）"
+              aria-keyshortcuts="Meta+k Control+k"
+              onClick={() => setQuickOpen(true)}
+            >
+              <Search />
+            </Button>
+            <span
+              className="console-connection hidden sm:inline-flex"
+              data-connected={!!api}
+            >
+              <i />
+              {api ? "已认证" : "未连接"}
+            </span>
+            <Button
+              variant="outline"
+              onClick={openConnection}
+              aria-label="连接设置"
+            >
+              <Plug data-icon="inline-start" />
+              <span className="hidden sm:inline">连接设置</span>
+              <span className="sm:hidden">连接</span>
+            </Button>
+          </div>
+        </header>
+        <main
+          id="main"
+          tabIndex={-1}
+          className="console-main mx-0 w-full min-w-0 max-w-none px-4 py-6 md:px-6 md:py-7"
+        >
+          {children}
+        </main>
+      </div>
+    </>
   );
 }
 function ConnectionDialog({
@@ -399,25 +413,31 @@ function ConnectionDialog({
   }
   return (
     <Dialog
-      title="连接实验空间"
-      subtitle="用项目令牌打开你的实验空间。"
+      title="连接项目"
+      subtitle="验证项目令牌后加载实验数据。"
       onClose={onClose}
     >
       <form onSubmit={submit} className="form">
-        <Field
-          label="项目令牌"
-          hint="支持 read 与 manage 令牌。令牌仅保留在当前页面内存中，刷新后需重新连接。"
-        >
-          <input
-            type="password"
-            disabled={busy}
-            required
-            autoComplete="off"
-            placeholder="输入 Bearer 令牌"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-          />
-        </Field>
+        <FieldGroup>
+          <Field data-disabled={busy} data-invalid={error != null}>
+            <FieldLabel htmlFor="project-token">项目令牌</FieldLabel>
+            <Input
+              id="project-token"
+              data-autofocus
+              type="password"
+              disabled={busy}
+              required
+              autoComplete="off"
+              aria-invalid={error != null}
+              placeholder="输入 Bearer 令牌"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+            />
+            <FieldDescription>
+              支持 read 与 manage 令牌。刷新页面后需重新连接。
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
         <details className="connection-help">
           <summary>如何获取项目令牌？</summary>
           <p>
@@ -429,23 +449,21 @@ function ConnectionDialog({
         {error != null && <ErrorNotice error={error} />}
         <div className="form-actions">
           {current && (
-            <button
+            <Button
+              variant="destructive"
               type="button"
-              className="button danger"
               onClick={() => onConnect(null)}
             >
-              <Unplug size={16} />
+              <Unplug data-icon="inline-start" />
               断开连接
-            </button>
+            </Button>
           )}
-          <button type="button" className="button" onClick={onClose}>
-            <X size={15} />
+          <Button type="button" variant="outline" onClick={onClose}>
             取消
-          </button>
-          <button className="button primary" disabled={busy || !token.trim()}>
-            <Plus size={15} />
+          </Button>
+          <Button type="submit" disabled={busy || !token.trim()}>
             {busy ? "正在验证…" : "连接项目"}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>
