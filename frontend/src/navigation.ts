@@ -19,11 +19,11 @@ export const navigation = [
   },
   {
     url: "/comparison",
-    text: "结果对比",
+    text: "回归报告",
     en: "Comparison",
     icon: GitCompareArrows,
     group: "实验与审阅",
-    description: "核对实验配置与逐用例结果",
+    description: "查看固定回归结论、门槛与执行证据",
   },
   {
     url: "/targets",

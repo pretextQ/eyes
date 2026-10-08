@@ -182,34 +182,33 @@ def run_details(session: Session, experiment: Experiment, limit: int, offset: in
         .limit(limit)
         .offset(offset)
     ).all()
-    items = []
-    for run in runs:
-        attempts = session.scalars(
-            select(Attempt)
-            .where(Attempt.case_run_id == run.id)
-            .order_by(Attempt.created_at, Attempt.id)
-        ).all()
-        item = public_record(run)
-        item["case"] = public_record(session.get(CaseVersion, run.case_version_id))
-        item["attempts"] = []
-        for attempt in attempts:
-            data = public_record(attempt)
-            data["score_runs"] = [
-                public_record(s)
-                for s in session.scalars(
-                    select(ScoreRun)
-                    .where(ScoreRun.attempt_id == attempt.id)
-                    .order_by(ScoreRun.created_at, ScoreRun.id)
-                )
-            ]
-            data["manifests"] = [
-                public_record(m)
-                for m in session.scalars(
-                    select(Manifest)
-                    .where(Manifest.attempt_id == attempt.id)
-                    .order_by(Manifest.version)
-                )
-            ]
-            item["attempts"].append(data)
-        items.append(item)
-    return items
+    return [run_detail(session, run) for run in runs]
+
+
+def run_detail(session: Session, run: CaseRun):
+    attempts = session.scalars(
+        select(Attempt)
+        .where(Attempt.case_run_id == run.id)
+        .order_by(Attempt.created_at, Attempt.id)
+    ).all()
+    item = public_record(run)
+    item["case"] = public_record(session.get(CaseVersion, run.case_version_id))
+    item["attempts"] = []
+    for attempt in attempts:
+        data = public_record(attempt)
+        data["score_runs"] = [
+            public_record(s)
+            for s in session.scalars(
+                select(ScoreRun)
+                .where(ScoreRun.attempt_id == attempt.id)
+                .order_by(ScoreRun.created_at, ScoreRun.id)
+            )
+        ]
+        data["manifests"] = [
+            public_record(m)
+            for m in session.scalars(
+                select(Manifest).where(Manifest.attempt_id == attempt.id).order_by(Manifest.version)
+            )
+        ]
+        item["attempts"].append(data)
+    return item

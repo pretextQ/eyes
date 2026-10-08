@@ -155,6 +155,19 @@ def get_case_runs(
     }
 
 
+@router.get("/experiments/{experiment_id}/case-runs/{case_run_id}")
+def get_case_run(experiment_id: UUID, case_run_id: UUID, session: Database, user: Reader):
+    from eyes.server.experiments import service
+
+    experiment = scoped(session, Experiment, experiment_id, user.project_id)
+    run = session.scalar(
+        select(CaseRun).where(CaseRun.id == case_run_id, CaseRun.experiment_id == experiment.id)
+    )
+    if run is None:
+        raise DomainError(404, "not_found", "case run does not belong to this experiment")
+    return {"schema_version": "1.0", **service.run_detail(session, run)}
+
+
 @router.post("/experiments/{experiment_id}/cancel")
 def cancel_experiment(experiment_id: UUID, session: Database, user: Manager):
     return record(scheduling.cancel(session, user.project_id, experiment_id))
