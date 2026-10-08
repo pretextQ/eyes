@@ -32,6 +32,7 @@ import {
   Pagination,
 } from "../components/ui";
 import { EventExplorer } from "../components/EventExplorer";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import type { Attempt, CaseRun, Event, Experiment, Manifest } from "../types";
 
 function pageNumber(value: string | null) {
@@ -65,7 +66,16 @@ function CaseWorkspace({ id, runId }: { id: string; runId: string }) {
     enabled: !!api,
     refetchInterval: 10000,
   });
-  const run = runs.data?.items.slice(0, 50).find((run) => run.id === runId);
+  const selectedRun = useQuery({
+    queryKey: ["case-run", id, runId],
+    queryFn: ({ signal }) =>
+      api!.request<CaseRun>(`/v1/experiments/${id}/case-runs/${runId}`, {
+        signal,
+      }),
+    enabled: !!api,
+    refetchInterval: 10000,
+  });
+  const run = selectedRun.data;
   const experimentSearch =
     typeof location.state?.experimentSearch === "string"
       ? location.state.experimentSearch
@@ -73,6 +83,15 @@ function CaseWorkspace({ id, runId }: { id: string; runId: string }) {
   const back = `/experiments/${id}?${experimentSearch}`;
   return (
     <>
+      {params.get("report") && (
+        <Link
+          className="back-link"
+          to={`/comparison?report=${encodeURIComponent(params.get("report")!)}`}
+        >
+          <ArrowLeft size={15} />
+          返回固定回归报告
+        </Link>
+      )}
       <Link className="back-link" to={back} state={location.state}>
         <ArrowLeft size={15} />
         返回实验 · {shortId(id)}
@@ -90,14 +109,14 @@ function CaseWorkspace({ id, runId }: { id: string; runId: string }) {
         <section className="panel">
           <Disconnected />
         </section>
-      ) : experiment.isPending || runs.isPending ? (
+      ) : experiment.isPending || selectedRun.isPending ? (
         <Loading label="正在读取执行记录" />
-      ) : experiment.error || runs.error ? (
+      ) : experiment.error || selectedRun.error ? (
         <ErrorNotice
-          error={experiment.error || runs.error}
+          error={experiment.error || selectedRun.error}
           retry={() => {
             void experiment.refetch();
-            void runs.refetch();
+            void selectedRun.refetch();
           }}
         />
       ) : !run || !experiment.data ? (
@@ -116,11 +135,18 @@ function CaseWorkspace({ id, runId }: { id: string; runId: string }) {
             <div className="case-index-heading">
               <span className="section-label">本页用例</span>
               <span className="count">
-                {runs.data!.items.slice(0, 50).length}
+                {runs.data?.items.slice(0, 50).length || 0}
               </span>
             </div>
+            {runs.isPending && <Loading label="读取用例导航" />}
+            {runs.error && (
+              <ErrorNotice
+                error={runs.error}
+                retry={() => void runs.refetch()}
+              />
+            )}
             <nav>
-              {runs.data!.items.slice(0, 50).map((item) => (
+              {runs.data?.items.slice(0, 50).map((item) => (
                 <Link
                   key={item.id}
                   to={`/experiments/${id}/cases/${item.id}?page=${page}`}
@@ -164,8 +190,10 @@ function AttemptReview({
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const selectedAttemptId = params.get("attempt") || "";
-  const attemptId = run.attempts.some((a) => a.id === selectedAttemptId)
-    ? selectedAttemptId
+  const attemptId = selectedAttemptId
+    ? run.attempts.some((a) => a.id === selectedAttemptId)
+      ? selectedAttemptId
+      : ""
     : run.attempts.at(-1)?.id || "";
   const tab = ["result", "events", "scores", "evidence"].includes(
     params.get("view") || "",
@@ -221,6 +249,10 @@ function AttemptReview({
     refetchInterval: 10000,
   });
   const inline = run.attempts.find((a) => a.id === attemptId);
+  const selectedScore = params.get("score");
+  const visibleScores = selectedScore
+    ? inline?.score_runs?.filter((score) => score.id === selectedScore)
+    : inline?.score_runs;
   const current = attempt.data || inline;
   async function rescore() {
     if (!api) return;
@@ -312,8 +344,23 @@ function AttemptReview({
       setBusy(false);
     }
   }
+  if (selectedAttemptId && !attemptId)
+    return (
+      <Empty
+        title="报告引用的执行不可读取"
+        description="该执行不属于当前用例或已不可用。未自动替换为其他尝试。"
+      />
+    );
   return (
     <section className="review-content" aria-label="执行证据审阅">
+      {params.get("report_unselected") === "1" && (
+        <Alert>
+          <AlertTitle>报告未选出成功执行</AlertTitle>
+          <AlertDescription>
+            以下显示当前用例历史，可能包含报告生成后的变化。固定结论请返回原报告查看。
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="review-heading">
         <div>
           <span className="section-label">CASE / EXECUTION RECORD</span>
@@ -338,6 +385,7 @@ function AttemptReview({
                     manifests: "",
                     event: "",
                     manifest: "",
+                    score: "",
                   });
                   setError(null);
                   setMessage("");
@@ -468,14 +516,33 @@ function AttemptReview({
           )
         ) : tab === "scores" ? (
           <div className="attempt-body">
-            {!inline?.score_runs?.length ? (
+            {selectedScore && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <span className="muted small-text">
+                  固定评分 {shortId(selectedScore)} · 证据可用性以当前状态为准
+                </span>
+                <button
+                  className="text-button"
+                  onClick={() => update({ score: "" })}
+                >
+                  查看全部评分历史
+                </button>
+              </div>
+            )}
+            {!visibleScores?.length ? (
               <Empty
                 compact
-                title="尚无评分记录"
-                description="执行或证据准备完成后，后端会安排评分。"
+                title={
+                  selectedScore ? "报告引用的评分不可读取" : "尚无评分记录"
+                }
+                description={
+                  selectedScore
+                    ? "未自动替换为其他评分，请返回报告核对引用。"
+                    : "执行或证据准备完成后，后端会安排评分。"
+                }
               />
             ) : (
-              inline.score_runs.map((score) => (
+              visibleScores.map((score) => (
                 <div className="score-detail" key={score.id}>
                   <div className="score-detail-heading">
                     <div>
