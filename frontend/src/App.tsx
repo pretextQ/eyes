@@ -50,6 +50,22 @@ const ExperimentsPage = lazy(() =>
     default: module.ExperimentsPage,
   })),
 );
+const BatchesPage = lazy(() =>
+  import("./pages/Batches").then((module) => ({ default: module.BatchesPage })),
+);
+const BatchPage = lazy(() =>
+  import("./pages/Batches").then((module) => ({ default: module.BatchPage })),
+);
+const ObservationPage = lazy(() =>
+  import("./pages/Observation").then((module) => ({
+    default: module.ObservationPage,
+  })),
+);
+const ObservationRunPage = lazy(() =>
+  import("./pages/Observation").then((module) => ({
+    default: module.ObservationRunPage,
+  })),
+);
 const ExperimentPage = lazy(() =>
   import("./pages/Experiment").then((module) => ({
     default: module.ExperimentPage,
@@ -126,11 +142,12 @@ export default function App() {
           >
             <Suspense fallback={<Loading label="正在打开页面" />}>
               <Routes>
-                <Route
-                  path="/"
-                  element={<Navigate to="/experiments" replace />}
-                />
+                <Route path="/" element={<Navigate to="/observe" replace />} />
+                <Route path="/observe" element={<ObservationPage />} />
+                <Route path="/observe/:id" element={<ObservationRunPage />} />
                 <Route path="/experiments" element={<ExperimentsPage />} />
+                <Route path="/batches" element={<BatchesPage />} />
+                <Route path="/batches/:id" element={<BatchPage />} />
                 <Route path="/experiments/:id" element={<ExperimentPage />} />
                 <Route
                   path="/experiments/:id/cases/:runId"
@@ -236,9 +253,9 @@ function WorkspaceShell({
         <SidebarHeader className="gap-4 px-3 py-4 group-data-[collapsible=icon]:px-2">
           <div className="flex items-center justify-between gap-2">
             <NavLink
-              to="/experiments"
+              to="/observe"
               className="console-brand"
-              aria-label="Eyes 实验工作台"
+              aria-label="Eyes Agent 观测"
               onClick={() => setOpenMobile(false)}
             >
               <Eye />
@@ -414,7 +431,7 @@ function ConnectionDialog({
   return (
     <Dialog
       title="连接项目"
-      subtitle="验证项目令牌后加载实验数据。"
+      subtitle="验证项目令牌后加载观测与实验数据。"
       onClose={onClose}
     >
       <form onSubmit={submit} className="form">

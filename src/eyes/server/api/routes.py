@@ -20,6 +20,7 @@ from eyes.contracts.target import (
 )
 from eyes.contracts.work import (
     ClaimedWork,
+    ExperimentBatchCreate,
     ExperimentCreate,
     LeaseRequest,
     RunnerRegister,
@@ -30,6 +31,7 @@ from eyes.server.catalog import service as catalog
 from eyes.server.domain import DomainError, public_record, scoped
 from eyes.server.evaluation import service as evaluation
 from eyes.server.evidence import service as evidence
+from eyes.server.experiments import batches
 from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.database import scheduling_lock
 from eyes.server.storage.models import (
@@ -41,6 +43,7 @@ from eyes.server.storage.models import (
     Event,
     EvidenceWait,
     Experiment,
+    ExperimentBatch,
     Manifest,
     ResolutionRecord,
     Runner,
@@ -128,6 +131,36 @@ def list_experiments(session: Database, user: Reader, limit: Limit = 50, offset:
             .offset(offset)
         )
     )
+
+
+@router.post("/experiment-batches", status_code=201)
+def create_batch(
+    body: ExperimentBatchCreate,
+    session: Database,
+    user: Manager,
+    request: Request,
+    key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)],
+):
+    batch = batches.create(session, user.project_id, key, body, request.app.state.settings)
+    return batches.detail(session, batch)
+
+
+@router.get("/experiment-batches")
+def list_batches(session: Database, user: Reader, limit: Limit = 50, offset: Offset = 0):
+    return {
+        "schema_version": "1.0",
+        "items": batches.list_batches(session, user.project_id, limit, offset),
+    }
+
+
+@router.get("/experiment-batches/{batch_id}")
+def get_batch(batch_id: UUID, session: Database, user: Reader):
+    return batches.detail(session, scoped(session, ExperimentBatch, batch_id, user.project_id))
+
+
+@router.post("/experiment-batches/{batch_id}/cancel")
+def cancel_batch(batch_id: UUID, session: Database, user: Manager):
+    return batches.detail(session, batches.cancel(session, user.project_id, batch_id))
 
 
 @router.get("/experiments/{experiment_id}")

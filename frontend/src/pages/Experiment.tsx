@@ -134,6 +134,11 @@ function ExperimentView({ id }: { id: string }) {
         <ArrowLeft size={15} />
         全部实验
       </Link>
+      {data?.batch_id && (
+        <Link className="back-link" to={`/batches/${data.batch_id}`}>
+          查看所属多 Agent 批次
+        </Link>
+      )}
       <PageHeading
         eyebrow={`EXPERIMENT / ${shortId(id).toUpperCase()}`}
         title={data?.snapshot.target.content.name || "实验详情"}

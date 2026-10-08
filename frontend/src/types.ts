@@ -51,6 +51,7 @@ export interface ExperimentRequest {
   parent_experiment_id?: string | null;
 }
 export interface Experiment extends RecordBase {
+  batch_id?: string | null;
   status: string;
   target_id: string;
   dataset_id: string;

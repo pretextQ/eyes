@@ -1,0 +1,600 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:eyes:agent-protocol:1.0",
+  "$defs": {
+    "AgentArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "name",
+        "media_type",
+        "size_bytes",
+        "sha256"
+      ],
+      "title": "AgentArtifact",
+      "type": "object"
+    },
+    "AgentCancelResult": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run": {
+          "$ref": "#/$defs/AgentRun"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "stopped_confirmed": {
+          "title": "Stopped Confirmed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run",
+        "accepted",
+        "stopped_confirmed"
+      ],
+      "title": "AgentCancelResult",
+      "type": "object"
+    },
+    "AgentCapabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "agent_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "agent_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent Version"
+        },
+        "input_schema": {
+          "$ref": "#/$defs/Payload"
+        },
+        "max_concurrency": {
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Concurrency",
+          "type": "integer"
+        },
+        "session_isolation": {
+          "title": "Session Isolation",
+          "type": "boolean"
+        },
+        "environment_isolation": {
+          "title": "Environment Isolation",
+          "type": "boolean"
+        },
+        "cancellation": {
+          "title": "Cancellation",
+          "type": "boolean"
+        },
+        "resources": {
+          "title": "Resources",
+          "type": "boolean"
+        },
+        "events": {
+          "title": "Events",
+          "type": "boolean"
+        },
+        "artifacts": {
+          "title": "Artifacts",
+          "type": "boolean"
+        },
+        "terminal_retention_seconds": {
+          "minimum": 86400,
+          "title": "Terminal Retention Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "agent_id",
+        "agent_version",
+        "input_schema",
+        "max_concurrency",
+        "session_isolation",
+        "environment_isolation",
+        "cancellation",
+        "resources",
+        "events",
+        "artifacts",
+        "terminal_retention_seconds"
+      ],
+      "title": "AgentCapabilities",
+      "type": "object"
+    },
+    "AgentError": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/AgentProblem"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "error"
+      ],
+      "title": "AgentError",
+      "type": "object"
+    },
+    "AgentEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "event_id",
+        "run_id",
+        "sequence",
+        "occurred_at",
+        "type",
+        "data"
+      ],
+      "title": "AgentEvent",
+      "type": "object"
+    },
+    "AgentEventPage": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/AgentEvent"
+          },
+          "maxItems": 200,
+          "title": "Items",
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Cursor"
+        },
+        "evidence": {
+          "$ref": "#/$defs/AgentEvidence"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run_id",
+        "items",
+        "next_cursor",
+        "evidence"
+      ],
+      "title": "AgentEventPage",
+      "type": "object"
+    },
+    "AgentEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "collecting",
+            "sealed",
+            "partial",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "dropped_events": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dropped Events"
+        },
+        "details": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "status",
+        "dropped_events"
+      ],
+      "title": "AgentEvidence",
+      "type": "object"
+    },
+    "AgentProblem": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[a-z][a-z0-9_]{0,99}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "AgentProblem",
+      "type": "object"
+    },
+    "AgentResource": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "resource_id": {
+          "format": "uuid",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "resource_id",
+        "media_type",
+        "size_bytes",
+        "sha256"
+      ],
+      "title": "AgentResource",
+      "type": "object"
+    },
+    "AgentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "timed_out",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payload"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentProblem"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stopped_confirmed": {
+          "title": "Stopped Confirmed",
+          "type": "boolean"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Completed At"
+        },
+        "cleanup_status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "unknown"
+          ],
+          "title": "Cleanup Status",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/AgentEvidence"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/AgentArtifact"
+          },
+          "maxItems": 100,
+          "title": "Artifacts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run_id",
+        "status",
+        "output",
+        "error",
+        "stopped_confirmed",
+        "completed_at",
+        "cleanup_status",
+        "evidence"
+      ],
+      "title": "AgentResult",
+      "type": "object"
+    },
+    "AgentRun": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RunState"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run_id",
+        "task_id",
+        "attempt_id",
+        "status",
+        "revision",
+        "observed_at",
+        "result"
+      ],
+      "title": "AgentRun",
+      "type": "object"
+    },
+    "AgentTask": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "deadline": {
+          "format": "date-time",
+          "title": "Deadline",
+          "type": "string"
+        },
+        "input": {
+          "$ref": "#/$defs/Payload"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/AgentResource"
+          },
+          "maxItems": 100,
+          "title": "Resources",
+          "type": "array"
+        },
+        "traceparent": {
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$",
+          "title": "Traceparent",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "task_id",
+        "attempt_id",
+        "idempotency_key",
+        "deadline",
+        "input",
+        "traceparent"
+      ],
+      "title": "AgentTask",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Payload": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "RunState": {
+      "enum": [
+        "accepted",
+        "queued",
+        "running",
+        "cancel_requested",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "timed_out",
+        "unknown"
+      ],
+      "type": "string"
+    }
+  },
+  "title": "Eyes external Agent protocol 1.0"
+}

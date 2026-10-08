@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import UUID
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +27,8 @@ class Settings(BaseSettings):
     pending_artifact_ttl_hours: int = Field(default=24, ge=1)
     orphan_artifact_grace_hours: int = Field(default=24, ge=1)
     trace_console_export: bool = False
+    local_observation: bool = False
+    local_observation_project_id: UUID | None = None
 
     @field_validator("database_url")
     @classmethod

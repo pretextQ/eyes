@@ -20,6 +20,26 @@ class ExperimentCreate(Contract):
     parent_experiment_id: UUID | None = None
 
 
+class ExperimentBatchCreate(Contract):
+    name: str = Field(min_length=1, max_length=200)
+    experiments: list[ExperimentCreate] = Field(min_length=1, max_length=32)
+
+    @field_validator("name")
+    @classmethod
+    def nonblank_name(cls, value):
+        if not value.strip():
+            raise ValueError("batch name cannot be blank")
+        return value.strip()
+
+    @field_validator("experiments")
+    @classmethod
+    def unique_targets(cls, value):
+        targets = [item.target_version_id for item in value]
+        if len(set(targets)) != len(targets):
+            raise ValueError("each target version may appear only once in a batch")
+        return value
+
+
 class RunnerRegister(Contract):
     name: str = Field(min_length=1, max_length=200)
     supported_schema_versions: list[str] = Field(min_length=1)

@@ -10,12 +10,28 @@ import {
 
 export const navigation = [
   {
+    url: "/observe",
+    text: "Agent 观测",
+    en: "Observation",
+    icon: Activity,
+    group: "执行观测",
+    description: "在 Agent 中对话，实时查看模型与工具调用",
+  },
+  {
     url: "/experiments",
     text: "实验",
     en: "Experiments",
     icon: FlaskConical,
     group: "实验与审阅",
     description: "运行测试，查看用例与执行证据",
+  },
+  {
+    url: "/batches",
+    text: "多 Agent 批次",
+    en: "Agent batches",
+    icon: Layers3,
+    group: "实验与审阅",
+    description: "为多个 Agent 配置测试集与并发任务，集中跟踪进度",
   },
   {
     url: "/comparison",
