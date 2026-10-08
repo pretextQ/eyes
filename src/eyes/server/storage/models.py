@@ -51,6 +51,47 @@ class Credential(Record):
     revoked: Mapped[bool] = mapped_column(default=False)
 
 
+class ObservationSource(Record):
+    __tablename__ = "observation_sources"
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    token_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    revoked: Mapped[bool] = mapped_column(default=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ObservedRun(Record):
+    __tablename__ = "observed_runs"
+    __table_args__ = (UniqueConstraint("source_id", "external_id"),)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
+    source_id: Mapped[UUID] = mapped_column(ForeignKey("observation_sources.id"), index=True)
+    external_id: Mapped[str] = mapped_column(String(200))
+    session_id: Mapped[str] = mapped_column(String(200), index=True)
+    agent: Mapped[str] = mapped_column(String(200))
+    model: Mapped[str] = mapped_column(String(200))
+    capture_body: Mapped[bool]
+    status: Mapped[str] = mapped_column(String(30), default="running")
+    prompt: Mapped[str | None] = mapped_column(String(4000))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    terminal_sequence: Mapped[int | None]
+    metrics: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class ObservedEvent(Record):
+    __tablename__ = "observed_events"
+    __table_args__ = (
+        UniqueConstraint("run_id", "sequence"),
+        UniqueConstraint("source_id", "event_id"),
+    )
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
+    source_id: Mapped[UUID] = mapped_column(ForeignKey("observation_sources.id"))
+    run_id: Mapped[UUID] = mapped_column(ForeignKey("observed_runs.id"), index=True)
+    event_id: Mapped[UUID]
+    sequence: Mapped[int]
+    content: Mapped[dict] = mapped_column(JSONB)
+    digest: Mapped[str] = mapped_column(String(64))
+
+
 class Version(Record):
     __abstract__ = True
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
@@ -92,10 +133,21 @@ class CaseVersion(Record):
     content: Mapped[dict] = mapped_column(JSONB)
 
 
+class ExperimentBatch(Record):
+    __tablename__ = "experiment_batches"
+    __table_args__ = (UniqueConstraint("project_id", "request_key"),)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    request_key: Mapped[str] = mapped_column(String(200))
+    request_digest: Mapped[str] = mapped_column(String(64))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+
+
 class Experiment(Record):
     __tablename__ = "experiments"
     __table_args__ = (UniqueConstraint("project_id", "request_key"),)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
+    batch_id: Mapped[UUID | None] = mapped_column(ForeignKey("experiment_batches.id"), index=True)
     target_id: Mapped[UUID] = mapped_column(ForeignKey("target_versions.id"))
     target_scope_id: Mapped[UUID] = mapped_column(ForeignKey("targets.id"))
     dataset_id: Mapped[UUID] = mapped_column(ForeignKey("dataset_versions.id"))

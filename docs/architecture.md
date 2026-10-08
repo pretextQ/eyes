@@ -10,6 +10,10 @@ HTTP Agent 和 Python 适配器两种通用接入与宿主机 Runner 已有代�
 
 首版插件由项目维护者安装，按可信代码管理。独立进程提供故障隔离；开放任意用户代码执行前，需要另行设计容器或更强的隔离边界。
 
+## 被动观测补充（2026-10-03）
+
+新增用户确认的本地 Agent 被动观测路径：用户在 Agent 中发起任务，Agent exporter 直接向 observation API 上报；以 ObservationSource → ObservedRun → ObservedEvent 保存来源、会话与任务内序列。该路径不创建 Experiment/Attempt，也不经过调度或评分。来源写入令牌与项目读取/管理令牌分离。采集、状态与恢复边界见 [被动观测说明](observation.md)。
+
 ## 运行结构
 
 采用模块化后端、独立调度进程和独立 Runner，共享一套协议定义。API 和调度进程由同一后端代码包提供，领域规则只保留一份实现。
@@ -245,3 +249,7 @@ contracts 不依赖 server；Runner、SDK 和 CLI 依赖公共契约，不能依
 保持原有模块和单机 PostgreSQL 架构。`0002_platform` 新增 EvidenceWait 与不可变 ComparisonReport。新实验冻结证据等待秒数，等待结束后才创建绑定具体清单的评分，不重绑已有 ScoreRun。回归报告固定首个成功 Attempt、明确的 ScoreRun 选择、可比性原因及门槛结果。
 
 证据保留是不可变事实规则的一个明确生命周期操作：仅允许清除事件 data 和清单载荷，保留原摘要、标识、引用和过期时间，历史评分及报告不修改。过期证据拒绝重新上传、下载和评分。数据库和证据卷备份通过维护锁及导出快照保持一致；恢复仅面向空目标，并撤销旧 Runner 令牌以隔离恢复前的进程。细节及升级要求见 [平台说明](platform.md)。
+
+## 多 Agent 批次（2026-10-08）
+
+新增 ExperimentBatch → Experiment 分组。一个批次可原子创建多个 Agent 的独立实验，每个成员冻结自己的目标、测试集、评分器和执行配置，沿用现有工作队列、额度、取消及证据/评分流程。成员失败不主动取消其他成员；批次状态从成员状态派生，未知执行仍保留额度。不同测试集的质量结果分别展示。协议和升级说明见 [多 Agent 批次](multi-agent-batches.md)。

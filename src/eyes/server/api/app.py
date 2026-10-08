@@ -15,6 +15,7 @@ from eyes.server.api.routes import router
 from eyes.server.config import Settings
 from eyes.server.domain import DomainError
 from eyes.server.evidence.service import LocalArtifactStore
+from eyes.server.observation.routes import router as observation_router
 from eyes.server.storage.database import SCHEMA_REVISION, database
 
 
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None):
     app.state.artifacts = LocalArtifactStore(settings.artifact_root)
     app.add_middleware(RequestBoundary, settings=settings, tracer=tracer)
     app.include_router(router)
+    app.include_router(observation_router)
 
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):

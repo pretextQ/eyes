@@ -1,0 +1,20 @@
+# Copy this to a private runtime directory and replace the absolute paths.
+# The interpreter must contain Eyes and Zeta's runtime dependencies.
+server_url = "http://127.0.0.1:8000"
+name = "zeta-local"
+state_dir = "runner"
+execution_slots = 2
+score_slots = 1
+poll_seconds = 1
+secret_env_allowlist = ["OPENAI_API_KEY"]
+
+[python_agents.zeta]
+entry_point = "integrations.zeta.bridge:execute"
+prepare = "integrations.zeta.bridge:prepare"
+python = "/absolute/path/to/combined-env/bin/python"
+import_paths = ["/absolute/path/to/eyes", "/absolute/path/to/Zeta/src"]
+execution_scope = "external"
+session_isolation = true
+# Applies to the inspected read-only Zeta tools, not future shell/write tools.
+environment_isolation = true
+cpu_seconds = 240

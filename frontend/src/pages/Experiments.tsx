@@ -132,10 +132,15 @@ export function ExperimentsPage() {
         description="查看固定配置、执行状态和用例结果。"
         action={
           api && (
-            <Button onClick={create}>
-              <Plus data-icon="inline-start" />
-              创建实验
-            </Button>
+            <>
+              <Link className="button" to="/batches">
+                多 Agent 批次
+              </Link>
+              <Button onClick={create}>
+                <Plus data-icon="inline-start" />
+                创建实验
+              </Button>
+            </>
           )
         }
       />
