@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | BUG-001 | P1 | `runner/outbox.py` 单项暂时上传失败阻塞同队列其他工作 | 单项退避重试，继续发送其他工作；完成结果和证据仍使用独立发送锁 | 已实现，待故障行为验收 |
 | BUG-002 | P2 | Outbox 中无任务 JSON 的内容文件继续计入容量 | 启动时核对配对文件，将真正孤立文件转移到独立私有隔离目录；不删除潜在证据；修正重新入队的容量计算 | 已实现，待崩溃行为验收 |
-| BUG-003 | P2 | readiness 未覆盖产物实际写入、替换和持久化操作 | 用实际存储实现检查完整发布和读取路径，检查失败返回明确 503，并清理探测文件 | 待修复 |
+| BUG-003 | P2 | readiness 未覆盖产物实际写入、替换和持久化操作 | 用实际存储实现检查完整发布和读取路径，检查失败返回明确 503，并清理探测文件 | 已实现，待部署行为验收 |
 | BUG-004 | P2 | Web 创建回归报告无法显式选择重新评分结果 | 提供可选 ScoreRun 选择，显示状态及默认规则，提交 API 已有的评分选择字段；不自动覆盖最早评分 | 待修复 |
 
 ## 行为验收条件
@@ -45,3 +45,9 @@
 - 孤立内容和未完成原子写入的临时文件移入 `state_dir/outbox-orphaned/`，不计入发送容量，原字节保留。Runner `status` 增加 `orphaned_upload_files`，由维护者审查隔离文件后决定保留或删除；隔离目录没有自动保留清理，需按磁盘容量管理。
 - 同一内容文件在任务 JSON 写入失败后重新入队时，容量检查扣除即将替换的旧内容，避免重复计算。
 - Ruff lint、格式检查及 diff 空白检查通过；未执行强杀或磁盘失败注入，未改动现有运行目录。提交说明：`fix(runner): quarantine orphaned outbox files on recovery`。
+
+### BUG-003
+
+- `LocalArtifactStore.check_ready` 通过正常产物发布方法写入随机 UUID 探测文件，覆盖文件 fsync、原子替换、目录 fsync 和读取内容核对；finally 清理探测文件，不登记业务记录。
+- `/health/ready` 在上述路径失败时返回 `503 artifact_store_unavailable`，不会仅凭文件可创建就报告 ready。本次不承诺原生 Windows API 支持；目录 fsync 不可用时应使用已记录的 Linux 部署。
+- Ruff lint、格式检查及 diff 空白检查通过；未启动 API 或修改现有证据目录，尚未在运行服务验证 200/503。提交说明：`fix(api): probe durable artifact publication for readiness`。

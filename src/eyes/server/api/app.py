@@ -94,18 +94,13 @@ def create_app(settings: Settings | None = None):
             ) from exc
         if revision != SCHEMA_REVISION:
             raise DomainError(503, "migration_required", "database revision does not match service")
-        import os
-        import tempfile
-
         try:
-            root = settings.artifact_root
-            root.mkdir(parents=True, exist_ok=True)
-            fd, name = tempfile.mkstemp(prefix=".health-", dir=root)
-            os.close(fd)
-            os.unlink(name)
+            app.state.artifacts.check_ready()
         except OSError as exc:
             raise DomainError(
-                503, "artifact_store_unavailable", "artifact volume is not writable"
+                503,
+                "artifact_store_unavailable",
+                "artifact volume cannot durably publish and read files",
             ) from exc
         return {"status": "ready", "database_revision": revision}
 

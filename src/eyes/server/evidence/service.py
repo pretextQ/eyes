@@ -3,7 +3,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from uuid import UUID, uuid5
+from uuid import UUID, uuid4, uuid5
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -215,6 +215,16 @@ class LocalArtifactStore(ArtifactStore):
                 os.close(dir_fd)
         finally:
             Path(filename).unlink(missing_ok=True)
+
+    def check_ready(self) -> None:
+        key = str(uuid4())
+        content = b"eyes-artifact-readiness"
+        try:
+            self.publish(key, content)
+            if self.path(key).read_bytes() != content:
+                raise OSError("artifact readiness probe could not verify published bytes")
+        finally:
+            self.path(key).unlink(missing_ok=True)
 
 
 def publish_artifact(
