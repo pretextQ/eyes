@@ -1,6 +1,6 @@
 # 回归、证据与运维
 
-更新日期：2026-10-03。本文描述 `0002_platform` 的平台功能。真实 HTTP/Python Agent 联调按要求放在最后；运行验证边界见 [平台验证记录](platform-validation.md)。本轮交付入口为公开 API、开发者 CLI 与本地运维 CLI，Web 对比页仍是并列审阅视图。
+校准日期：2026-10-09。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 已是 `0004_experiment_batches`。公开 API、开发者 CLI、本地运维 CLI 和 Web 固定回归报告均已有实现；Web 支持显式选择历史评分，行为验收尚未完成。Python 真实接入已有记录，HTTP 仍待验收。历史运维验证边界见 [平台验证记录](platform-validation.md)，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 
@@ -12,7 +12,7 @@ uv run eyes-server
 uv run eyes-scheduler
 ```
 
-升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。数据库迁移为 `0001_control_plane → 0002_platform`，新增回归报告、证据等待记录、证据过期时间和评分取消时间。API 就绪检查要求新迁移，并实际检查证据卷可写。
+升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，后两版分别增加被动观测与实验批次。当前 API 就绪检查要求 0004，并通过实际产物发布与读取路径检查证据卷，不能仅升级到 0002 后运行当前服务。
 
 协议仍为 `1.0`。新增 `ExperimentCreate.evidence_wait_seconds`，新实验默认 60 秒，可设 0；历史实验快照缺少该字段时沿用即时评分。旧实验创建请求重试时，未显式传入新字段仍按原摘要判断幂等。旧 Runner 可继续上报，升级 Runner 后支持迟到上传完成后的 `evidence-close`。新版 Runner 对旧 API 的封存请求会失败，因此先升级服务端。
 

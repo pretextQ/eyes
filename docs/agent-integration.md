@@ -260,7 +260,7 @@ Runner 使用服务端 deadline 控制墙钟超时；心跳只续租，不延长
 
 此前给 `ExecutionResult` 增加可选 `evidence_details`，给 `ScoreInput` 增加可选 `execution_root_span_id` 和 `deadline`，给 `ExecutionInput` 增加可选 `artifact_requirements`。本次审查修复增加注册字段 `python_agents/http_origins`、结果字段 `completed_at`、契约 `ScoreAssignment` 和读取完整评分输入的接口，改变评分领取 payload 的结构。它们使用已有 JSON 字段和截止时间，不需要数据库迁移。协议仍是未发布原型的 1.0，控制端、scheduler 与 Runner 必须同步升级到本源码版本。旧注册缺少别名或 origin 时，不会获得相应 Python/HTTP 工作；持有额度时不能改变注册能力，应在升级前结束或核对旧工作。
 
-已实现的通用接口不意味着目标已通过验证。HTTP/Python 两个真实 Agent 的完整执行、评分、证据查询以及 PostgreSQL 并发、故障和恢复验收按用户要求暂缓。前端已有实现与未连接状态的浏览器验证，见 [前端记录](frontend.md)。回归报告、CI 质量门槛、完整保留删除和部署验收仍属于后续工作。
+已实现的通用接口不意味着所有目标已通过验证。Python 路径已有 Deta/Zeta/MewCode 的真实执行、评分和证据记录；HTTP Agent 闭环、Runner 整体重启、网络/数据库故障及远端停止确认仍待验收。固定回归报告、CI 质量门槛、实验证据保留清理和备份恢复已有实现，历史部署验证范围见 [平台记录](platform-validation.md)。Web 已有固定报告及证据审阅，近期历史评分选择仍待完整浏览器验收，见 [修复计划](bug-fix-plan.md)。M0～M4 的剩余工作见 [开发计划](PLAN.md)。
 
 
 ## 2026-10-03：证据等待和封存

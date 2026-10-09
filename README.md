@@ -202,6 +202,7 @@ uv run eyes-ops maintain
 | Web 与前端质量     | [frontend.md](docs/frontend.md)、[frontend-quality.md](docs/frontend-quality.md)   |
 | MewCode 接入与实测 | [接入说明](integrations/mewcode/README.md)、[验证记录](docs/mewcode-validation.md) |
 | 故障处理修复进度   | [bug-fix-plan.md](docs/bug-fix-plan.md)                                            |
+| 当前开发与验收计划 | [PLAN.md](docs/PLAN.md)                                                            |
 | 开发约定           | [AGENT.md](AGENT.md)                                                               |
 
 ```text
