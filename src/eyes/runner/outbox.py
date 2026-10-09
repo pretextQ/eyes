@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import shutil
+import time
 from pathlib import Path
 
 import httpx
@@ -32,6 +33,11 @@ class Outbox:
         write_json(identity_file, {"fingerprint": fingerprint})
         self.max_bytes = max_bytes
         self.locks = {"completion": asyncio.Lock(), "evidence": asyncio.Lock()}
+        self.retries = {}
+
+    def retry_later(self, key):
+        failures = self.retries.get(key, (0, 0))[0] + 1
+        self.retries[key] = (min(failures, 6), time.monotonic() + min(60, 2 ** min(failures, 6)))
 
     def size(self):
         return sum(path.stat().st_size for path in self.directory.rglob("*") if path.is_file())
@@ -82,6 +88,8 @@ class Outbox:
             files = []
             for path in sorted(self.pending.glob("*.json")):
                 job = json.loads(path.read_bytes())
+                if self.retries.get(job["key"], (0, 0))[1] > time.monotonic():
+                    continue
                 if (job["kind"] == "completion") == (lane == "completion"):
                     files.append((path, job))
             sent = 0
@@ -108,16 +116,19 @@ class Outbox:
                     path.unlink()
                     (self.pending / f"{job['key']}.content").unlink(missing_ok=True)
                     sent += 1
+                    self.retries.pop(job["key"], None)
                 except ApiError as error:
                     if error.retryable:
                         logger.warning("outbox_retry key=%s status=%s", job["key"], error.status)
-                        break
+                        self.retry_later(job["key"])
+                        continue
                     job["rejection"] = {"status": error.status, "code": error.code}
                     write_json(self.rejected / path.name, job)
                     content_path = self.pending / f"{job['key']}.content"
                     if content_path.exists():
                         shutil.move(content_path, self.rejected / content_path.name)
                     path.unlink()
+                    self.retries.pop(job["key"], None)
                     logger.error(
                         "outbox_rejected key=%s status=%s code=%s",
                         job["key"],
@@ -126,5 +137,5 @@ class Outbox:
                     )
                 except httpx.HTTPError, OSError:
                     logger.warning("outbox_transport_or_disk_error key=%s", job["key"])
-                    break
+                    self.retry_later(job["key"])
             return sent
