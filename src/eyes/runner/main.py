@@ -105,6 +105,9 @@ def main():
                     {
                         "pending_uploads": len(list((outbox / "pending").glob("*.json"))),
                         "rejected_uploads": len(list((outbox / "rejected").glob("*.json"))),
+                        "orphaned_upload_files": len(
+                            list((config.state_dir / "outbox-orphaned").glob("*"))
+                        ),
                         "retained_work": len(list(work.glob("*/assignment.json"))),
                         "quarantined_work": len(list(work.glob("*/quarantine.json"))),
                     },

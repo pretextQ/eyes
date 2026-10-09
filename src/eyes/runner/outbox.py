@@ -5,6 +5,7 @@ import logging
 import shutil
 import time
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 
@@ -32,12 +33,34 @@ class Outbox:
             )
         write_json(identity_file, {"fingerprint": fingerprint})
         self.max_bytes = max_bytes
+        self.recover_files()
         self.locks = {"completion": asyncio.Lock(), "evidence": asyncio.Lock()}
         self.retries = {}
 
     def retry_later(self, key):
         failures = self.retries.get(key, (0, 0))[0] + 1
         self.retries[key] = (min(failures, 6), time.monotonic() + min(60, 2 ** min(failures, 6)))
+
+    def recover_files(self):
+        # Called at startup while the Runner holds its state-directory lock.
+        # Keep unpaired bytes outside the bounded sending queue for inspection.
+        orphaned = self.directory.with_name(self.directory.name + "-orphaned")
+        for directory, other in [
+            (self.pending, self.rejected),
+            (self.rejected, self.pending),
+            (self.directory, self.directory),
+        ]:
+            for path in [*directory.glob("*.content"), *directory.glob(".writing-*")]:
+                if path.suffix == ".content":
+                    if path.with_suffix(".json").exists():
+                        continue
+                    counterpart = other / path.name
+                    if counterpart.with_suffix(".json").exists() and not counterpart.exists():
+                        shutil.move(path, counterpart)
+                        continue
+                orphaned.mkdir(parents=True, exist_ok=True, mode=0o700)
+                shutil.move(path, orphaned / f"{directory.name}-{uuid4()}-{path.name}")
+                logger.warning("outbox_orphan_preserved file=%s", path.name)
 
     def size(self):
         return sum(path.stat().st_size for path in self.directory.rglob("*") if path.is_file())
@@ -48,10 +71,16 @@ class Outbox:
             return
         job = {**job, "key": key}
         data = json_bytes(job)
-        if self.size() + len(data) + (len(content) if content else 0) > self.max_bytes:
+        content_path = self.pending / f"{key}.content"
+        replaced_bytes = content_path.stat().st_size if content_path.exists() else 0
+        additional_bytes = len(data) + (len(content) if content is not None else 0)
+        if (
+            self.size() - (replaced_bytes if content is not None else 0) + additional_bytes
+            > self.max_bytes
+        ):
             raise ValueError("durable outbox byte limit reached")
         if content is not None:
-            atomic_write(self.pending / f"{key}.content", content)
+            atomic_write(content_path, content)
         atomic_write(path, data)
 
     def evidence(self, work_id):
@@ -72,6 +101,9 @@ class Outbox:
             "rejected": len(list(self.rejected.glob("*.json"))),
             "bytes": self.size(),
             "byte_limit": self.max_bytes,
+            "orphaned": len(
+                list(self.directory.with_name(self.directory.name + "-orphaned").glob("*"))
+            ),
         }
 
     async def flush(self, client, limit=50, *, completions_only=False, evidence_only=False):
