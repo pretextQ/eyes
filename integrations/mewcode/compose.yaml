@@ -1,0 +1,21 @@
+services:
+  migrate:
+    build: &runtime_build
+      context: ..
+      dockerfile: integrations/mewcode/Dockerfile
+      additional_contexts:
+        mewcode: ../../MewCode
+  api:
+    build: *runtime_build
+  scheduler:
+    build: *runtime_build
+  runner:
+    image: eyes-mewcode:local
+    command: ["python", "/app/integrations/mewcode/run_runner.py"]
+    env_file: ../data/mewcode-integration/model.env
+    volumes:
+      - ../data/mewcode-integration:/app/data/mewcode-integration
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true

@@ -1,0 +1,23 @@
+server_url = "http://host.docker.internal:18044"
+name = "mewcode-linux-runner"
+state_dir = "/app/data/mewcode-integration/runner"
+execution_slots = 1
+score_slots = 1
+secret_env_allowlist = ["MEWCODE_MODEL_KEY"]
+
+[python_agents.mewcode]
+entry_point = "integrations.mewcode.bridge:execute"
+import_paths = ["/app", "/opt/mewcode"]
+prepare = "integrations.mewcode.bridge:prepare"
+cleanup = "integrations.mewcode.bridge:cleanup"
+execution_scope = "external"
+session_isolation = true
+environment_isolation = false
+cpu_seconds = 300
+memory_bytes = 2147483648
+
+[python_scorers.deta_code]
+entry_point = "integrations.deta.scorer:score"
+import_paths = ["/app"]
+cpu_seconds = 30
+memory_bytes = 536870912

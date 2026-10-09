@@ -1,5 +1,7 @@
 # Agent 接入与 Runner
 
+2026-10-09 新增 [MewCode 真实 Python 接入](../integrations/mewcode/README.md) 和 [Windows 本机验证](mewcode-validation.md)。Runner 及 API 产物存储使用 POSIX 能力，本机最终采用 Linux 容器；不要把本文 macOS 示例直接作为 Windows 原生运行支持声明。
+
 若要在自己的 Agent 中照常输入任务、仅让 Eyes 接收过程，请先看 [被动观测接入](observation.md)；下文的 Runner/测试集流程用于主动评测。
 
 接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 只维护统一客户端。当前已落地协议文档和独立类型契约，尚未启用运行时；本页仍描述可运行的既有 HTTP/Python 接入方式，不能将两者视为已完成迁移。

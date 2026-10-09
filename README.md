@@ -1,5 +1,7 @@
 # Eyes
 
+2026-10-09 在 Windows 宿主机完成 MewCode 单 Agent 真实评测闭环：执行 3/3、独立评分 3/3 通过、证据 3/3 sealed。实际使用本机独立 PostgreSQL、Linux API/Runner 与现有评测任务；环境失败、重评分历史及能力边界见 [验证记录](docs/mewcode-validation.md)，接入和启动步骤见 [MewCode 接入](integrations/mewcode/README.md)。
+
 Eyes 的产品目标是成为 Agent 测试与执行观测平台，支持外部测试集、自定义评分、并发执行和过程追踪，并通过版本记录、回归对比及评分证据帮助开发者验证修改效果。
 
 当前已实现控制后端、独立 Runner、HTTP/Python 接入、独立评分进程、SDK 与 Web 控制台。平台现已加入持久化回归报告、CI 门槛与开发者 CLI、服务端证据等待、评分取消/重试、证据保留清理，以及存储审计和备份恢复工具。当前迁移为 `0004_experiment_batches`。2026-10-03 已用真实 Deta coding agent 完成 Python 接入、3 个编码任务、产物上传和独立评分，见 [接入与实测记录](integrations/deta/README.md)。2026-10-08 完成 Deta 与 Zeta 双 Python Agent 的并发、受控工作进程中断和整批取消验证，见 [Zeta 接入记录](integrations/zeta/README.md)。真实 HTTP Agent、Runner 整体重启恢复及容量验收仍待完成。实现范围见 [平台功能说明](docs/platform.md)，此前的平台验证见 [平台验证记录](docs/platform-validation.md)。下文的完整产品目标不等同于全部验收通过。
