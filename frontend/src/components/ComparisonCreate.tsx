@@ -8,7 +8,7 @@ import { GitCompareArrows } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useConnection } from "../connection";
 import { formatDate, shortId } from "../format";
-import type { Experiment } from "../types";
+import type { CaseRun, Experiment } from "../types";
 import type {
   ComparisonReport,
   ComparisonRequest,
@@ -253,6 +253,15 @@ function ReportSettings({
     return matches;
   });
   const [gate, setGate] = useState(initialRequest?.gate || defaultGate);
+  const sameExperiments =
+    initialRequest?.baseline_id === baseline.id &&
+    initialRequest?.candidate_id === candidate.id;
+  const [baselineScores, setBaselineScores] = useState<string[]>(
+    sameExperiments ? initialRequest?.baseline_score_ids || [] : [],
+  );
+  const [candidateScores, setCandidateScores] = useState<string[]>(
+    sameExperiments ? initialRequest?.candidate_score_ids || [] : [],
+  );
   const [error, setError] = useState<unknown>(null);
   const pending = useRef<{ signature: string; key: string } | null>(null);
   const submitting = useRef(false);
@@ -282,6 +291,8 @@ function ReportSettings({
       candidate_id: candidate.id,
       scorer_pairs: selectedPairs,
       gate,
+      baseline_score_ids: baselineScores,
+      candidate_score_ids: candidateScores,
     };
     const signature = JSON.stringify(body);
     if (pending.current?.signature !== signature)
@@ -329,9 +340,11 @@ function ReportSettings({
                 id={`scorer-${scorer.id}`}
                 value={pairs[scorer.id] || ""}
                 disabled={busy}
-                onChange={(event) =>
-                  setPairs({ ...pairs, [scorer.id]: event.target.value })
-                }
+                onChange={(event) => {
+                  setPairs({ ...pairs, [scorer.id]: event.target.value });
+                  setBaselineScores([]);
+                  setCandidateScores([]);
+                }}
               >
                 <option value="">不纳入本报告</option>
                 {candidate.snapshot.scorers.map((other) => (
@@ -361,6 +374,22 @@ function ReportSettings({
           </AlertDescription>
         </Alert>
       )}
+      <ScoreSelection
+        experiment={baseline}
+        label="基线"
+        scorerIds={selectedPairs.map((pair) => pair.baseline_id)}
+        selected={baselineScores}
+        onChange={setBaselineScores}
+        busy={busy}
+      />
+      <ScoreSelection
+        experiment={candidate}
+        label="候选"
+        scorerIds={selectedPairs.map((pair) => pair.candidate_id)}
+        selected={candidateScores}
+        onChange={setCandidateScores}
+        busy={busy}
+      />
       <details open>
         <summary>质量门槛</summary>
         <FieldGroup className="mt-4 sm:flex-row sm:flex-wrap">
@@ -396,7 +425,7 @@ function ReportSettings({
       </details>
       <FieldDescription>
         {initialRequest &&
-          "已保留原报告门槛与原实验的评分器配对；本次重新按默认规则读取评分，不沿用显式指定的历史评分。"}
+          "相同实验保留原报告门槛、评分器配对和显式评分选择；切换评分器配对会清除历史评分选择。"}
         每个用例的重复执行先求平均，再按用例等权汇总。默认选择首个成功执行及其最早评分；不会自动采用后来重新评分的结果。
       </FieldDescription>
       {error != null && <ErrorNotice error={error} />}
@@ -415,5 +444,163 @@ function ReportSettings({
         </Button>
       </div>
     </form>
+  );
+}
+
+function ScoreSelection({
+  experiment,
+  label,
+  scorerIds,
+  selected,
+  onChange,
+  busy,
+}: {
+  experiment: Experiment;
+  label: string;
+  scorerIds: string[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  busy: boolean;
+}) {
+  const { api } = useConnection();
+  const [open, setOpen] = useState(selected.length > 0);
+  const runs = useInfiniteQuery({
+    queryKey: ["comparison-score-options", experiment.id],
+    initialPageParam: 0,
+    queryFn: ({ signal, pageParam }) =>
+      api!.request<{ items: CaseRun[] }>(
+        `/v1/experiments/${experiment.id}/case-runs?limit=50&offset=${pageParam}`,
+        { signal },
+      ),
+    getNextPageParam: (last, pages) =>
+      last.items.length === 50 ? pages.length * 50 : undefined,
+    enabled: !!api && open,
+  });
+  const rows = (runs.data?.pages.flatMap((page) => page.items) || []).flatMap(
+    (run) => {
+      const attempt = run.attempts.find((item) => item.status === "succeeded");
+      return scorerIds.map((scorerId) => ({
+        run,
+        attempt,
+        scorer: experiment.snapshot.scorers.find(
+          (item) => item.id === scorerId,
+        ),
+        scores:
+          attempt?.score_runs?.filter(
+            (score) => score.scorer_id === scorerId,
+          ) || [],
+      }));
+    },
+  );
+  const knownIds = new Set(
+    rows.flatMap((row) => row.scores.map((score) => score.id)),
+  );
+  const unloaded = selected.filter((id) => !knownIds.has(id));
+  return (
+    <details
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        {label}评分历史（可选）· 已显式选择 {selected.length} 项
+      </summary>
+      <div className="mt-4 flex flex-col gap-4">
+        <FieldDescription>
+          留空使用首个成功执行的最早评分。可显式选择重新评分记录，报告会固定所选记录；不改变实验原始汇总或旧报告。
+        </FieldDescription>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || !selected.length}
+          onClick={() => onChange([])}
+        >
+          恢复全部默认评分
+        </Button>
+        {runs.isPending ? (
+          <Loading label="正在读取评分历史" />
+        ) : runs.error ? (
+          <ErrorNotice error={runs.error} retry={() => void runs.refetch()} />
+        ) : (
+          <>
+            {!rows.length && (
+              <Empty
+                compact
+                title="暂无可选评分"
+                description="请先选择评分口径配对，或等待实验产生执行与评分记录。"
+              />
+            )}
+            {rows.map(({ run, attempt, scorer, scores }) => {
+              const value =
+                selected.find((id) =>
+                  scores.some((score) => score.id === id),
+                ) || "";
+              const fieldId = `score-${label}-${run.id}-${scorer?.id}`;
+              return (
+                <Field key={fieldId}>
+                  <FieldLabel htmlFor={fieldId}>
+                    {run.case.case_id} · 第 {run.repetition + 1} 次 ·{" "}
+                    {scorer?.content.name}
+                  </FieldLabel>
+                  <select
+                    id={fieldId}
+                    value={value}
+                    disabled={busy || !scores.length}
+                    onChange={(event) =>
+                      onChange([
+                        ...selected.filter(
+                          (id) => !scores.some((score) => score.id === id),
+                        ),
+                        ...(event.target.value ? [event.target.value] : []),
+                      ])
+                    }
+                  >
+                    <option value="">
+                      默认：
+                      {scores[0]
+                        ? `${shortId(scores[0].id)} · ${scores[0].status} · ${scores[0].result?.verdict || "无质量结论"}`
+                        : "尚无评分"}
+                    </option>
+                    {scores.map((score) => (
+                      <option key={score.id} value={score.id}>
+                        {shortId(score.id)} · {formatDate(score.created_at)} ·{" "}
+                        {score.status} · {score.result?.verdict || "无质量结论"}
+                      </option>
+                    ))}
+                  </select>
+                  {attempt && (
+                    <Link
+                      className="small-text"
+                      to={`/experiments/${experiment.id}/cases/${run.id}?attempt=${attempt.id}&view=scores${value ? `&score=${value}` : ""}`}
+                    >
+                      查看评分与证据
+                    </Link>
+                  )}
+                </Field>
+              );
+            })}
+            {runs.hasNextPage && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || runs.isFetchingNextPage}
+                onClick={() => void runs.fetchNextPage()}
+              >
+                加载更多用例的评分
+              </Button>
+            )}
+            {!!unloaded.length && (
+              <Alert>
+                <AlertTitle>
+                  有 {unloaded.length} 项历史选择尚未出现在当前列表
+                </AlertTitle>
+                <AlertDescription>
+                  请加载更多用例或检查记录是否仍属于首个成功执行；服务端会校验所选评分的归属。也可恢复默认选择。
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
+        )}
+      </div>
+    </details>
   );
 }

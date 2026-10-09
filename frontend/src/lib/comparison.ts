@@ -15,6 +15,8 @@ export interface ComparisonRequest {
   candidate_id: string;
   scorer_pairs: { baseline_id: string; candidate_id: string }[];
   gate: GatePolicy;
+  baseline_score_ids?: string[];
+  candidate_score_ids?: string[];
 }
 export interface ComparisonSide {
   case_run_id: string;
