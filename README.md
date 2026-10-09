@@ -1,6 +1,14 @@
 # Eyes
 
-**面向团队自托管的 AI Agent 评测与执行观测平台。**
+![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+
+**自托管的 AI Agent 评测与执行观测平台。**
 
 Eyes 把测试集、Agent 执行、评分依据和过程证据关联起来，帮助开发者判断任务是否完成、理解失败原因，以及比较 Agent 修改后的改善与退化。
 
