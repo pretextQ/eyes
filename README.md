@@ -1,33 +1,127 @@
 # Eyes
 
-2026-10-09 在 Windows 宿主机完成 MewCode 单 Agent 真实评测闭环：执行 3/3、独立评分 3/3 通过、证据 3/3 sealed。实际使用本机独立 PostgreSQL、Linux API/Runner 与现有评测任务；环境失败、重评分历史及能力边界见 [验证记录](docs/mewcode-validation.md)，接入和启动步骤见 [MewCode 接入](integrations/mewcode/README.md)。
+**面向团队自托管的 AI Agent 评测与执行观测平台。**
 
-Eyes 的产品目标是成为 Agent 测试与执行观测平台，支持外部测试集、自定义评分、并发执行和过程追踪，并通过版本记录、回归对比及评分证据帮助开发者验证修改效果。
+Eyes 把测试集、Agent 执行、评分依据和过程证据关联起来，帮助开发者判断任务是否完成、理解失败原因，以及比较 Agent 修改后的改善与退化。
 
-当前已实现控制后端、独立 Runner、HTTP/Python 接入、独立评分进程、SDK 与 Web 控制台。平台现已加入持久化回归报告、CI 门槛与开发者 CLI、服务端证据等待、评分取消/重试、证据保留清理，以及存储审计和备份恢复工具。当前迁移为 `0004_experiment_batches`。2026-10-03 已用真实 Deta coding agent 完成 Python 接入、3 个编码任务、产物上传和独立评分，见 [接入与实测记录](integrations/deta/README.md)。2026-10-08 完成 Deta 与 Zeta 双 Python Agent 的并发、受控工作进程中断和整批取消验证，见 [Zeta 接入记录](integrations/zeta/README.md)。真实 HTTP Agent、Runner 整体重启恢复及容量验收仍待完成。实现范围见 [平台功能说明](docs/platform.md)，此前的平台验证见 [平台验证记录](docs/platform-validation.md)。下文的完整产品目标不等同于全部验收通过。
+你可以导入自己的任务和评分规则，通过 Runner 调用外部 Agent，查看逐用例结果、工具事件和产物，再生成固定的回归报告。也可以只接收 Agent 的过程事件，用于日常执行观测。
 
-系统边界、技术选择、接入契约、故障处理和交付阶段见 [首版架构方案](docs/architecture.md)。当前实现、启动命令、API 清单和 Runner 接入约定见 [后端开发说明](docs/backend.md)，HTTP 协议、本地入口、SDK、评分器与恢复说明见 [Agent 接入文档](docs/agent-integration.md)，验证记录见 [后端验证记录](docs/backend-validation.md)。
+当前版本为 **0.1.0，处于真实接入与可靠性验收阶段**。已有 Python Agent 的真实执行、评分和证据展示记录；完整发布验收仍在推进。
 
-## 直接观测本地 Agent
+## 主要能力
 
-在 Deta 终端照常输入任务，Eyes 自动接收会话、模型调用与工具参数/结果。本机默认自动登记，无需来源令牌，不需要创建测试集、评分器或实验；纯观测只需 API、数据库和前端。接入、缓冲与实测边界见 [被动观测说明](docs/observation.md)。
+| 能力          | 当前实现                                                       |
+| ------------- | -------------------------------------------------------------- |
+| 自定义评测    | JSONL 测试集、版本化用例、规则评分和可信 Python 评分器         |
+| Agent 接入    | 通用 HTTP 适配器、本地 Python 适配器，按能力和凭据匹配 Runner  |
+| 执行调度      | 独立执行与评分额度、租约和心跳、超时、取消、未知状态保留       |
+| 多 Agent 批次 | 一次创建多个独立实验，成员分别配置任务集、评分器与并发         |
+| 执行证据      | SDK 事件、trace/span 关联、产物上传与摘要校验、证据完整性标识  |
+| 独立评分      | 评分绑定固定证据清单，支持错误重试和重新评分，保留历史         |
+| 回归对比      | 逐用例可比性检查、改善/退化统计、固定报告及 CLI 质量门槛       |
+| Web 控制台    | 实验、批次、用例审阅、评分历史、回归报告、目录与运行状态       |
+| 被动观测      | 独立会话/任务事件入口、执行流程图；当前真实接入案例为 Deta CLI |
+| 运维          | 数据库迁移、存储审计、证据保留、文件回收及数据库/证据备份恢复  |
 
-## 启动控制后端
+模型评分可以通过可信 Python 评分器接入。内置评分器不会自动判断任意业务任务，也不会把 Agent 自述当作任务已完成的证明。
 
-保持 Python >=3.14，使用 `uv.lock` 安装固定依赖：
+## 两条使用路径
+
+### 主动评测
+
+接入 Agent → 导入测试集 → 发布评分器 → 创建实验或批次 → Runner 执行 → 查看评分与证据 → 对比迭代。
+
+每次实验冻结目标、测试集、评分器和执行配置。执行状态、评分结论与证据完整性分别记录：执行成功不等于任务质量通过，`sealed` 只代表声明采集范围已封存。
+
+重新评分产生新的 ScoreRun，不覆盖旧记录。回归报告默认选择首个成功执行的最早评分；Web 也支持显式选择历史评分，生成绑定所选记录的新报告。
+
+### 被动观测
+
+在 Agent 中照常发起任务 → exporter 上报实际事件 → Eyes 展示会话、模型和工具调用。
+
+此路径不需要测试集、评分器或 Runner，不创建评测实验。目前 Deta CLI 已有真实接入和离线补传记录；MewCode 当前通过主动评测的 Python 桥接接入。详见[被动观测说明](docs/observation.md)。
+
+## 系统结构
+
+```mermaid
+flowchart LR
+    Web[Web / CLI] --> API[控制 API]
+    API --> DB[(PostgreSQL)]
+    Scheduler[调度进程] --> DB
+    Runner[目标环境中的 Runner] --> API
+    Runner --> Agent[HTTP / Python Agent]
+    Runner --> Scorer[独立评分进程]
+    API --> Evidence[事件与产物存储]
+    Exporter[Agent 观测 exporter] --> API
+```
+
+控制后端管理版本、实验、调度状态、评分和证据；Runner 主动通过认证 API 领取、续租并上报，不直接连接数据库。目标 Agent 负责自己的推理和工具执行，适配器负责转换接入接口。
+
+主要技术：Python 3.14+、FastAPI、Pydantic、SQLAlchemy、PostgreSQL、OpenTelemetry，以及 React、TypeScript、Vite 和 shadcn/Base UI。
+
+## 当前验证进度
+
+| 范围          | 已有证据                                                                                                    | 尚未覆盖                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| MewCode 评测  | 2026-10-09：3/3 执行成功、3/3 独立评分通过，共 12/12 项功能检查；3/3 sealed，53 条事件、6 份产物及 Web 核对 | 完整 MewCode 服务、复杂仓库任务、远端取消、重启恢复与容量 |
+| 多 Agent 执行 | Deta/Zeta 两个 Python Agent 的真实并发，峰值 3 个任务；受控工作进程中断与批次取消                           | 真实 HTTP Agent、Runner 整体崩溃、网络/数据库故障         |
+| 回归与部署    | 固定报告、证据跳转、部分 CLI 门槛、历史 Compose 部署和数据库备份恢复                                        | 真实版本改善/退化、含完整事件和产物的恢复、生产容量       |
+| 本轮 Bug 修复 | 单项上传退避、孤立文件隔离、完整产物存储就绪检查、Web 历史评分选择已实现并通过相关静态检查/构建             | 故障注入及完整浏览器行为验收                              |
+
+MewCode 目前是 Eyes 的主要被测 Agent，用于验证平台能力。上述三任务结果是基础功能冒烟记录，不代表 MewCode 的完整编码能力或稳定性。
+
+最新证据见 [MewCode 验证记录](docs/mewcode-validation.md)、[双 Agent 记录](integrations/zeta/README.md)和 [Bug 修复计划](docs/bug-fix-plan.md)。早期文档保留当时状态，应结合日期和后续追加记录阅读。
+
+## 启动控制平台
+
+### Docker Compose
+
+需要 Docker Engine 与 Compose，或运行 Linux 容器的 Docker Desktop。在项目根目录执行：
+
+```sh
+cp deploy/.env.example deploy/.env
+```
+
+将 `deploy/.env` 中的 `POSTGRES_PASSWORD` 改为自行生成的随机十六进制密码。PowerShell 可用 `Copy-Item deploy/.env.example deploy/.env` 复制文件。配置完成后：
+
+```sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml up --build -d
+docker compose --env-file deploy/.env -f deploy/compose.yaml exec api eyes-admin bootstrap --name default
+```
+
+`bootstrap` 在首次初始化时创建项目，输出项目 ID 和一次性管理令牌；不要把它当作每次重启的步骤。保存令牌，在 Web 的“连接设置”中连接项目。
+
+| 入口       | 默认地址                           |
+| ---------- | ---------------------------------- |
+| Web 控制台 | http://127.0.0.1:8080              |
+| 控制 API   | http://127.0.0.1:8000              |
+| API 文档   | http://127.0.0.1:8000/docs         |
+| 就绪检查   | http://127.0.0.1:8000/health/ready |
+
+Compose 包含 PostgreSQL、迁移、API、Scheduler 和 Web，**不包含可直接执行任意 Agent 的 Runner**。仅启动控制平台不会自动运行任务。数据库和证据使用独立数据卷。
+
+通用 Compose 方案有历史部署记录；本次 Windows/MewCode 实测使用的是独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，完整 Compose 部署未在该环境验收。其实际启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。
+
+### 源码开发
+
+API 与 Runner 使用 Linux/macOS 的 POSIX 能力。Windows 上请将这两个组件放在 Linux 环境中运行；已有实测方案采用 Linux 容器。目录 `fsync`、进程组及资源限制尚不支持完整原生 Windows 路径。
+
+准备 Python 3.14+、uv、Node.js 22.12+ 和可用的 PostgreSQL。Linux/macOS 上：
 
 ```sh
 uv sync --frozen
 cp .env.example .env
-# 将 .env 中的 EYES_DATABASE_URL 改为实际 PostgreSQL 连接地址。
+```
+
+编辑 `.env` 的 `EYES_DATABASE_URL`，连接专用 PostgreSQL 数据库，再执行：
+
+```sh
 uv run alembic upgrade head
 uv run eyes-admin bootstrap --name default
 uv run eyes-server
 ```
 
-另一个终端运行 `uv run eyes-scheduler`。API 默认监听 `127.0.0.1:8000`，交互文档位于 `/docs`。`eyes-admin` 创建项目并一次性输出管理令牌，业务 API 使用 Bearer 认证。Docker Compose 启动方式及更完整的说明见 [后端开发说明](docs/backend.md)。
-
-## 启动 Web 控制台
+在另一终端运行 `uv run eyes-scheduler`，API 与 Scheduler 使用相同数据库及调度配置。启动前端：
 
 ```sh
 cd frontend
@@ -35,126 +129,36 @@ npm ci
 npm run dev
 ```
 
-打开 `http://127.0.0.1:5173/`，在右上角“连接设置”输入项目令牌。控制台包含实验、用例执行证据、目标接入、JSONL 测试集、评分口径、固定回归报告与运行状态；未连接时显示连接引导。开发请求经 `/api` 代理到控制 API，令牌仅在当前页面内存中保存。
+开发前端默认地址为 http://127.0.0.1:5173，API 为 http://127.0.0.1:8000。API 使用其他地址时，在 `frontend/.env.local` 配置 `EYES_API_PROXY_TARGET`；示例见 [frontend/.env.example](frontend/.env.example)。Web 的项目令牌只保存在页面内存中，刷新后需重新连接。
 
-完整前端启动、配置、Compose 部署及验证边界见 [Web 控制台说明](docs/frontend.md)，本轮优化、截图和剩余差距见 [前端质量记录](docs/frontend-quality.md)。Web 支持创建和读取固定回归报告，展示质量门槛、改善/退化、不可比原因及固定评分证据；API/CLI 使用同一份报告。Compose 默认前端入口为 `http://127.0.0.1:8080/`，部署验证范围见平台验证记录。
+## 接入 Agent 与 Runner
 
-## 多 Agent 并发任务
-
-在「多 Agent 批次」一次配置多个 Agent，每个成员独立选择测试集、评分口径和任务并发数。批次集中展示任务进度，并沿用各成员的实验、证据和评分链路。实际执行受目标隔离能力、各级容量和 Runner 槽位限制；使用、API、CLI 与升级说明见 [多 Agent 批次](docs/multi-agent-batches.md)。
-
-后续接入以语言无关的统一 Agent 协议为默认方向，避免为每个 Agent 在 Eyes 核心中增加专用调用逻辑。[协议 v1 草案](docs/agent-protocol.md) 已定义能力发现、幂等提交、状态/结果查询及可选取消、事件和产物，并提供可导出的 JSON Schema。目前只落地文档与数据契约，统一协议客户端和接入端服务尚未实现；现有 HTTP/Python 接入行为保持不变。
-
-## 启动 Agent Runner
-
-在目标宿主机复制并填写配置，通过环境变量提供已签发的 Runner 令牌：
+在目标所在的 Linux/macOS 环境安装 Eyes，复制并修改配置：
 
 ```sh
 cp deploy/runner.example.toml runner.toml
 uv run eyes-runner --config runner.toml plugins
+uv run eyes-runner --config runner.toml status
+```
+
+先发布目标版本和评分器，再在控制端签发限制到该项目、目标及执行/评分工作类型的 Runner 令牌。将其通过 `EYES_RUNNER_TOKEN` 环境变量提供，随后运行：
+
+```sh
 uv run eyes-runner --config runner.toml run
 ```
 
-`plugins` 查看本机入口能力和评分器实现摘要，`status` 查看待上传、被拒绝及隔离工作。HTTP 目标配置允许的 origin，本地 Python 目标配置可信模块入口；完整配置、令牌签发和发布请求见 [Agent 接入文档](docs/agent-integration.md)。
+- HTTP 接入：配置允许的 origin，并按现有任务接口实现请求、结果及实际支持的取消/查询行为。
+- Python 接入：配置可信的执行、准备、清理入口及解释器；评分器可以使用独立解释器。
+- 多个 Runner 使用不同凭据与状态目录。容器内的 `localhost` 指向该容器，应按实际网络配置服务地址。
+- 会话隔离、环境隔离、取消和幂等必须如实声明，Eyes 据此匹配任务和限制并发。
 
-## 核心流程
+完整步骤见 [Agent 接入文档](docs/agent-integration.md)。MewCode 桥接、运行配置与采集工具位于 [integrations/mewcode](integrations/mewcode/README.md)。
 
-接入目标 Agent → 导入测试集 → 配置评分口径 → 创建实验 → 并发执行 → 查看评分和执行证据 → 修改后回归对比。
+语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)目前只有文档、类型契约和 JSON Schema；统一协议客户端与参考服务尚未实现，不能替代现有可运行的 HTTP/Python 接入。
 
-每条测试结果应能关联到具体用例、执行尝试、评分记录和已采集的执行过程。
+## 回归与运维
 
-## 已确认的能力范围
-
-### Agent 功能测试与并发执行
-
-- 对指定外部 Agent 执行测试集，记录每个用例的输入、输出、执行状态和耗时。
-- 支持多个独立测试任务并发运行，并提供批次进度和单任务详情。
-- 测试任务之间的并发由 Eyes 调度；目标 Agent 内部的工具和子 Agent 并发属于观测内容。
-
-### 外部测试集与自定义评分口径
-
-- 支持用户导入自己的测试集，校验用例标识、输入及评分所需字段，并明确报告无效记录。
-- 允许按评分器需要提供参考答案、业务约束或预期产物，不强制所有任务使用文本标准答案。
-- 评分器可基于任务输出、已采集的执行轨迹和任务产物进行判定。
-- JSONL 导入格式、规则评分和可信 Python 评分接口已实现；模型评分可按同一 Python 接口接入自己的调用逻辑。
-
-### 外部 Agent 执行过程观测
-
-- 将单次任务与可采集的模型调用、工具执行、子 Agent 调用、异常及产物关联。
-- 展示执行顺序、父子关系和并行关系，支持从测试结果进入对应执行详情。
-- 显示采集来源、覆盖范围、截断、丢失和未完成状态。
-
-透明化能力取决于目标提供的接入条件：
-
-| 接入条件 | 可观测范围 |
-| --- | --- |
-| 仅提供任务接口 | 输入、输出、接口错误和总耗时 |
-| 模型通信经过代理 | 经过代理的消息、模型提出的工具调用和回传的工具结果 |
-| 接入 SDK 或上报执行轨迹 | 实际埋点覆盖的执行边界、异常和调用关系 |
-
-只有任务接口时无法还原内部执行。模型提出工具调用、Agent 回传工具结果、采集器观察到工具执行需要分别表达。缺少证据的步骤保持未知。
-
-### 版本与回归对比
-
-- 实验创建时固定测试集版本、评分器版本及参数、通过阈值、目标配置和执行配置。
-- 保存目标提供的 Agent 版本，以及能获取到的模型、prompt 等配置标识；无法获取的内容标记为未知。
-- 保留历史实验，后续编辑测试集或评分器不改变历史记录。
-- 按用例标识及内容版本比较实验，展示新增失败、恢复通过、分数和耗时变化。
-- 对新增、删除或修改的用例，以及评分口径变化，单独标记可比性，避免直接混入同口径指标。
-
-版本快照用于追溯执行条件。外部模型、服务及业务状态可能变化，因此不承诺完全相同的重复执行结果。
-
-### 可靠调度与隔离
-
-- 支持全局和目标级并发限制、单任务超时、批次取消及进度查询。
-- 每次执行尝试独立记录；重试和重跑保留前次状态、结果及原因。
-- 持久化任务状态，服务重启后能够识别未完成任务，并按目标能力决定恢复、重试或标记结果未知。
-- 为用例提供独立会话和执行上下文，并明确工作目录、远程业务数据等资源的隔离责任。
-- 目标不能提供足够隔离时，应限制并发或明确拒绝该配置。
-- 由目标接入方声明重试与取消能力。远程取消未确认时保留相应状态，不能仅因本地停止等待就认定目标已停止。
-- 对可能产生副作用的任务，依据幂等能力和执行证据决定是否重试；执行结果未知时不自动重复操作。
-
-建议目标适配接口包含准备、执行和清理三个阶段。清理失败应单独记录，不覆盖原执行结果。
-
-### 评分证据
-
-- 每项评分保存评分器版本、使用的配置、分数或判定、理由，以及对应输入、输出、轨迹或产物的引用。
-- 区分目标执行失败、评分未通过、评分器失败和证据不足。
-- 明确分数方向、范围、通过阈值及汇总规则；缺失评分不能默认为零或通过。
-- 报表同时展示执行完成率、评分覆盖情况和有明确分母的通过率。
-- 证据采集和保存应支持敏感内容处理、大小限制及保留策略；证据缺失或过期需要可见。
-
-## 建议的数据对象
-
-以下关联已进入公共契约与控制端模型，固定回归报告通过 API/CLI 提供。
-
-| 对象 | 职责 |
-| --- | --- |
-| 目标 Agent | 保存接入配置、版本信息及隔离、取消、重试、观测能力声明 |
-| 测试集版本 | 固定一组带稳定标识和内容版本的用例 |
-| 评分器版本 | 固定评分逻辑或规则、参数约定及输出含义 |
-| 实验 | 绑定目标、测试集、评分口径及调度配置 |
-| 用例执行尝试 | 记录一次具体调用、状态及重试关系 |
-| 执行轨迹与产物 | 保存过程事实、来源和覆盖范围 |
-| 评分记录 | 将评分结论与执行尝试、评分器及证据关联 |
-
-执行与评分分别记录状态，为复用已有执行证据重新评分保留接口；重新评分不能覆盖旧记录。
-
-## 建议的首版验收标准
-
-1. 接入一个真实外部 Agent，导入用户提供的测试集和自定义评分器，完成一次批量实验。
-2. 配置并发上限后，实际同时执行的任务不超限，用例之间不会串用会话；无法保证隔离时有明确处理。
-3. 超时、取消、评分器异常和服务重启都留下可解释的状态；未确认的外部执行结果保持未知。
-4. 任意一条评分都能追溯到执行尝试、评分口径和实际使用的证据，观测缺口明确可见。
-5. 在目标修改后再次运行，能够逐条比较可比用例，并明确列出数据集或评分口径变化。
-
-这些是完整流程的验收要求。当前检查证据见 [验证记录](docs/backend-validation.md)，真实 Agent 执行、评分和故障恢复按本次要求暂缓验收。
-
-## 后续验收
-
-先完成平台能力，再接入两个真实 Agent 验证执行、评分、证据等待、取消及故障恢复。Web 已接入回归报告，运维交互可继续基于公开 API 扩展；真实事件、评分引用定位及完整产品交互仍需实际任务验收。
-
-## 回归与运维命令
+开发者 CLI 使用 `EYES_TOKEN` 提供项目令牌，默认连接 `http://127.0.0.1:8000`；可用 `--url` 指定 API。
 
 ```sh
 uv run eyes --help
@@ -164,6 +168,49 @@ uv run eyes-ops audit
 uv run eyes-ops maintain
 ```
 
-`eyes gate` 以 0/1/2/3 区分通过、失败、无法判定和配置/服务错误。`eyes-ops maintain` 默认只预览，`--apply` 执行清理。请求格式、升级边界、备份恢复和保留配置见 [平台功能说明](docs/platform.md)。
+`comparison.json` 使用真实实验和评分器 UUID，请求格式见[平台说明](docs/platform.md)。`eyes gate` 的退出码分别为：0 通过、1 不通过、2 无法判定、3 配置或服务错误。
 
-优先使用真实项目验证这些契约。首版暂不扩展攻击样例库、Agent 构建器、自动修复或大规模框架适配；这些能力需要另行评估和确认范围。
+`eyes-ops` 在控制端使用其数据库与证据卷配置。`maintain` 默认预览，`--apply` 才执行清理。备份恢复、升级和保留策略须按[运维说明](docs/platform.md)操作。
+
+## 数据与执行边界
+
+- 项目管理/读取令牌、Runner 令牌和模型 API key 分开使用。目标快照保存密钥引用，不保存明文凭据；本机 `.env`、`data/` 和前端本地配置不提交 Git。
+- Python 插件及 shell 按可信代码管理。独立目录、独立进程或本轮容器部署不能自动视为安全沙箱。
+- 未确认停止的外部任务保持未知；本地进程退出或租约失效不证明远端任务已经停止。
+- 观测范围取决于实际接口与埋点。缺失、截断、丢弃和过期证据应明确显示，不能推断隐藏执行过程。
+- 重新评分、迟到证据和报告生成保留历史；显式选择新评分不会改变原实验汇总。
+- Outbox 孤立文件保存在私有 `outbox-orphaned` 目录供排查，需人工管理保留；被动观测记录尚无自动保留清理策略。
+
+## 文档与源码导航
+
+| 主题               | 入口                                                                               |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| 架构与阶段验收     | [architecture.md](docs/architecture.md)                                            |
+| 后端、认证与 API   | [backend.md](docs/backend.md)                                                      |
+| Agent/Runner 接入  | [agent-integration.md](docs/agent-integration.md)                                  |
+| 回归、证据与运维   | [platform.md](docs/platform.md)                                                    |
+| 多 Agent 批次      | [multi-agent-batches.md](docs/multi-agent-batches.md)                              |
+| 被动观测           | [observation.md](docs/observation.md)                                              |
+| Web 与前端质量     | [frontend.md](docs/frontend.md)、[frontend-quality.md](docs/frontend-quality.md)   |
+| MewCode 接入与实测 | [接入说明](integrations/mewcode/README.md)、[验证记录](docs/mewcode-validation.md) |
+| 故障处理修复进度   | [bug-fix-plan.md](docs/bug-fix-plan.md)                                            |
+| 开发约定           | [AGENT.md](AGENT.md)                                                               |
+
+```text
+src/eyes/contracts/   公共数据契约
+src/eyes/server/      控制 API、调度、证据、评分、回归与运维
+src/eyes/runner/      宿主机执行、进程控制及持久化发送队列
+src/eyes/adapters/    HTTP/Python 适配器
+src/eyes/sdk/         事件和链路采集
+src/eyes/scorers/     内置规则评分
+src/eyes/cli/         开发者 CLI
+frontend/            Web 控制台
+migrations/          PostgreSQL 迁移
+deploy/              通用部署示例
+integrations/        真实 Agent 接入案例
+docs/                设计、使用和验证记录
+```
+
+## 下一步
+
+当前重点是完成四项修复的行为验收、可靠部署与故障恢复，补齐真实 HTTP 接入、真实版本回归和含产物的备份恢复记录，再开展容量及长期运行验证。功能实现、静态检查和真实运行验收分别记录，以实际证据判断交付阶段。
