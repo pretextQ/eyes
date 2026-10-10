@@ -1,5 +1,6 @@
 # Eyes
 
+[![CI](https://github.com/pretextQ/eyes/actions/workflows/ci.yml/badge.svg)](https://github.com/pretextQ/eyes/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
@@ -138,6 +139,28 @@ npm run dev
 ```
 
 开发前端默认地址为 http://127.0.0.1:5173，API 为 http://127.0.0.1:8000。API 使用其他地址时，在 `frontend/.env.local` 配置 `EYES_API_PROXY_TARGET`；示例见 [frontend/.env.example](frontend/.env.example)。Web 的项目令牌只保存在页面内存中，刷新后需重新连接。
+
+## 仓库 CI
+
+[GitHub Actions 工作流](.github/workflows/ci.yml) 在推送、Pull Request 和手动触发时并行执行两组检查，使用 `uv.lock` 和 `frontend/package-lock.json` 安装固定依赖。Python 锁文件使用官方 PyPI 下载地址；Git 属性将前端文本文件统一为 LF 换行，避免 Windows 检出后的格式检查差异。
+
+- 后端（Python 3.14）：`ruff check src migrations`、`ruff format --check src migrations`。
+- 前端（Node.js 24，与前端 Docker 构建一致）：`npm run lint`、`npm run format:check`、`npm run build`；构建包含 TypeScript 类型检查。
+
+本地运行同样的检查：
+
+```sh
+uv sync --frozen
+uv run --no-sync ruff check src migrations
+uv run --no-sync ruff format --check src migrations
+cd frontend
+npm ci
+npm run lint
+npm run format:check
+npm run build
+```
+
+这些检查覆盖代码规范、格式、类型和前端构建，不启动 PostgreSQL 或外部 Agent，也不代表真实评测、调度恢复或部署验收通过。产品的 `eyes gate` 回归质量门槛与仓库 CI 分开使用。
 
 ## 接入 Agent 与 Runner
 

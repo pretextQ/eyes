@@ -1,0 +1,3 @@
+# Keep Prettier-managed files consistent across Windows and Linux checkouts.
+frontend/** text=auto eol=lf
+.github/workflows/** text eol=lf
