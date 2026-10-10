@@ -1,6 +1,6 @@
 # Eyes 开发与验收计划
 
-初次校准日期：2026-10-09。依据当前源码、0001～0004 迁移、根目录 [开发约定](../AGENT.md) 与已有验证记录整理；该次仅做源码和文档核对。2026-10-10 仅更新统一 Agent 协议运行时任务：实现与静态检查完成、真实 HTTP 验收因环境故障阻塞，见[检查记录](agent-http-validation.md)。其他历史结果按原记录引用，不作为本次重新验证。
+初次校准日期：2026-10-09。依据当前源码、0001～0004 迁移、根目录 [开发约定](../AGENT.md) 与已有验证记录整理；该次仅做源码和文档核对。2026-10-10 仅更新统一 Agent 协议运行时任务：实现与静态检查完成，Docker 恢复后真实 MewCode HTTP 基本闭环已验收，见[检查及实际记录](agent-http-validation.md)。其他历史结果按原记录引用，不作为本次重新验证。
 
 状态含义：**已实现**表示找到对应代码；**部分实现**表示设计中仍有实现缺口；**未实现**表示已明确保留为计划且未找到运行时实现；**无法确认**表示缺少足够运行证据。功能实现与里程碑验收分别判断，静态核对不能证明可靠性或容量。优先级 P1 为首版闭环/可信度阻塞，P2 为发布验收，P3 为后续扩展。
 
@@ -9,7 +9,7 @@
 | 功能 | 实现状态 | 代码依据 | 验证边界 |
 | --- | --- | --- | --- |
 | 版本、JSONL 导入与实验快照 | 已实现 | `contracts/dataset.py`、`server/catalog/service.py`、`server/experiments/service.py`；0001 版本/快照保护触发器 | 整体错误行校验、幂等、同事务入队；多轮 steps 不在已完成范围 |
-| HTTP/Python 接入与独立执行/评分进程 | 已实现 | `adapters/http.py`、`adapters/python.py`、`runner/process.py`、`runner/worker.py` | Python 真实闭环有记录；HTTP 通用代码不能替代真实 HTTP 目标验收 |
+| HTTP/Python 接入与独立执行/评分进程 | 已实现 | `adapters/agent_http.py`、`adapters/http.py`、`adapters/python.py`、`runner/process.py`、`runner/worker.py` | Python 真实闭环及 2026-10-10 MewCode 统一 HTTP 3/3 执行与独立评分有记录；不能推广为全部可选/故障能力已验收 |
 | 认证、项目与 Runner 范围 | 已实现 | `server/api/dependencies.py`、`server/admin.py`、`server/scheduling/service.py` | read/manage/runner 边界已有代码；完整权限验收仍待补齐 |
 | 领取、执行/评分容量、租约、取消与未知额度保留 | 已实现 | `server/scheduling/service.py`、`server/storage/database.py` | advisory lock 与 SKIP LOCKED 协作；双 Python Agent 的峰值 3 任务和部分中断/取消有记录，完整故障矩阵未验收 |
 | SDK、事件去重、产物上传与固定清单 | 已实现 | `sdk/recorder.py`、`server/evidence/service.py`、`runner/outbox.py` | MewCode 有真实事件/产物记录；缺失、迟到、耗尽、过期等分支未全面验证 |
@@ -28,7 +28,7 @@
 | --- | --- | --- | --- |
 | 普通契约严格要求版本字段 | 部分实现 | `contracts/base.py` 的 `schema_version` 缺省为 1.0，已拒绝其他版本与未知字段；[开发约定](../AGENT.md) 要求拒绝缺失版本。后续需制定兼容/迁移方式再修改，不能直接改变旧请求行为 | P1 |
 | 重启后未知远端任务自动核对 | 部分实现 | 适配器有 cancel/reconcile，Runner 在有效租约期间调用；Scheduler 仅扫描、标 unknown 并保留额度，管理端 resolve 追加人工事实。缺少后台主动查询/重启后自动协调，不得自动重跑未知副作用 | P1 |
-| 统一 Agent 协议客户端与参考服务 | 已实现，真实验收阻塞 | 2026-10-10 新增 `adapters/agent_http.py`、`agent_service/http.py`、Runner/领取匹配、发现发布与兼容校验，保留旧 HTTP/Python；MewCode 真实回调已准备。静态检查通过；本机 Docker 引擎启动崩溃、API 未开放，真实 HTTP 闭环、去重/重启/可选能力仍待验证，见[记录](agent-http-validation.md) | P1 |
+| 统一 Agent 协议客户端与参考服务 | 已实现，真实基本闭环已验收 | 2026-10-10 `adapters/agent_http.py`、`agent_service/http.py`、Runner/领取匹配、发现发布与兼容校验，保留旧 HTTP/Python。真实 MewCode 3/3 执行/评分通过、12/12 功能检查、48 外部事件及 8 产物对应、认证/去重/已完成服务重启核对；可选能力正向及活动故障矩阵未覆盖，见[记录](agent-http-validation.md) | P1 |
 | 执行结束后的独立清理记录 | 部分实现 | Attempt 单独保存清理状态，但当前随执行最终结果上报；后续独立清理记录接口尚未实现，见 [后端说明](backend.md) | P2 |
 | 被动观测自动保留清理 | 未实现 | observation 正文在 PostgreSQL JSONB；现有实验 Artifact 清理不覆盖这些表，需设计观测记录生命周期 | P2 |
 | 多轮 steps 驱动 | 未实现 | `CaseDefinition.single_turn_only` 明确拒绝非空 steps；保留未来有序步骤驱动设计 | P3 |
@@ -40,7 +40,7 @@
 | 阶段 | 当前状态 | 完整验收前必须补齐 |
 | --- | --- | --- |
 | M0 契约定稿 | 部分实现，未完整验收 | 四类契约、表/API/CLI 已存在；版本字段规则仍有规范差异，缺少真实 HTTP 与 Python 两种接入的完整逐项核对；统一协议已增加独立运行时，旧接入保留 |
-| M1 真实闭环 | 实现主体已有，部分验收 | Deta/Zeta/MewCode 为 Python 接入记录；补齐真实 HTTP 的导入、执行、评分、证据、认证及独立接入复现 |
+| M1 真实闭环 | HTTP/Python 基本闭环已验收，独立复现仍待验证 | Deta/Zeta/MewCode Python 及 MewCode 统一 HTTP 均有真实记录；HTTP 导入、执行、独立评分、证据和基础认证已补齐，干净环境独立接入及完整能力核对未覆盖 |
 | M2 并发与恢复 | 部分实现、部分验收 | 已有多 Runner 峰值并发、受控工作进程中断和 unknown 额度保留；补齐 Runner 整体崩溃、网络/数据库异常、重传、停止确认、自动协调与隔离证据 |
 | M3 回归产品 | 已实现，验收无法确认完整通过 | 列表/详情/固定报告/CLI 已有；同一真实目标版本的一次改善和一次退化、gate pass 及评分追溯仍待验证；不同 Agent 的通过率差异不替代版本回归 |
 | M4 发布验收 | 工具已实现，验收无法确认完整通过 | 历史部署/迁移/无产物恢复已有；当前版本干净环境复现、权限、完整证据恢复、保留运维、依赖审计问题和容量/长期运行仍待验证 |
@@ -50,7 +50,7 @@
 | 优先级 | 任务 | 验收输出 |
 | --- | --- | --- |
 | P1 | BUG-001～004 行为验收 | 按现有计划验证上传失败时其他项继续、崩溃孤立文件隔离、readiness 200/503、Web 选择新评分后新报告绑定且旧报告不变 |
-| P1 | 真实 HTTP Agent 闭环 | 固定目标能力/版本，完成导入→执行→独立评分→证据查询与认证，并记录外部停止、幂等及查询的实际边界 |
+| P1 | 真实 HTTP Agent 扩展能力与故障验收 | MewCode 基本闭环已完成，保留未覆盖的取消/资源正向路径、第二个统一协议实现、响应丢失及活动故障矩阵；记录停止、幂等和查询的实际边界 |
 | P1 | 多 Runner 故障恢复矩阵 | Runner 整体退出、API/网络/数据库中断、租约失效、重复/迟到上传；原始状态、额度、停止/核对证据与失败记录齐全 |
 | P1 | 同目标真实版本回归 | 冻结同一测试集和评分口径，实际产生改善与退化；核对默认/显式评分选择、引用、分母和 gate 0/1/2/3 |
 | P2 | 当前版本发布与完整备份恢复 | 干净环境升级到 0004；含 ready 产物、事件、清单、评分和报告的备份恢复及 audit，旧 Runner 凭据隔离、未知额度保留和权限边界可核对 |
@@ -59,7 +59,7 @@
 
 ## 下一阶段三个开发任务
 
-1. **P1：统一 Agent 协议运行时与参考 HTTP 接入端已实现，真实验收阻塞。** 本轮仅完成此任务实现与静态检查；用户补充允许参考服务调用真实 MewCode，通过 HTTP 验证，而不能用参考服务空壳或预设结果替代真实目标。恢复 Linux 引擎/API 后补齐 M0/M1，见[实际记录](agent-http-validation.md)。
+1. **P1：统一 Agent 协议运行时与参考 HTTP 接入端已实现，真实 MewCode HTTP 基本验收完成。** 用户补充允许参考服务实际调用 MewCode；Docker 恢复后本轮完成导入、3/3 执行/独立评分、证据/认证/去重及终态重启核对，保留首次部署失败。完整可选能力/活动故障与多实现验收未覆盖，见[实际记录](agent-http-validation.md)。
 2. **P1：实现重启后未知任务的安全自动核对。** 在目标查询/停止/幂等能力允许时追加核对事实，未确认停止继续保留额度；结合 Runner 整体崩溃与网络异常验收推进 M2。
 3. **P1：落实普通公共契约的显式版本要求及兼容迁移。** 先梳理旧请求/JSONL/Runner 的缺省版本用法，明确升级路径，再对齐开发规范并验证兼容行为。
 
@@ -67,7 +67,7 @@
 
 ## 证据入口
 
-- [统一 HTTP 运行时检查与阻塞](agent-http-validation.md)：2026-10-10，客户端/参考服务/真实 MewCode 回调实现，Ruff/字节编译通过；未完成真实 HTTP 认证及执行闭环。
+- [统一 HTTP 运行时真实验收](agent-http-validation.md)：2026-10-10，Docker 阻塞解除，真实 MewCode 3/3 执行和独立评分、12/12 功能检查、60 条 Eyes 事件/8 产物、认证/去重/终态服务重启核对；完整可选/故障矩阵未覆盖。
 - [Python/MewCode 真实闭环](mewcode-validation.md)：2026-10-09，3/3 执行、3/3 评分通过、53 条事件和 6 份产物；仅基础冒烟。
 - [双 Python Agent 并发与中断](../integrations/zeta/README.md)：2026-10-08，两个 Runner、峰值 3 任务；取消不代表远端停止已确认。
 - [历史平台与运维验证](platform-validation.md)：2026-10-03，PostgreSQL/Compose、固定报告、fail/inconclusive 及无业务产物恢复。

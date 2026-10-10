@@ -4,9 +4,9 @@
 
 若要在自己的 Agent 中照常输入任务、仅让 Eyes 接收过程，请先看 [被动观测接入](observation.md)；下文的 Runner/测试集流程用于主动评测。
 
-接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 维护统一客户端。2026-10-10 已实现 `agent_http` Runner 客户端、能力发现/兼容校验和持久化参考 HTTP 服务，见[统一运行时接入](agent-http-runtime.md)。下文仍保留既有 HTTP/Python 使用方式；旧目标不自动迁移。真实 MewCode HTTP 闭环仍[阻塞](agent-http-validation.md)。
+接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 维护统一客户端。2026-10-10 已实现 `agent_http` Runner 客户端、能力发现/兼容校验和持久化参考 HTTP 服务，见[统一运行时接入](agent-http-runtime.md)。下文仍保留既有 HTTP/Python 使用方式；旧目标不自动迁移。真实 MewCode HTTP 基本闭环已验收，3/3 执行/评分通过，见[实际记录](agent-http-validation.md)。
 
-当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的宿主机 Runner。2026-10-03 已完成真实 Deta 的 Python 接入闭环，桥接代码、3 个编码任务和实际结果见 [Deta 接入记录](../integrations/deta/README.md)。2026-10-08 已完成 Deta 与 Zeta 双 Python Agent 并发、受控工作进程中断和整批取消验证，见 [Zeta 接入记录](../integrations/zeta/README.md)。真实 HTTP Agent、Runner 整体重启及网络/数据库故障恢复仍待验收；下文的通用协议示例不代表运行成功。此前检查结果见 [验证记录](backend-validation.md)。
+当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的宿主机 Runner。2026-10-03 已完成真实 Deta 的 Python 接入闭环，桥接代码、3 个编码任务和实际结果见 [Deta 接入记录](../integrations/deta/README.md)。2026-10-08 已完成 Deta 与 Zeta 双 Python Agent 并发、受控工作进程中断和整批取消验证，见 [Zeta 接入记录](../integrations/zeta/README.md)。2026-10-10 已补齐真实 MewCode 统一 HTTP 基本闭环；Runner 整体重启及网络/数据库故障恢复仍待验收；下文的通用协议示例不代表运行成功。此前检查结果见 [验证记录](backend-validation.md)。
 
 ## 1. 启动宿主机 Runner
 
@@ -260,7 +260,7 @@ Runner 使用服务端 deadline 控制墙钟超时；心跳只续租，不延长
 
 此前给 `ExecutionResult` 增加可选 `evidence_details`，给 `ScoreInput` 增加可选 `execution_root_span_id` 和 `deadline`，给 `ExecutionInput` 增加可选 `artifact_requirements`。本次审查修复增加注册字段 `python_agents/http_origins`、结果字段 `completed_at`、契约 `ScoreAssignment` 和读取完整评分输入的接口，改变评分领取 payload 的结构。它们使用已有 JSON 字段和截止时间，不需要数据库迁移。协议仍是未发布原型的 1.0，控制端、scheduler 与 Runner 必须同步升级到本源码版本。旧注册缺少别名或 origin 时，不会获得相应 Python/HTTP 工作；持有额度时不能改变注册能力，应在升级前结束或核对旧工作。
 
-已实现的通用接口不意味着所有目标已通过验证。Python 路径已有 Deta/Zeta/MewCode 的真实执行、评分和证据记录；HTTP Agent 闭环、Runner 整体重启、网络/数据库故障及远端停止确认仍待验收。固定回归报告、CI 质量门槛、实验证据保留清理和备份恢复已有实现，历史部署验证范围见 [平台记录](platform-validation.md)。Web 已有固定报告及证据审阅，近期历史评分选择仍待完整浏览器验收，见 [修复计划](bug-fix-plan.md)。M0～M4 的剩余工作见 [开发计划](PLAN.md)。
+已实现的通用接口不意味着所有目标已通过验证。Python 路径已有 Deta/Zeta/MewCode 的真实执行、评分和证据记录；MewCode 统一 HTTP 基本闭环已有本轮记录，HTTP 可选能力正向、Runner 整体崩溃、网络/数据库故障及远端取消停止确认仍待验收。固定回归报告、CI 质量门槛、实验证据保留清理和备份恢复已有实现，历史部署验证范围见 [平台记录](platform-validation.md)。Web 已有固定报告及证据审阅，近期历史评分选择仍待完整浏览器验收，见 [修复计划](bug-fix-plan.md)。M0～M4 的剩余工作见 [开发计划](PLAN.md)。
 
 
 ## 2026-10-03：证据等待和封存

@@ -1,6 +1,6 @@
 # 统一 Agent HTTP 运行时
 
-2026-10-10：客户端与持久化参考接入服务已实现，通过源码规范、格式及字节编译检查；真实 HTTP 闭环仍阻塞，见[实际验证记录](agent-http-validation.md)。本页的接入命令是复现步骤，不是已运行成功的证据。
+2026-10-10：客户端与持久化参考接入服务已实现，通过源码规范、格式及字节编译检查；Docker 恢复后真实 MewCode HTTP 基本闭环已完成，3/3 执行和独立评分通过。实际版本、事件/产物、认证及首次失败见[验证记录](agent-http-validation.md)。本页通用命令是接入步骤，不能将单目标验收推广到任意 Agent 或全部故障行为。
 
 ## 发布并执行统一协议目标
 
@@ -25,6 +25,8 @@ score_slots = 1
 ```
 
 按现有[接入流程](agent-integration.md)导入 JSONL、发布独立评分器、创建实验、签发只授权新目标的 Runner 凭据，再运行 `eyes-runner --config runner.toml run`。控制端、Scheduler 和 Runner 使用包含本实现的版本；新 Runner 注册 `http` 和 `agent_http`，旧 Runner 不会领取新 adapter 的工作。不改变旧注册或旧目标行为。
+
+Runner 的安装环境也必须升级到相同版本，不能仅通过 Supervisor 的 PYTHONPATH 覆盖源码：隔离子进程有意不继承该变量，仍从其解释器安装的 Eyes 包加载 worker。MewCode 首次实际部署因此准备失败，完整安装代码同步后恢复；不要为此放开平台凭据环境隔离。
 
 客户端只发送 `AgentTask` 的任务/尝试身份、原幂等键、原截止时间、业务 input、资源引用和 traceparent；不会发送预期答案、评分配置、Eyes 凭据或完整目标快照。`environment` 尚无外部 v1 表达，非空时在实验创建前明确拒绝，应由接入方的版本化准备逻辑消费业务 input。不支持产物的目标遇到产物要求也在创建实验前拒绝。
 

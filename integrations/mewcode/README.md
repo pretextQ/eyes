@@ -77,7 +77,7 @@ execution_scope=external；取消、目标幂等、远端查询与恢复均为 f
 
 sealed 表示明确声明的 SDK/Runner 采集边界封存。轨迹包含流式文本、真实模型/工具事件和对话，不包含全部内部状态、完整提供方 HTTP 报文或远端思考过程。原评分器只覆盖冻结代码的 12 项功能检查，不完整检查指令遵循、输入不可变、文件变更范围或解释质量。
 
-## 2026-10-10：统一 HTTP 接入（已实现，真实运行阻塞）
+## 2026-10-10：统一 HTTP 接入（真实基本闭环已验收）
 
 新增 `http_service.py`，以 `eyes.agent_service.http.create_app` 接入持久化协议服务，回调复用本目录 `bridge.prepare/execute/cleanup` 的真实 MewCode Agent 事件循环。没有修改 MewCode 核心，没有复制或修改原三任务和独立评分器。旧 Python 接入和上述 2026-10-09 历史记录保持原样；该历史 3/3 不是 HTTP 路径结果。
 
@@ -85,7 +85,7 @@ HTTP 目标只接收 `prompt` / 可选 `files` 业务输入和统一身份。pro
 
 能力保持会话隔离=true、环境隔离=false、并发=1、取消=false、输入资源=false；代码准备使用 input.files。新增的幂等与按键/状态查询由 HTTP 接入端持久化映射提供，不代表模型提供方幂等或自动重放 MewCode。服务重启后不确定业务记录为 unknown，保留容量；截止时间中断不声明远端模型停止。工作目录与原始协议记录保留在新的私有 `data/mewcode-http/`，不能用原 `publish.py` 覆盖历史发布和运行记录。
 
-以下是环境恢复后的步骤，**本轮没有实际运行这些服务或完成验收**：
+以下是通用复现步骤。Docker 恢复后已按此路径完成真实基本验收；本机本轮新 API 为 18046（保留原 18044 容器），完整版本、具体命令、首次准备失败及结果见[记录](../../docs/agent-http-validation.md)。必须同步 Runner 的安装代码，仅覆盖 Supervisor 的 PYTHONPATH 不能升级隔离子进程：
 
 1. 恢复原 Linux Eyes API（18044）、PostgreSQL 与 Scheduler，确认 readiness。使用含本轮 Eyes 源码的 Linux 环境及已安装真实 MewCode 的环境。现有 Dockerfile 可构建该环境，但需保存实际镜像 ID/依赖版本，不能把移动镜像标签当作版本。
 2. 新建私有 `data/mewcode-http/`，配置独立随机 `AGENT_HTTP_TOKEN`（至少 32 字符，写入私有 agent.env）。沿用原 `data/mewcode-integration/model.env` 和 `parameters.json`，不输出或复制模型密钥进目标 JSON。环境变量 `MEWCODE_HTTP_STATE` 指向新的接入端目录，`MEWCODE_PARAMETERS_FILE` 指向已有参数文件，`MEWCODE_HTTP_VERSION` 填本次真实 MewCode commit/源码摘要及桥接版本。
@@ -102,4 +102,6 @@ HTTP 目标只接收 `prompt` / 可选 `files` 业务输入和统一身份。pro
 6. 使用控制端 `eyes-admin issue-token --project-id ... --role runner --target-id ... --work-kind execute --work-kind score` 签发新目标范围凭据，保存为私有 Runner 凭据；不要将旧 Runner 的授权范围强行扩展。Runner 环境加载 `EYES_RUNNER_TOKEN`，运行 `eyes-runner --config ... run`。HTTP Runner 配置没有 Python Agent 绑定，实际业务必须经过协议 HTTP 接口。
 7. 经公开 API 获取新实验 results、case-runs、attempts、events、manifests、score-runs 及 artifact content，保存原始响应与字节摘要，核对评分引用。另核对 Agent 提交/按键查询/状态/结果/事件/产物的认证、同键重放与冲突；独立评分必须实际执行，不能只核对 Agent 自述。保持原历史文件不变，原 `collect.py` 固定写旧目录，本轮应在新目录按相同公开端点采集。
 
-本轮阻塞证据：Docker Desktop 4.72.0 在 Inference manager 的 dockerInference listener 初始化时报文件访问/路径语法错误并崩溃；启动系统服务权限不足，原 API 不可达。因此导入、真实 HTTP 执行、独立评分、证据查询和两侧认证均未验收，详见[运行时检查记录](../../docs/agent-http-validation.md)。可选取消/资源需其他实际支持目标补证据。
+首次 Docker 阻塞与失败保留在[检查记录](../../docs/agent-http-validation.md)。恢复后的最终实验 `e93b6f02-0d9e-4a0d-abba-47e48e305847`：3/3 执行、3/3 原独立评分通过（12/12 功能检查），3/3 sealed，48 条外部事件对应到 60 条 Eyes 事件，8 份产物的两侧字节/大小/摘要一致。认证、同键重放/冲突、已完成 Agent 服务重启映射已核对；首次缓存安装不同步导致的失败实验另行保留。没有修改 MewCode 核心、原任务或评分器。
+
+实际运行为 `eyes-agent-http-api`（18046）、`eyes-agent-http-mewcode`（19045）、`eyes-agent-http-scheduler`、原专用 PostgreSQL（55435）；本轮 Runner `eyes-agent-http-runner` 在验收结束后停止，防止继续领取工作。新私有目录 `data/mewcode-http/` 保存原始响应、证据、版本、部署日志和凭据，不提交。可选取消/资源的正向流程及活动任务故障需要实际支持的目标另行补证据。

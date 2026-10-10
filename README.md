@@ -72,6 +72,7 @@ flowchart LR
 
 | 范围          | 已有证据                                                                                                    | 尚未覆盖                                                  |
 | ------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 统一 HTTP 接入 | 2026-10-10：真实 MewCode 经 agent_http，3/3 执行、3/3 独立评分、12/12 功能检查；60 条事件、8 份产物、认证/去重/终态重启核对 | 可选取消/资源正向路径、活动崩溃、第二个统一协议实现及容量 |
 | MewCode 评测  | 2026-10-09：3/3 执行成功、3/3 独立评分通过，共 12/12 项功能检查；3/3 sealed，53 条事件、6 份产物及 Web 核对 | 完整 MewCode 服务、复杂仓库任务、远端取消、重启恢复与容量 |
 | 多 Agent 执行 | Deta/Zeta 两个 Python Agent 的真实并发，峰值 3 个任务；受控工作进程中断与批次取消                           | 真实 HTTP Agent、Runner 整体崩溃、网络/数据库故障         |
 | 回归与部署    | 固定报告、证据跳转、部分 CLI 门槛、历史 Compose 部署和数据库备份恢复                                        | 真实版本改善/退化、含完整事件和产物的恢复、生产容量       |
@@ -185,7 +186,7 @@ uv run eyes-runner --config runner.toml run
 
 完整步骤见 [Agent 接入文档](docs/agent-integration.md)。MewCode 桥接、运行配置与采集工具位于 [integrations/mewcode](integrations/mewcode/README.md)。
 
-语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)已有 `agent_http` Runner 客户端与持久化参考 HTTP 服务；旧 HTTP/Python 保持兼容。发现、发布及责任边界见[运行时文档](docs/agent-http-runtime.md)。真实 MewCode HTTP 回调已准备，但本机 Linux 引擎与 API 不可用，完整执行/评分/证据/认证闭环仍[阻塞](docs/agent-http-validation.md)，不能按静态检查宣称真实验收。
+语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)已有 `agent_http` Runner 客户端与持久化参考 HTTP 服务；旧 HTTP/Python 保持兼容。发现、发布及责任边界见[运行时文档](docs/agent-http-runtime.md)。2026-10-10 Docker 恢复后，真实 MewCode 已完成 HTTP 执行、独立评分、证据与基础认证闭环，3/3 通过，实际版本、首次失败及验收边界见[记录](docs/agent-http-validation.md)。
 
 ## 回归与运维
 
@@ -245,4 +246,4 @@ docs/                设计、使用和验证记录
 
 ## 下一步
 
-当前重点是完成四项修复的行为验收、可靠部署与故障恢复，补齐真实 HTTP 接入、真实版本回归和含产物的备份恢复记录，再开展容量及长期运行验证。功能实现、静态检查和真实运行验收分别记录，以实际证据判断交付阶段。
+当前重点是完成四项修复的行为验收、可靠部署与故障恢复，补齐 HTTP 可选能力/故障、真实版本回归和含产物的备份恢复记录，再开展容量及长期运行验证。功能实现、静态检查和真实运行验收分别记录，以实际证据判断交付阶段。
