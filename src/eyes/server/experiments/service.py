@@ -62,6 +62,17 @@ def create(
     ).all()
     if len(cases) * request.repetitions > settings.max_experiment_runs:
         raise DomainError(413, "too_many_runs", "experiment exceeds configured run limit")
+    if target.content["capabilities"]["adapter"] == "agent_http":
+        discovery = target.content["config"]["discovery"]
+        if (
+            any(case.content["artifact_requirements"] for case in cases)
+            and not discovery["artifacts"]
+        ):
+            raise DomainError(422, "agent_artifacts", "Agent cannot provide required artifacts")
+        if any(case.content["environment"] for case in cases):
+            raise DomainError(
+                422, "agent_environment", "v1 business setup must be encoded in input"
+            )
     experiment = Experiment(
         project_id=project_id,
         target_id=target.id,

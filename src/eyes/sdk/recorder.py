@@ -132,7 +132,7 @@ class Recorder(SpanProcessor):
             with self.lock:
                 self.dropped += 1
 
-    def event(self, kind, data):
+    def event(self, kind, data, *, source="sdk"):
         try:
             current = trace.get_current_span().get_span_context()
             span_id = (
@@ -140,7 +140,7 @@ class Recorder(SpanProcessor):
                 if current.is_valid and current.trace_id == int(self.trace_id, 16)
                 else int(self.root_id, 16)
             )
-            self._emit(kind, data, span_id, None, "sdk")
+            self._emit(kind, data, span_id, None, source)
         except Exception:
             with self.lock:
                 self.failures += 1

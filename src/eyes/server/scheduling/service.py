@@ -106,6 +106,18 @@ def supports_target(capabilities: dict, target: dict) -> bool:
                 "reconciliation",
             )
         ) and not (set(requested["observation"]) - set(available["observation"]))
+    if adapter == "agent_http":
+        from eyes.adapters.agent_http import AgentHttpConfig, target_capabilities
+
+        try:
+            config = AgentHttpConfig.model_validate(target["config"])
+            return (
+                http_origin(config.url) in capabilities.get("http_origins", [])
+                and requested == target_capabilities(config.discovery).model_dump(mode="json")
+                and target["concurrency_limit"] <= config.discovery.max_concurrency
+            )
+        except TypeError, ValueError, AttributeError:
+            return False
     if adapter == "http":
         config = target["config"]
         if not config.get("url"):
@@ -200,7 +212,7 @@ def claim(session: Session, credential: Credential, request: WorkClaim, settings
             )
         )
         if not runner.capabilities.get("http_origins"):
-            query = query.where(WorkItem.plugin != "http")
+            query = query.where(WorkItem.plugin.not_in(["http", "agent_http"]))
     with session.scalars(
         query.order_by(WorkItem.created_at, WorkItem.id)
         .with_for_update(skip_locked=True, of=WorkItem)

@@ -23,8 +23,8 @@ class AgentContext:
     def span(self, name, attributes=None):
         return self.recorder.span(name, attributes)
 
-    def event(self, kind, data):
-        self.recorder.event(kind, data)
+    def event(self, kind, data, *, source="sdk"):
+        self.recorder.event(kind, data, source=source)
 
     def remote_operation(self, operation_id: str):
         if not operation_id or len(operation_id) > 500:

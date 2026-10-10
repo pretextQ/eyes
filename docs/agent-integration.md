@@ -4,7 +4,7 @@
 
 若要在自己的 Agent 中照常输入任务、仅让 Eyes 接收过程，请先看 [被动观测接入](observation.md)；下文的 Runner/测试集流程用于主动评测。
 
-接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 只维护统一客户端。当前已落地协议文档和独立类型契约，尚未启用运行时；本页仍描述可运行的既有 HTTP/Python 接入方式，不能将两者视为已完成迁移。
+接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 维护统一客户端。2026-10-10 已实现 `agent_http` Runner 客户端、能力发现/兼容校验和持久化参考 HTTP 服务，见[统一运行时接入](agent-http-runtime.md)。下文仍保留既有 HTTP/Python 使用方式；旧目标不自动迁移。真实 MewCode HTTP 闭环仍[阻塞](agent-http-validation.md)。
 
 当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的宿主机 Runner。2026-10-03 已完成真实 Deta 的 Python 接入闭环，桥接代码、3 个编码任务和实际结果见 [Deta 接入记录](../integrations/deta/README.md)。2026-10-08 已完成 Deta 与 Zeta 双 Python Agent 并发、受控工作进程中断和整批取消验证，见 [Zeta 接入记录](../integrations/zeta/README.md)。真实 HTTP Agent、Runner 整体重启及网络/数据库故障恢复仍待验收；下文的通用协议示例不代表运行成功。此前检查结果见 [验证记录](backend-validation.md)。
 

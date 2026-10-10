@@ -48,6 +48,20 @@ def reject_inline_secrets(value, path="config"):
 
 def publish(session: Session, project_id: UUID, request: TargetPublish | ScorerPublish):
     reject_inline_secrets(request.config)
+    if isinstance(request, TargetPublish) and request.capabilities.adapter == "agent_http":
+        from eyes.adapters.agent_http import AgentHttpConfig, target_capabilities
+
+        try:
+            config = AgentHttpConfig.model_validate(request.config)
+        except ValueError:
+            raise DomainError(422, "agent_config", "invalid unified Agent configuration") from None
+        if (
+            request.capabilities != target_capabilities(config.discovery)
+            or request.concurrency_limit > config.discovery.max_concurrency
+            or request.external_version != config.discovery.agent_version
+            or (config.bearer_secret_ref and config.bearer_secret_ref not in request.secret_refs)
+        ):
+            raise DomainError(422, "agent_discovery", "target must match frozen Agent discovery")
     content = request.model_dump(mode="json")
     model = TargetVersion if isinstance(request, TargetPublish) else ScorerVersion
     fields = {

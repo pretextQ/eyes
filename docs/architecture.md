@@ -6,7 +6,7 @@
 
 Eyes 负责测试集与评分器版本、实验配置、任务调度、证据保存、评分和回归对比。目标 Agent 负责自身的推理、工具调度及业务行为。适配器负责翻译目标协议并声明其实际能力。
 
-HTTP Agent 和 Python 适配器两种通用接入与宿主机 Runner 已有代码实现；Python 路径已有 Deta、Zeta 和 MewCode 的真实运行记录，真实 HTTP Agent 闭环仍待验收。单轮任务已有执行、评分与证据闭环；用例模型预留有序对话步骤，目前拒绝非空 `steps`，多轮驱动后续实现。模型代理作为后续采集适配器，不阻塞首版。统一 Agent 协议目前只有文档、类型契约和 Schema，运行时客户端与参考服务尚未实现，见 [协议说明](agent-protocol.md)。
+HTTP Agent 和 Python 适配器两种通用接入与宿主机 Runner 已有代码实现；Python 路径已有 Deta、Zeta 和 MewCode 的真实运行记录，真实 HTTP Agent 闭环仍待验收。单轮任务已有执行、评分与证据闭环；用例模型预留有序对话步骤，目前拒绝非空 `steps`，多轮驱动后续实现。模型代理作为后续采集适配器，不阻塞首版。2026-10-10 统一 Agent 协议已接入 `agent_http` Runner 客户端与持久化参考服务，旧 HTTP/Python 保留，真实 HTTP 验收仍因本机 Linux 环境不可用而阻塞，见[运行时说明](agent-http-runtime.md)。参考服务的 SQLite 仅保存外部接入端单机协议状态，不改变 Eyes PostgreSQL 架构或迁移。
 
 首版插件由项目维护者安装，按可信代码管理。独立进程提供故障隔离；开放任意用户代码执行前，需要另行设计容器或更强的隔离边界。
 
@@ -88,7 +88,7 @@ Experiment、CaseRun、Attempt 和 OTel trace 是不同概念。首版每个 Att
 
 ## 四份核心接入契约
 
-协议以 Pydantic 模型及其 JSON Schema 表达，并带 `schema_version`。当前公共 `Contract` 允许省略该字段并默认解析为 `1.0`，拒绝其他版本、未知字段及缺少的其他必需字段；严格拒绝缺失版本仍是开发规范中的待落实要求。独立的统一 Agent 协议使用必填 `protocol_version`，尚未接入运行时。Runner 注册时协商协议版本和可执行能力。
+协议以 Pydantic 模型及其 JSON Schema 表达，并带 `schema_version`。当前公共 `Contract` 允许省略该字段并默认解析为 `1.0`，拒绝其他版本、未知字段及缺少的其他必需字段；严格拒绝缺失版本仍是开发规范中的待落实要求。独立的统一 Agent 协议使用必填 `protocol_version`，由新客户端严格校验。Runner 注册时协商协议版本和可执行能力。
 
 ### 目标适配器
 

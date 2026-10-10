@@ -44,6 +44,10 @@ def describe(config):
         "schema_version": "1.0",
         "adapters": {
             "http": {"allowed_origins": config.allowed_http_origins},
+            "agent_http": {
+                "protocol_version": "1.0",
+                "allowed_origins": config.allowed_http_origins,
+            },
             "python": {
                 name: {
                     "entry_point": binding.entry_point,

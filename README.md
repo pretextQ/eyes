@@ -22,7 +22,7 @@ Eyes 把测试集、Agent 执行、评分依据和过程证据关联起来，帮
 | 能力          | 当前实现                                                       |
 | ------------- | -------------------------------------------------------------- |
 | 自定义评测    | JSONL 测试集、版本化用例、规则评分和可信 Python 评分器         |
-| Agent 接入    | 通用 HTTP 适配器、本地 Python 适配器，按能力和凭据匹配 Runner  |
+| Agent 接入    | 统一协议 HTTP 客户端、通用 HTTP 与本地 Python 适配器，按能力和凭据匹配 Runner  |
 | 执行调度      | 独立执行与评分额度、租约和心跳、超时、取消、未知状态保留       |
 | 多 Agent 批次 | 一次创建多个独立实验，成员分别配置任务集、评分器与并发         |
 | 执行证据      | SDK 事件、trace/span 关联、产物上传与摘要校验、证据完整性标识  |
@@ -185,7 +185,7 @@ uv run eyes-runner --config runner.toml run
 
 完整步骤见 [Agent 接入文档](docs/agent-integration.md)。MewCode 桥接、运行配置与采集工具位于 [integrations/mewcode](integrations/mewcode/README.md)。
 
-语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)目前只有文档、类型契约和 JSON Schema；统一协议客户端与参考服务尚未实现，不能替代现有可运行的 HTTP/Python 接入。
+语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)已有 `agent_http` Runner 客户端与持久化参考 HTTP 服务；旧 HTTP/Python 保持兼容。发现、发布及责任边界见[运行时文档](docs/agent-http-runtime.md)。真实 MewCode HTTP 回调已准备，但本机 Linux 引擎与 API 不可用，完整执行/评分/证据/认证闭环仍[阻塞](docs/agent-http-validation.md)，不能按静态检查宣称真实验收。
 
 ## 回归与运维
 

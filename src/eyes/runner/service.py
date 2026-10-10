@@ -290,7 +290,7 @@ class RunnerService:
             binding = self.config.python_agents.get(request.target.config.get("agent"))
             if binding is None:
                 raise ValueError("Python Agent alias is not configured on this Runner")
-        elif request.target.capabilities.adapter != "http":
+        elif request.target.capabilities.adapter not in {"http", "agent_http"}:
             raise ValueError("unsupported target adapter")
         secrets = resolve_secrets(
             request.target.secret_refs, self.config.secret_env_allowlist, self.config.token_env
@@ -619,7 +619,7 @@ class RunnerService:
                 "schema_version": "1.0",
                 "name": self.config.name,
                 "supported_schema_versions": ["1.0"],
-                "adapters": (["http"] if self.config.allowed_http_origins else [])
+                "adapters": (["http", "agent_http"] if self.config.allowed_http_origins else [])
                 + (["python"] if self.config.python_agents else []),
                 "scorers": ["rules", *self.config.python_scorers],
                 "python_agents": {

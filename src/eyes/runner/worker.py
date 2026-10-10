@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
+from eyes.adapters.agent_http import AgentHttpAdapter
 from eyes.adapters.http import HttpAdapter
 from eyes.adapters.python import PythonAdapter, invoke, resolve
 from eyes.contracts.scorer import ScoreInput, ScoreOutput
@@ -132,7 +133,11 @@ def main():
         adapter = (
             PythonAdapter(binding, context)
             if binding
-            else HttpAdapter(
+            else (
+                AgentHttpAdapter
+                if request.target.capabilities.adapter == "agent_http"
+                else HttpAdapter
+            )(
                 request.target.config,
                 context,
                 config.allowed_http_origins,
