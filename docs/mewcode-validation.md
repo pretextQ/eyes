@@ -1,5 +1,7 @@
 # 2026-10-09：Windows / MewCode 真实评测
 
+最新重新验证：见 [2026-10-11 MewCode 记录](../MewCode/2026-10-11-rerun/REPORT.md)。使用当前 Eyes 源码及新建独立数据库，经统一 HTTP 接入完成 3/3 执行与评分、12/12 功能检查；首次旧缓存接入代码导致的 unknown 另行保留。
+
 本次完成单 Agent 功能闭环，不覆盖版本回归、故障恢复或容量验收。接入方式、凭据边界与重启步骤见 [MewCode 接入](../integrations/mewcode/README.md)。双 Agent 并发与完整故障恢复需在当前 Windows 环境另行验收。
 
 ## 实际结果

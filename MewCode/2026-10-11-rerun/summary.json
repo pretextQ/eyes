@@ -1,0 +1,459 @@
+{
+  "date": "2026-10-11",
+  "timezone": "Asia/Shanghai",
+  "eyes_commit": "1f25f9ff9307c1303fb7410262c4f98b4acd5f86",
+  "eyes_source_sha256": "4a85bc849ca03e1b0d2a3ccce24017b03fbaeb6b01be3af684b3c7d589920834",
+  "mewcode_commit": "3f104082b6c5ca53efe273630bf08f67f1fc3ff5",
+  "mewcode_source_sha256": "a007cfa9bcfb9d2f1051a154c6f64d2b42542fc83061d45ba046787d0b94e35d",
+  "image_id": "sha256:420dba75f4b41b95976e91e0d590cfc9d1fb3397a8a64b39c1c21ed167ceca2a",
+  "experiment": {
+    "project_id": "c7deefdb-a06d-459d-8b87-0bdd7833d623",
+    "target_id": "51850337-ed17-4355-b95c-7ef6257969b2",
+    "dataset_id": "132752e6-4b40-48bd-9733-c4577757f0da",
+    "scorer_id": "33d4e1d6-5c25-442d-bc44-7beb5d598525",
+    "experiment_id": "f796e3cd-e59e-4361-b188-dea7edd5280e"
+  },
+  "results": {
+    "schema_version": "1.0",
+    "experiment_id": "f796e3cd-e59e-4361-b188-dea7edd5280e",
+    "status": "completed",
+    "planned_runs": 3,
+    "execution_successes": 3,
+    "execution_success_rate": {
+      "numerator": 3,
+      "denominator": 3
+    },
+    "execution_attempts": 3,
+    "failed_attempts": 0,
+    "unknown_attempts": 0,
+    "cancelled_runs": 0,
+    "scorers": [
+      {
+        "scorer_version_id": "33d4e1d6-5c25-442d-bc44-7beb5d598525",
+        "planned_runs": 3,
+        "valid_scores": 3,
+        "passed": 3,
+        "not_applicable": 0,
+        "unresolved": 0,
+        "score_coverage": {
+          "numerator": 3,
+          "denominator": 3
+        },
+        "valid_score_pass_rate": {
+          "numerator": 3,
+          "denominator": 3
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "fix-mean",
+      "attempt_id": "9faf6541-3b23-4b2f-93c1-d2fe68fee88e",
+      "run_id": "039da784-46df-4640-95ee-8adb090e21d0",
+      "status": "succeeded",
+      "sealed": true,
+      "dropped_events": 0,
+      "cleanup_status": "succeeded",
+      "stopped_confirmed": true,
+      "eyes_events": 24,
+      "agent_events": 20,
+      "all_external_events_preserved": true,
+      "artifacts": [
+        {
+          "internal_id": "d40b46e3-780c-5ca9-b58f-2c6679e0143a",
+          "name": "stats.py",
+          "size": 145,
+          "sha256": "14b1a6c0fc93aa7691e925ece271667c6c5194f0c2f5101303b96a1ff894f87b",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        },
+        {
+          "internal_id": "9e7794ff-ceb5-566e-a1d5-3844dc1c7978",
+          "name": "__pycache__/stats.cpython-314.pyc",
+          "size": 481,
+          "sha256": "db6aa64c0cca28b862bc08b702b78763cb9b4d06be910559bb3d44d67162521a",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        },
+        {
+          "internal_id": "0ce5fe6d-b074-5b53-80e3-315425585e69",
+          "name": "mewcode-trajectory.json",
+          "size": 14339,
+          "sha256": "d416dd90778b18cfae5fe76d8fb4973a56336b67b1374a2aa18e728f13488a98",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        }
+      ],
+      "score_checks": [
+        4
+      ],
+      "score_verdicts": [
+        "pass"
+      ]
+    },
+    {
+      "case_id": "integer-cli",
+      "attempt_id": "b93277ca-1e06-4a0c-8d6f-d4b94bb2968a",
+      "run_id": "fb747bf0-1b1c-44b3-b594-461ec463db0b",
+      "status": "succeeded",
+      "sealed": true,
+      "dropped_events": 0,
+      "cleanup_status": "succeeded",
+      "stopped_confirmed": true,
+      "eyes_events": 20,
+      "agent_events": 16,
+      "all_external_events_preserved": true,
+      "artifacts": [
+        {
+          "internal_id": "4300da46-c83c-506a-9432-054575d2c16c",
+          "name": "mewcode-trajectory.json",
+          "size": 13915,
+          "sha256": "7a957497117d3e8feed67352c0e598b926025e71a7075adc4a29bd76857d17ca",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        },
+        {
+          "internal_id": "9af04686-c673-5748-aa79-466540939a48",
+          "name": "total.py",
+          "size": 233,
+          "sha256": "47b1aea24b8b1dc7e7ace37dc8e3727798f2f920065c440d58c85a41c6c54d44",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        }
+      ],
+      "score_checks": [
+        4
+      ],
+      "score_verdicts": [
+        "pass"
+      ]
+    },
+    {
+      "case_id": "stable-unique",
+      "attempt_id": "b1a1f919-a5a5-4422-8d20-240d26f5b1da",
+      "run_id": "4f1fdcf0-8bd5-4826-b419-f6c88a1114cb",
+      "status": "succeeded",
+      "sealed": true,
+      "dropped_events": 0,
+      "cleanup_status": "succeeded",
+      "stopped_confirmed": true,
+      "eyes_events": 16,
+      "agent_events": 12,
+      "all_external_events_preserved": true,
+      "artifacts": [
+        {
+          "internal_id": "58bb81c3-0a42-5783-bef4-ca2b00f9866d",
+          "name": "mewcode-trajectory.json",
+          "size": 15207,
+          "sha256": "d241cb453555479b41a2f6a47930c5aac41c8f5ca956ad01032f5f39b3d300dd",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        },
+        {
+          "internal_id": "4ea1718a-b37c-5747-8d33-ac697c16ad2a",
+          "name": "unique.py",
+          "size": 168,
+          "sha256": "cfc22b32a4801f0420cf02ede31121ae3237a23be43728c40d77bdb824ef2c7c",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        },
+        {
+          "internal_id": "346e972e-a6b0-5f85-b905-3fe41d2a6e7c",
+          "name": "__pycache__/unique.cpython-314.pyc",
+          "size": 761,
+          "sha256": "ee667bb5704786e9fcde450e622ff2b9d24c5163560e41c63ec9022730675060",
+          "internal_metadata_matches": true,
+          "external_bytes_match": true,
+          "external_metadata_matches": true
+        }
+      ],
+      "score_checks": [
+        4
+      ],
+      "score_verdicts": [
+        "pass"
+      ]
+    }
+  ],
+  "facts": {
+    "cases": [
+      {
+        "case_id": "fix-mean",
+        "duration_seconds": 10.113,
+        "input_tokens": 1023,
+        "output_tokens": 577,
+        "score_evidence": {
+          "manifest_found": true,
+          "input_manifest_matches_score": true,
+          "all_refs_authorized": true,
+          "independent_trace": true
+        }
+      },
+      {
+        "case_id": "integer-cli",
+        "duration_seconds": 8.312,
+        "input_tokens": 747,
+        "output_tokens": 687,
+        "score_evidence": {
+          "manifest_found": true,
+          "input_manifest_matches_score": true,
+          "all_refs_authorized": true,
+          "independent_trace": true
+        }
+      },
+      {
+        "case_id": "stable-unique",
+        "duration_seconds": 8.341,
+        "input_tokens": 744,
+        "output_tokens": 765,
+        "score_evidence": {
+          "manifest_found": true,
+          "input_manifest_matches_score": true,
+          "all_refs_authorized": true,
+          "independent_trace": true
+        }
+      }
+    ],
+    "restart_all_runs": [
+      {
+        "case_id": "fix-mean",
+        "identical_snapshot": true,
+        "run_id": "039da784-46df-4640-95ee-8adb090e21d0"
+      },
+      {
+        "case_id": "integer-cli",
+        "identical_snapshot": true,
+        "run_id": "fb747bf0-1b1c-44b3-b594-461ec463db0b"
+      },
+      {
+        "case_id": "stable-unique",
+        "identical_snapshot": true,
+        "run_id": "4f1fdcf0-8bd5-4826-b419-f6c88a1114cb"
+      }
+    ],
+    "secret_matches": [],
+    "resources_unsupported": {
+      "http_status": 422,
+      "body": {
+        "protocol_version": "1.0",
+        "error": {
+          "code": "unsupported_capability",
+          "message": "unsupported capability"
+        }
+      }
+    },
+    "image_id": "sha256:420dba75f4b41b95976e91e0d590cfc9d1fb3397a8a64b39c1c21ed167ceca2a",
+    "mewcode_runtime_verification": {
+      "all_files_match": true,
+      "file_count": 158,
+      "repository_source_sha256": "a007cfa9bcfb9d2f1051a154c6f64d2b42542fc83061d45ba046787d0b94e35d",
+      "note": "Runtime package-relative keys normalized to repository-relative mewcode/ prefix before comparison."
+    }
+  },
+  "runtime": {
+    "system": "Windows-11-10.0.22631-SP0",
+    "python": "3.14.4 (main, Apr 14 2026, 14:30:57) [MSC v.1944 64 bit (AMD64)]",
+    "node": "v22.14.0",
+    "docker": "29.8.2"
+  },
+  "installed_source": {
+    "api": {
+      "all_current_files_match": true,
+      "current_file_count": 71,
+      "mismatches": [],
+      "extra_python_files": []
+    },
+    "agent": {
+      "all_current_files_match": true,
+      "current_file_count": 71,
+      "mismatches": [],
+      "extra_python_files": []
+    },
+    "runner": {
+      "all_current_files_match": true,
+      "current_file_count": 71,
+      "mismatches": [],
+      "extra_python_files": []
+    },
+    "scheduler": {
+      "all_current_files_match": true,
+      "current_file_count": 71,
+      "mismatches": [],
+      "extra_python_files": []
+    }
+  },
+  "protocol_statuses": [
+    {
+      "label": "discovery_valid",
+      "http_status": 200
+    },
+    {
+      "label": "by_key_valid",
+      "http_status": 200
+    },
+    {
+      "label": "state_valid",
+      "http_status": 200
+    },
+    {
+      "label": "result_valid",
+      "http_status": 200
+    },
+    {
+      "label": "idempotent_replay",
+      "http_status": 200
+    },
+    {
+      "label": "idempotency_conflict",
+      "http_status": 409
+    },
+    {
+      "label": "attempt_conflict",
+      "http_status": 409
+    },
+    {
+      "label": "cancel_unsupported",
+      "http_status": 422
+    },
+    {
+      "label": "agent_missing_capabilities",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_capabilities",
+      "http_status": 401
+    },
+    {
+      "label": "agent_missing_by_key",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_by_key",
+      "http_status": 401
+    },
+    {
+      "label": "agent_missing_state",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_state",
+      "http_status": 401
+    },
+    {
+      "label": "agent_missing_result",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_result",
+      "http_status": 401
+    },
+    {
+      "label": "agent_missing_events",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_events",
+      "http_status": 401
+    },
+    {
+      "label": "agent_missing_artifact",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_artifact",
+      "http_status": 401
+    },
+    {
+      "label": "agent_missing_submit",
+      "http_status": 401
+    },
+    {
+      "label": "agent_wrong_submit",
+      "http_status": 401
+    },
+    {
+      "label": "agent_eyes_runner_token_rejected",
+      "http_status": 401
+    },
+    {
+      "label": "eyes_read_valid",
+      "http_status": 200
+    },
+    {
+      "label": "eyes_missing",
+      "http_status": 401
+    },
+    {
+      "label": "eyes_wrong",
+      "http_status": 401
+    },
+    {
+      "label": "eyes_agent_token_rejected",
+      "http_status": 401
+    },
+    {
+      "label": "eyes_read_cannot_manage",
+      "http_status": 403
+    },
+    {
+      "label": "eyes_runner_cannot_read_results",
+      "http_status": 403
+    },
+    {
+      "label": "eyes_runner_authorized_artifact",
+      "http_status": 200
+    },
+    {
+      "label": "eyes_previous_database_runner_token_rejected",
+      "http_status": 401
+    }
+  ],
+  "static_checks": {
+    "ruff_check": "pass",
+    "ruff_format": "pass (93 files)",
+    "frontend_lint": "pass",
+    "frontend_format": "pass",
+    "frontend_build": "pass (TypeScript + Vite)"
+  },
+  "first_deployment": {
+    "schema_version": "1.0",
+    "experiment_id": "c8285e4d-655e-47a9-b79f-164be0eae5c8",
+    "status": "completed_with_unresolved",
+    "planned_runs": 3,
+    "execution_successes": 0,
+    "execution_success_rate": {
+      "numerator": 0,
+      "denominator": 3
+    },
+    "execution_attempts": 1,
+    "failed_attempts": 0,
+    "unknown_attempts": 1,
+    "cancelled_runs": 2,
+    "scorers": [
+      {
+        "scorer_version_id": "3b65d045-6f8d-457e-ae31-29a9772757a1",
+        "planned_runs": 3,
+        "valid_scores": 0,
+        "passed": 0,
+        "not_applicable": 0,
+        "unresolved": 3,
+        "score_coverage": {
+          "numerator": 0,
+          "denominator": 3
+        },
+        "valid_score_pass_rate": {
+          "numerator": 0,
+          "denominator": 0
+        }
+      }
+    ]
+  }
+}

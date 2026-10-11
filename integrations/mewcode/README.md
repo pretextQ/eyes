@@ -1,5 +1,7 @@
 # MewCode 单 Agent 真实评测接入
 
+最新重新验证位于 [MewCode/2026-10-11-rerun](../../MewCode/2026-10-11-rerun/REPORT.md)：当前 Windows 的独立数据库与统一 HTTP 接入，3/3 执行及评分通过，12/12 功能检查通过。该记录保留首次部署失败，使用独立端口和运行目录。
+
 2026-10-09（Asia/Shanghai）在 Windows 宿主机完成真实闭环：独立 PostgreSQL → Eyes API/Scheduler → Linux Runner → MewCode Agent → DeepSeek → 文件/命令工具 → 产物上传 → 原有独立评分器 → Web。没有修改 MewCode 核心源码、Eyes 核心源码、仓库测试或评测用例，没有 Git 提交或推送。
 
 最终实验：`087a0f7c-bfd5-44d0-b27c-d812fc45cbd9`。执行成功 3/3，有效评分 3/3，通过 3/3；证据 sealed 3/3，清理成功 3/3。每项原有 4 个验收检查通过。详见 [本机验证记录](../../docs/mewcode-validation.md)。

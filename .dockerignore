@@ -4,6 +4,7 @@
 .idea
 .ruff_cache
 data
+MewCode
 dist
 **/__pycache__
 deploy/.env
