@@ -2,10 +2,11 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import AwareDatetime, Field, field_validator
 
+from eyes.contracts.agent_protocol import AgentRun
 from eyes.contracts.base import Contract, Payload
-from eyes.contracts.target import TargetCapabilities, http_origin
+from eyes.contracts.target import TargetCapabilities, TargetPublish, http_origin
 
 
 class ExperimentCreate(Contract):
@@ -62,6 +63,26 @@ class WorkClaim(Contract):
 class LeaseRequest(Contract):
     runner_id: UUID
     lease_token: UUID
+
+
+class ReconciliationClaim(Contract):
+    runner_id: UUID
+
+
+class ReconciliationAssignment(Contract):
+    work_item_id: UUID
+    lease_token: UUID
+    lease_expires_at: AwareDatetime
+    attempt_id: UUID
+    case_run_id: UUID
+    idempotency_key: str
+    remote_operation_id: str | None
+    target: TargetPublish
+
+
+class ReconciliationSubmission(LeaseRequest):
+    snapshot: AgentRun | None = None
+    diagnostic: Literal["query_failed", "capability_mismatch", "snapshot_received"]
 
 
 class ClaimedWork(Contract):

@@ -11,6 +11,7 @@ from eyes.contracts.evidence import ArtifactMetadata, ExecutionEvent
 from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput
 from eyes.contracts.target import ExecutionInput, ExecutionResult
 from eyes.contracts.work import ClaimedWork
+from eyes.runner import reconciliation
 from eyes.runner.client import ApiError, ControlClient
 from eyes.runner.files import error_text, file_digest, redact, resolve_secrets, write_json
 from eyes.runner.outbox import Outbox
@@ -194,6 +195,7 @@ class RunnerService:
         )
 
     def recover(self, restarting=True):
+        reconciliation.recover(self)
         for directory in self.work_dir.iterdir():
             if not directory.is_dir() or not (directory / "assignment.json").exists():
                 continue
@@ -634,11 +636,18 @@ class RunnerService:
         self.runner_id = registration["runner_id"]
         logger.info("runner_registered runner=%s", self.runner_id)
         counts = {"execute": self.config.execution_slots, "score": self.config.score_slots}
+        query_task = None
         try:
             while not self.stopping.is_set():
                 await self.outbox.flush(self.client)
                 self.recover(restarting=False)
                 self.reap()
+                if (
+                    self.config.allowed_http_origins
+                    and (query_task is None or query_task.done())
+                    and self.outbox.size() < self.config.outbox_bytes * 0.75
+                ):
+                    query_task = asyncio.create_task(reconciliation.run_one(self))
                 for kind, slots in counts.items():
                     self.active[kind] = {task for task in self.active[kind] if not task.done()}
                     while (
@@ -675,6 +684,8 @@ class RunnerService:
                         if once:
                             break
                 if once:
+                    if query_task:
+                        await query_task
                     await asyncio.gather(
                         *(task for tasks in self.active.values() for task in tasks)
                     )
@@ -685,6 +696,8 @@ class RunnerService:
                     pass
         finally:
             self.stopping.set()
+            if query_task:
+                await asyncio.gather(query_task, return_exceptions=True)
             await asyncio.gather(
                 *(task for tasks in self.active.values() for task in tasks), return_exceptions=True
             )

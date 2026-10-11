@@ -32,7 +32,7 @@ flowchart TD
     API --> Store[证据文件存储]
 ```
 
-Runner 主动通过认证后的 HTTP 请求领取工作、续租和上传结果，适用于开发者本机及内网环境。Runner 不直接连接数据库。API 在短事务中完成领取、并发额度预留和状态写入；调度进程扫描到期任务、安排安全的准备阶段重试，并将执行意图之后失联的任务标记为 unknown、保留额度。当前调度进程不主动查询远端未知任务，自动协调仍是后续目标。
+Runner 主动通过认证后的 HTTP 请求领取工作、续租和上传结果，适用于开发者本机及内网环境。Runner 不直接连接数据库。API 在短事务中完成领取、并发额度预留和状态写入；调度进程扫描到期任务、安排安全的准备阶段重试，并将执行意图之后失联的任务标记为 unknown、保留额度。2026-10-11 新增统一 agent_http 的独立查询租约：匹配 Runner 通过 API 自动领取未知原操作的只读核对，API 按可信终态更新原 Attempt、追加来源记录并释放额度。Scheduler 不持有目标凭据或直接请求目标；详见[恢复说明](unknown-recovery.md)，真实故障验收阻塞。
 
 ### 模块职责
 
@@ -60,7 +60,7 @@ Web 与 CLI 使用同一套公开 API。业务规则不放在路由和前端中�
 | 前端 | React、TypeScript、Vite、shadcn/Base UI、Tailwind CSS 4 | 运行列表、执行详情和逐用例对比；组件选择已落地，见前端说明 |
 | 部署 | Docker Compose | 固定版本、数据卷、健康检查和迁移步骤；Runner 也可在宿主机独立运行 |
 
-当前项目保持 Python >=3.14。依赖锁定在 uv.lock；历史 Compose 部署及 PostgreSQL 迁移、报告持久化和无产物备份恢复已有运行记录，见 [平台验证记录](platform-validation.md)。当前迁移 head 为 `0004_experiment_batches`。Windows/MewCode 记录使用 Linux API/Runner 与独立 PostgreSQL，不能作为原生 Windows API/Runner 或该环境完整 Compose 的验收；见 [MewCode 验证记录](mewcode-validation.md)。完整故障恢复与容量仍待验证。
+当前项目保持 Python >=3.14。依赖锁定在 uv.lock；历史 Compose 部署及 PostgreSQL 迁移、报告持久化和无产物备份恢复已有运行记录，见 [平台验证记录](platform-validation.md)。当前迁移 head 为 `0005_reconciliation`。Windows/MewCode 记录使用 Linux API/Runner 与独立 PostgreSQL，不能作为原生 Windows API/Runner 或该环境完整 Compose 的验收；见 [MewCode 验证记录](mewcode-validation.md)。完整故障恢复与容量仍待验证。
 
 PostgreSQL 的 `SKIP LOCKED` 可用于多个消费者领取队列表中的工作；它只解决领取时的行锁竞争，并不自动提供租约、并发限额、公平性或外部执行幂等。[PostgreSQL SELECT 文档](https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE)
 
@@ -145,7 +145,7 @@ Attempt 的正常流程为 `claimed → preparing → running → succeeded / fa
 
 只有确认本地执行已终止或远端已停止，才能结束为 `cancelled` 或 `timed_out`。已发出取消请求但未确认时保留 `cancel_requested`；超过协调期限后转为 `unknown`，并记录取消或超时原因。
 
-`unknown` 表示平台无法确定目标状态。租约失效会停止旧领取者修改当前调度状态，但无法自动终止外部副作用。当前 Runner 只在有效租约生命周期内按适配器能力取消/查询；重启后的未知任务由管理端 `resolve` 追加人工核对记录。协调进程主动根据目标查询结果追加核对记录仍是后续设计，不能视为已实现。
+`unknown` 表示平台无法确定目标状态。租约失效会停止旧领取者修改当前调度状态，但无法自动终止外部副作用。统一 agent_http 的未知工作由匹配 Runner 自动查询原幂等键，校验 Attempt、任务、远端运行身份、revision 和停止确认；独立查询令牌、退避及来源历史持久化。只有可信终态释放原额度，查询失败或非终态继续 unknown。通用 HTTP/Python 当前不具备同等重启查询契约，仍由管理端 `resolve` 追加人工事实，不自动重跑。详见[自动与人工核对边界](unknown-recovery.md)。
 
 ### 分别记录执行与证据状态
 
@@ -161,7 +161,7 @@ Attempt 的正常流程为 `claimed → preparing → running → succeeded / fa
 | 情况 | 处理规则 |
 | --- | --- |
 | Worker 领取后、明确尚未执行时退出 | 旧 lease 失效后重新排队，记录原尝试 |
-| 存在执行意图，但调用是否发生不确定 | 当前失联后记录 unknown 并保留额度、等待显式核对；远端查询或幂等协议的自动恢复仍为后续目标 |
+| 存在执行意图，但调用是否发生不确定 | 失联后 unknown 并保留额度；统一 agent_http 自动只读查询原键，能力不足仍需人工 resolve，不重跑未知副作用 |
 | Runner 失联、远端可能仍在运行 | 保留目标额度占用或冻结该目标的新分配，直到确认停止；不能凭租约过期认定资源已释放 |
 | 旧 Runner 迟到提交 | 领取令牌校验阻止覆盖当前状态；迟到证据可按身份和 Attempt 归档为补充事实 |
 | 评分器崩溃 | 保存 scorer error，可独立重试评分，不重新执行目标 |

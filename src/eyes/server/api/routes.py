@@ -23,6 +23,9 @@ from eyes.contracts.work import (
     ExperimentBatchCreate,
     ExperimentCreate,
     LeaseRequest,
+    ReconciliationAssignment,
+    ReconciliationClaim,
+    ReconciliationSubmission,
     RunnerRegister,
     WorkClaim,
 )
@@ -32,6 +35,7 @@ from eyes.server.domain import DomainError, public_record, scoped
 from eyes.server.evaluation import service as evaluation
 from eyes.server.evidence import service as evidence
 from eyes.server.experiments import batches
+from eyes.server.scheduling import reconciliation
 from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.database import scheduling_lock
 from eyes.server.storage.models import (
@@ -224,6 +228,21 @@ def heartbeat(
     work_id: UUID, body: LeaseRequest, session: Database, runner: RunnerIdentity, request: Request
 ):
     return scheduling.heartbeat(session, runner, work_id, body, request.app.state.settings)
+
+
+@router.post("/reconciliation/claim")
+def claim_reconciliation(body: ReconciliationClaim, session: Database, runner: RunnerIdentity):
+    return {"schema_version": "1.0", "query": reconciliation.claim(session, runner, body)}
+
+
+@router.post("/work/{work_id}/reconciliation-result")
+def reconciliation_result(
+    work_id: UUID,
+    body: ReconciliationSubmission,
+    session: Database,
+    runner: RunnerIdentity,
+):
+    return reconciliation.submit(session, runner, work_id, body)
 
 
 class ProgressSubmission(LeaseRequest):
@@ -483,6 +502,9 @@ def contract_schemas(user: Reader):
         ExecutionEvent,
         ArtifactMetadata,
         ClaimedWork,
+        ReconciliationAssignment,
+        ReconciliationClaim,
+        ReconciliationSubmission,
     ]
     return {
         "schema_version": "1.0",

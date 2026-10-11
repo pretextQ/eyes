@@ -12,7 +12,7 @@
 | 调度 | 主动领取、插件匹配、执行/评分容量、租约、心跳、令牌校验、取消及到期扫描 |
 | 证据 | 事件去重、冲突诊断、固定清单、迟到清单、受控产物上传及查询 |
 | 评分 | 固定清单绑定、前置证据检查、结果校验、重新评分历史及明确分母的结果查询 |
-| 部署 | Alembic 0001～0004 迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移/Web 服务 |
+| 部署 | Alembic 0001～0005 迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移/Web 服务 |
 | 实际执行组件 | 宿主机 Runner、HTTP/Python 适配器、独立规则/Python 评分进程、SDK、插件摘要与本地状态 CLI 已实现；Python 真实接入有记录，HTTP 仍待验收 |
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
@@ -179,7 +179,7 @@ ScorerVersion 冻结插件标识、实现摘要、配置、证据要求、超时
 
 领取、额度判断、令牌及恢复使用同一组按固定顺序获取的 PostgreSQL 事务 advisory lock。额度从 `reserved` 工作项计算；未知执行仍计入全局、项目和稳定目标的执行容量。符合条件的队列使用 `FOR UPDATE OF work_items SKIP LOCKED` 领取。初版将这些事务串行协调，吞吐需实测；不承诺公平性或外部副作用恰好一次执行。
 
-完整评分输入读取只校验项目、身份、工作范围、有效租约与计算期限，不持有全局调度锁；只读取已分配的固定清单。`EYES_MAX_SCORE_INPUT_BYTES` 控制响应大小，Runner 使用相同的 `max_score_input_bytes`。API 与 scheduler 的 `EYES_SCORE_SUBMISSION_GRACE_SECONDS` 必须一致；提交宽限不延长计算期限，也不恢复已失效租约。完成结果与证据在 Runner 中分别发送，证据的重试不会阻塞结果发送锁。上述评分输入协议变更要求三类进程同步升级；当前服务要求迁移到 `0004_experiment_batches`，详见 [平台升级说明](platform.md) 及 [接入兼容性](agent-integration.md#6-兼容性与验收边界)。
+完整评分输入读取只校验项目、身份、工作范围、有效租约与计算期限，不持有全局调度锁；只读取已分配的固定清单。`EYES_MAX_SCORE_INPUT_BYTES` 控制响应大小，Runner 使用相同的 `max_score_input_bytes`。API 与 scheduler 的 `EYES_SCORE_SUBMISSION_GRACE_SECONDS` 必须一致；提交宽限不延长计算期限，也不恢复已失效租约。完成结果与证据在 Runner 中分别发送，证据的重试不会阻塞结果发送锁。上述评分输入协议变更要求三类进程同步升级；当前服务要求迁移到 `0005_reconciliation`，详见 [平台升级说明](platform.md) 及 [接入兼容性](agent-integration.md#6-兼容性与验收边界)。
 
 数据库触发器保护版本、事件、清单、核对记录、实验配置、已发布评分和回归报告；事件与清单仅允许按严格过期规则清除载荷，保留原摘要与标识。Attempt 的核对会保留先前结果及来源，已固定清单保存自己的执行结果副本。
 
@@ -199,10 +199,15 @@ API 使用 OTel SDK 创建实际 HTTP 请求 span，接收 W3C Trace Context，�
 
 ## 迁移、备份与后续验收
 
-迁移入口是 `alembic.ini` 和 `migrations/versions/`，当前 head 为 `0004_experiment_batches`。迁移只在显式命令/Compose migrate 服务中运行，API 启动不自动建表。升级前备份数据库和证据卷，并记录应用版本与迁移版本。恢复时需要检查每个 ready 产物的路径、大小和摘要，以及评分引用的清单。`eyes-ops backup/restore/audit` 提供可执行流程，命令和验证边界见 [平台说明](platform.md)。
+迁移入口是 `alembic.ini` 和 `migrations/versions/`，当前 head 为 `0005_reconciliation`。迁移只在显式命令/Compose migrate 服务中运行，API 启动不自动建表。升级前备份数据库和证据卷，并记录应用版本与迁移版本。恢复时需要检查每个 ready 产物的路径、大小和摘要，以及评分引用的清单。`eyes-ops backup/restore/audit` 提供可执行流程，命令和验证边界见 [平台说明](platform.md)。
 
 已提供 `eyes-server`、`eyes-scheduler`、`eyes-admin`、`eyes-runner`、开发者 CLI `eyes` 和运维 CLI `eyes-ops`。新增回归、封存和评分重试端点见 [平台说明](platform.md)。
 
 HTTP 与 Python 通用接入功能已有实现；Python 路径已有真实闭环，仍需补齐真实 HTTP Agent 的导入、领取、执行、证据查询和独立评分。多 Runner 已有部分并发证据，完整租约、取消、迟到上报和评分故障恢复仍需验证。原始结果须按 [AGENT.md](../AGENT.md) 的阶段要求保存；本次文档校准不新增运行验收。
 
 多 Agent 批次新增公开 API 和 CLI，在同一事务创建多份独立实验，详见 [多 Agent 批次](multi-agent-batches.md)。
+
+
+## 2026-10-11：未知原操作自动核对
+
+统一 agent_http 新增独立查询领取与上报端点 `/v1/reconciliation/claim` 和 `/v1/work/{id}/reconciliation-result`。查询只关联原 Attempt/幂等键/远端运行，查询租约和退避持久化于 0005 的 work_items.reconciliation，来源事实追加到不可变 resolutions。只有协议可信终态及停止确认释放原额度；失败、非终态、身份冲突和能力不足继续 unknown。旧业务 lease 校验不变，迟到查询只追加事实。通用 HTTP/Python 仍需人工 resolve。升级、历史数据、原评分/证据保留及本次故障验收阻塞见[恢复说明](unknown-recovery.md)。

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from eyes.server.config import Settings
 
-SCHEMA_REVISION = "0004_experiment_batches"
+SCHEMA_REVISION = "0005_reconciliation"
 
 
 def database(settings: Settings):

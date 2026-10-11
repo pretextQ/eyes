@@ -253,6 +253,7 @@ class WorkItem(Record):
     reserved: Mapped[bool] = mapped_column(default=False)
     completion_digest: Mapped[str | None] = mapped_column(String(64))
     completed_by: Mapped[UUID | None]
+    reconciliation: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
 
 
 class Event(Record):

@@ -528,7 +528,14 @@ def cancel(session: Session, project_id: UUID, experiment_id: UUID):
     return experiment
 
 
-def resolve(session: Session, credential: Credential, attempt_id: UUID, resolution: Resolution):
+def resolve(
+    session: Session,
+    credential: Credential,
+    attempt_id: UUID,
+    resolution: Resolution,
+    *,
+    source="manager_reconciliation",
+):
     scheduling_lock(session)
     attempt = scoped(session, Attempt, attempt_id, credential.project_id, lock=True)
     if attempt.status not in {"unknown", "cancel_requested"}:
@@ -545,7 +552,7 @@ def resolve(session: Session, credential: Credential, attempt_id: UUID, resoluti
             attempt_id=attempt_id,
             credential_id=credential.id,
             previous_status=attempt.status,
-            content=evidence.redact(resolution.model_dump(mode="json")),
+            content={**evidence.redact(resolution.model_dump(mode="json")), "source": source},
         )
     )
     attempt.status = resolution.status
@@ -558,9 +565,9 @@ def resolve(session: Session, credential: Credential, attempt_id: UUID, resoluti
         "schema_version": "1.0",
         "status": resolution.status,
         "output": evidence.redact(resolution.output),
-        "error": resolution.reason,
+        "error": evidence.redact(resolution.reason),
         "previous_result": previous_result,
-        "source": "manager_reconciliation",
+        "source": source,
     }
     session.get(CaseRun, attempt.case_run_id).status = resolution.status
     work.status = "completed"
