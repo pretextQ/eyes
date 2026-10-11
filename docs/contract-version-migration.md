@@ -110,3 +110,5 @@ uv run python -m eyes.contracts.schema > docs/control-contracts-v1.schema.json
 另只读检查前次真实 Runner 保留的 6 份 completion journal（3 执行、3 评分）：它们原本已含版本，当前传输投影载荷和结果摘要全部保持相同。这是实际材料读取/摘要核对，**不是旧 outbox 的真实网络补传/服务确认**。记录保存在未提交的私有 `data/contract-version-migration/`，只汇报状态、计数与摘要比较，不输出凭据。
 
 限制与待验证：Docker Linux 引擎不可达；Windows API `/health/ready` 返回 503/artifact_store_unavailable，目录 fsync 的既有平台限制未在本任务修复。PostgreSQL 迁移和以上 API/幂等操作实际运行成功，但不能称为完整部署、证据上传、评分或 Runner 验收。已接受完成的网络重传、真正缺少版本的历史 outbox、旧 SDK/外部 exporter/插件二进制、多进程并发与 evidence_wait_seconds 缺省更早快照重放仍待 Linux/真实旧环境验证。M0/M2 不因本任务而宣称完整通过。
+
+随后用户要求继续兼容验收并优先修复 Docker：2026-10-11 Docker 运行时残留套接字隔离后，Linux 引擎恢复；使用独立历史数据库/产物副本验证了 6 份已接受完成载荷的旧版 Outbox 真实中断/恢复（6 个 duplicate 确认），以及旧 Runner/SDK/评分器、新 Supervisor+旧 Worker/SDK/评分器两组实际评分，各 3/3、12/12 检查通过。原执行、清单、历史评分及 journal 保留。具体版本、命令与仍未覆盖的边界见[兼容验收补充](contract-compatibility-validation.md)。上述初次环境限制作为历史失败记录保留，已接受结果重传与这两种组合不再标为完全未验证；其他旧客户端和真正缺版本的持久化载荷仍待验证。
