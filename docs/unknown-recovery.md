@@ -71,3 +71,5 @@ Runner 在私有 `state_dir/reconciliation/<query-id>/` 原子保存 assignment.
 - PostgreSQL 实际升级/重启，核对历史数据、清单、评分和报告不被覆盖，成功恢复但证据缺失时明确 evidence partial/insufficient_evidence。
 
 上述故障项目均为**待验证/当前环境阻塞**，取消/资源正向能力仍需另一个真正支持这些能力的目标；不会因为 MewCode cancellation=false 而伪造停止验收。
+
+2026-10-11 验收审查补充：后续版本迁移任务已在独立 PostgreSQL 实际执行 0001～0005，并在真实历史冷态副本执行 0004→0005；迁移日志和副本前后原执行/清单/评分记录已核对，见[兼容验收](contract-compatibility-validation.md)及[本轮审查](acceptance-review-20261011.md)。因此实际升级不再完全缺证据，但这些操作没有运行活动未知任务的自动核对，不能替代上述故障矩阵。本轮 Docker Linux 引擎管道再次不可达，未启动或中断原服务，任务二结论为部分通过、真实安全恢复仍无法确认。此前环境检查作为历史记录保留。
