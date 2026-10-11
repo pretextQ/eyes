@@ -805,10 +805,18 @@ class RunnerService:
                         *(task for tasks in self.active.values() for task in tasks)
                     )
                     break
+                # Refill slots when real work finishes; an idle Runner keeps the
+                # configured polling interval. Never cancel work just to wake up.
+                stopping = asyncio.create_task(self.stopping.wait())
                 try:
-                    await asyncio.wait_for(self.stopping.wait(), self.config.poll_seconds)
-                except TimeoutError:
-                    pass
+                    await asyncio.wait(
+                        [stopping, *(task for tasks in self.active.values() for task in tasks)],
+                        timeout=self.config.poll_seconds,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                finally:
+                    stopping.cancel()
+                    await asyncio.gather(stopping, return_exceptions=True)
         finally:
             self.stopping.set()
             if query_task:
