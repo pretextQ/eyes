@@ -96,3 +96,49 @@ Eyes 运行基线 `4ab8a73`；Windows 11 / Docker Engine 29.8.2，本机 Linux C
 未覆盖：真实改善/退化、远端取消正向、所有历史评分/缺版本组合、所有 gate 错误分支、完整 M2、干净完整 Compose、完整证据备份恢复、容量和长期运行。本轮没有处理全局锁、轮询或索引，没有新增或修改仓库测试/评测用例。M3 **部分验收，不能宣称完整通过**。
 
 收尾：本轮新增 Runner 已正常停止；新旧两轮 Agent、nginx 验收容器及本轮重新启动的安全 API/PostgreSQL 已停止，状态目录和容器均保留。此前仍在运行的 MewCode 重验 API/Agent 未中断。静态检查与文档链接/diff 检查结果和本轮 Git 发布分别核对，文档不包含凭据或私有运行载荷。
+
+## 补充：真实改善/退化候选检查与阻塞
+
+2026-10-11（Asia/Shanghai），Eyes 基线 `5233701fa3f1710fe4e7c18c8c8388bfa4c8c443`，开始时 `main` 工作区干净。本次仅推进真实版本质量变化验收，不重新开发回归功能。阅读开发约定、README、架构、PLAN、本页、MewCode/Python 与 HTTP 验证、Runner 可靠性及回归口径说明后，定向检查 `D:\projects\MewCode` 的版本历史和本页已有私有材料。
+
+实际执行 `git -C D:/projects/MewCode fetch origin` 成功；本地 `master`、远端 `origin/master` 均为 `3f104082b6c5ca53efe273630bf08f67f1fc3ff5`，外部 Agent 工作区干净。检查 Agent、client、工具、权限、prompt 与配置相关历史，没有 checkout 或修改外部源码；远端没有比既有候选更新的主线版本。`origin/ci-logs` 是日志分支，未把其记录当作新增 Agent 实现。没有扫描无关项目或安装依赖。
+
+### 已检查的真实候选
+
+通过只读 `git show/log/diff` 检查以下真实变化，并对 15 个提交使用内存中的 `git archive` 计算全部 `mewcode/**/*.py` 字节摘要。这里的摘要是 **Git 源码候选摘要**；除既有两个正式版本外，没有新的容器加载核对或业务执行，不能称为实际运行版本。
+
+| 候选提交 | 实际源码差异 | 固定三任务/当前接入下的判断 |
+| --- | --- | --- |
+| `90918c6` → `7152ddf` | 工具相对路径从进程 CWD 改为绑定 work_dir，新增 `ToolRegistry.bind_work_dir` | 是相关行为修复，但旧侧缺少 bridge 无条件调用的方法。原接入会在业务前失败，不能将接入故障算作质量退化；不修改 bridge 或旧 Agent 绕过此边界 |
+| `f86827b` | 子 Agent 三条创建路径绑定工具 work_dir | bridge 直接创建主 Agent 和默认六工具，没有注册子 Agent 工具；不是现有路径的质量变化证据 |
+| `c0080ef` | `run_to_completion` 环境注入及 compact 后恢复 | bridge 调用 `Agent.run`，未调用该入口；不能用不同入口的修复声称现有任务改善 |
+| `a1fe065`、`539ae2b`、`e72ffc2`、`a9acd9b` | thinking 预算/截断恢复、未知工具连续中断结果补齐、空消息防护、OpenAI 输出上限与截断信号 | 固定 thinking=false、8192 输出上限和正常六工具；已有材料没有提供这些恢复条件导致代码质量 fail 的可比两侧证据。输出截断修复确有行为差异，但不能靠降低预算、制造错误或盲目重复运行触发它 |
+| `02543a6` | 文件编码/行尾保留、CRLF 匹配及编辑历史记录时机 | 既有输入是 UTF-8/LF，执行在 Linux；bridge 没有启用编辑历史。没有已知对应功能检查失败，不改输入或切换操作系统制造差异 |
+| `7f50a5b`、`e83a496` | 读取/扫描移出事件循环，grep 限制；rewind 缓存失效与空缓存判断 | 三任务是小文件功能检查，不评分扫描吞吐；bridge 不传 FileCache、不调用 rewind。没有质量变化材料，不开展容量试跑 |
+| `2236900` | 子进程环境白名单、密钥变量展开、MCP transport 配置 | bridge 传入实际密钥、未接入 MCP；配置/认证问题不能当质量退化 |
+| `9282caa`、`1d3daab`、`3f10408` | shell 环境说明、超时/取消进程树清理、服务事务取消所有权 | 两个正式版本已经各 3/3 pass；中间提交的主要变化是清理。原任务正常完成，没有可比质量 fail；不重复超时/取消验收或把可靠性故障当质量变化 |
+
+这些排除依据是源码与既有材料的定向判断，**不是证明所有历史版本在本测试集永远同分**。兼容旧版本仍可能产生不同模型输出，但当前没有足够依据选出会触及既有评分条件的真实缺陷版本；为了碰到偶然失败而连续试跑不满足本轮要求。
+
+源码映射摘要按 `SHA-256(json.dumps(按路径排序的 Python 文件 SHA-256 映射, sort_keys=True))` 计算，与此前正式记录口径相同：
+
+| 候选 | Git Python 源码映射摘要 |
+| --- | --- |
+| `90918c6ac3272cc0c02613efb31ef5b0318dd7e5` | `e9bd6f88cc27868efc0eedfa0f701805645fe4afeb4ccaa14549391e6f113911` |
+| `7152ddf75b9dabb579d3ec798783ef77151bc20a` | `cad65a85b6325fb7948bf3c8a39d2df4ad71530eea1c99ddf40348fcd47f548d` |
+| `9282caa1f769ce4d8b6f8f47624eedfe9847f8c1` | `6cd3a5d15d41c449c313e88fedc423f51c27c825671277ead0d41704aa4a4791` |
+| `3f104082b6c5ca53efe273630bf08f67f1fc3ff5` | `b29a77964163dcf5a10d32d386e1d16144aa3f0f4780ff829123bcf170729ead` |
+
+其余候选的完整提交、每文件映射与集合摘要保存在新建且 Git 忽略的 `data/real-version-quality-20261011/`：`candidate-audit.json`、各提交 `*-source-hashes.json`、`agent-history.txt`、`agent-core-diff.txt`。仅保存只读检查材料，没有覆盖旧实验、评分、报告或运行目录。已有 `data/mewcode-regression-20261009/` 为空，没有可用的额外版本质量材料；此前 Python/HTTP 记录中的失败是产物部署/缓存接入问题，不能复用为质量退化。
+
+### 既有事实、执行边界与状态
+
+从 `verified-versions-final/` 原始 case-runs、results、source-identity/source-hashes 及固定报告摘要定向核实：两个源码映射与对应 Git archive 完全一致，六个原始用例都只有一个 Attempt，均 succeeded；六个原始 ScoreRun 均 completed/pass、各 4/4。既有正反向报告仍为可比 3/3、unchanged=3、improved=0、regressed=0、gate=pass。这是读取已有证据，不是新一轮独立评分或 API/CLI 复验，也不重复已通过的历史选择、引用和 gate 检查。
+
+数据集文件 SHA-256 仍为 `9e868ae0c53f1e2f88d6114b5c76e591647ecd78ef6b6d3882cbaf8b49771e4b`，评分器文件仍为 `3e72cfd6a721cddd420f9d850cf79366545e886ec59b7377424c01fb0737d826`。既有配置与实际环境沿用上节记录：串行、重复 1、first_success、300 秒、证据等待 15 秒，DeepSeek/deepseek-flash、thinking=false、128000 context、8192 输出、12 轮，Windows 宿主机/Linux CPython 3.14.7/PostgreSQL 15.17。模型别名及外部环境限制继续保留，不推断固定权重或稳定性。
+
+**本次结果：候选检查已完成，真实改善/退化验收阻塞。** 新执行=0、新评分=0、新报告=0。未找到具备既有任务质量差异依据且满足当前接入/可比环境的版本对，按要求停止试跑；没有发现需最小修复的 Eyes 明确缺陷。未启动或改动已有服务，没有新增测试、评测用例、fixtures、mocks、模拟数据或依赖，没有提交原始日志/私有数据。
+
+状态区分：回归功能**已实现**；两真实版本无变化及此前列出的默认/显式评分、旧报告、证据引用、分母与 CLI 路径**已验证**；固定既有测试集下至少一项真实改善与退化仍**待验证且阻塞**。解除阻塞需要同一 Agent 的可兼容真实版本，并有既有三任务对应的实际质量失败/修复依据或可比历史材料；不能用另一个 Agent、改变任务/评分器/参数，或偶然失败挑选代替。本次不更新 M3 为完整通过，纯验收文档集中提交，不要求推送。
+
+本次文档检查：两份修改文档的本地文件链接均存在，新增章节锚点对应，`git diff --check` 通过；Git 修改范围仅本页和 PLAN。没有产品代码修改，未重复运行静态构建、仓库测试或已通过的业务验收；这些文档检查不算真实改善/退化验证。
