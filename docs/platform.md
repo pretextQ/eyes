@@ -20,6 +20,8 @@ uv run eyes-scheduler
 
 ## 1. 固定回归报告与 CI
 
+2026-10-11 在隔离环境对同一真实 MewCode 的两个原样 Git 版本运行既有三任务/评分器，验证无变化报告、默认最早评分、显式历史选择、旧报告不变、引用/分母和 CLI 0/1/2/3。两版本均通过，仍未观察到改善/退化，不代表完整 M3，见[实际结果与边界](deployment-regression-20261011.md#同一真实-agent-的不同版本)。
+
 ### 创建报告
 
 `POST /v1/comparisons` 需要管理令牌和 `Idempotency-Key`。请求包含两次实验、明确的评分器配对、门槛和可选 ScoreRun 选择。用具体 UUID 替换下列占位内容，保存为 `comparison.json`：
