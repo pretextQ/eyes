@@ -13,3 +13,13 @@ Docker Engine 29.8.2。新项目 `eyes-clean-20261011`，API 18064、Web 18086�
 前端干净安装报告 7 项 high：链路来自 devDependency `shadcn` 及 registry/ts-morph/glob/braces。保留实际 `npm audit --json` 和锁文件摘要，未运行 audit fix 或升级依赖。仍需按实际漏洞条件核实影响，不能因构建成功宣称依赖安全。
 
 独立 Agent/Runner 最小真实闭环、完整权限矩阵及产物下载仍在本轮继续验证；本节只记录已完成的部署与权限修复，不宣称全部 M4 通过。
+
+## 接入构建修复及已通过的检查
+
+旧 `integrations/mewcode/Dockerfile` 没有 COPY Eyes 锁文件，使用浮动 uv 与非冻结 `uv pip install /app /opt/mewcode`；不能按仓库锁文件独立复现。最小调整为与控制镜像相同的 Python 3.14.7/uv 0.12.2，先 `uv sync --frozen --no-dev` 安装 Eyes，再导出外部 MewCode 非开发锁定依赖，安装当前环境缺少的包和 Agent。共享依赖不覆盖，最后 `uv pip check` 必须通过；不改外部源码或两份锁文件。同时将该镜像的新证据目录设为服务用户私有 `0700`。接入 README 增补干净构建、依赖边界、HTTP 服务必需变量、独立状态卷和分离 Runner 的实际步骤，避免固定旧脚本覆盖历史目录。
+
+保留本轮第一次实现检查失败：依赖过滤误用了系统 Python 的 metadata，第一次镜像构建及 pip check 虽成功，逐项核对发现 14 个 Eyes 锁定包版本被替换。该镜像未运行 Agent 业务；改用 `/app/.venv/bin/python` 获取已冻结环境后，重新 `--no-cache --pull` 构建最终 `eyes-clean-mewcode-verified:20261011`，再核对共享包与干净控制镜像完全一致、pip check 通过，才启动业务。此前用于检查组合安装方法的独立私有镜像也保留，不作为文档构建证明。
+
+实际 MewCode 提交 `3f104082b6c5ca53efe273630bf08f67f1fc3ff5`，运行容器全部 Python 源码与干净 Windows checkout 逐文件一致，实际源码映射摘要 `a007cfa9bcfb9d2f1051a154c6f64d2b42542fc83061d45ba046787d0b94e35d`。Git archive 的 LF 字节与 Windows checkout 行尾不同，不能将这项首次候选摘要比较不一致误报为加载缓存源码；随后明确比较实际 checkout 与运行字节。外部模型配置沿用已有无密钥参数和运行时密钥，未写入镜像或发布配置。外部 Agent 是真实执行目标，不是控制平台缓存运行镜像。
+
+最终镜像已通过真实 HTTP 发现/能力读取，Agent 可加载、状态目录可写；干净控制镜像中的独立 Runner plugins 读取到原评分器文件摘要 `3e72cfd6a721cddd420f9d850cf79366545e886ec59b7377424c01fb0737d826`。新项目导入原完整三任务，签发限定目标与工作类型的凭据。真实闭环和权限矩阵的最终结果随后记录，不以构建/发现代替执行成功。

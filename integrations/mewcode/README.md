@@ -35,6 +35,25 @@
 
 Linux 运行环境需要 Python 3.14+、当前 Eyes 和 MewCode。模板使用 `/app/.venv/bin/python`，Eyes/integrations 位于 `/app`，MewCode 位于 `/opt/mewcode`。按实际挂载调整解释器、import_paths 和 server_url，不能把 Windows 路径填入容器配置。
 
+### 从干净环境构建接入镜像
+
+先按 Eyes 根 README 启动独立控制平台。已有 `eyes-mewcode:local` 或历史脚本不代替本次构建；MewCode checkout 必须包含它自己的 `uv.lock`，先确认提交和工作区。Windows PowerShell 在 Eyes 根目录执行：
+
+```powershell
+git -C D:/projects/MewCode status --short
+git -C D:/projects/MewCode rev-parse HEAD
+docker build --no-cache --pull --build-context mewcode=D:/projects/MewCode -f integrations/mewcode/Dockerfile -t eyes-mewcode:independent .
+docker run --rm eyes-mewcode:independent uv pip check --python /app/.venv/bin/python
+```
+
+Dockerfile 用 Eyes `uv.lock` 执行 `uv sync --frozen --no-dev`，再从 MewCode 锁文件导出非开发依赖，只安装当前 Eyes 环境缺少的包并安装 Agent 本身。共享包保持 Eyes 的冻结版本；因此组合环境不宣称逐项等于 MewCode 自己的锁文件。最后 `uv pip check` 验证组合依赖约束，失败时停止接入，不自动升级或改锁文件。模型参数和密钥只在运行时提供，不能 COPY 进镜像。
+
+Python Runner 使用该镜像及本页模板；统一 HTTP 服务使用同一镜像，以 `uvicorn integrations.mewcode.http_service:app --factory --host 0.0.0.0 --port <Agent端口>` 启动。HTTP 服务运行时需要 `AGENT_HTTP_TOKEN`、`MEWCODE_MODEL_KEY`、`MEWCODE_HTTP_VERSION`（实际提交）、`MEWCODE_PARAMETERS_FILE`（挂载的无密钥 JSON 参数）和 `MEWCODE_HTTP_STATE`（独立可写私有状态目录）。新命名卷可挂载到镜像已创建的 `/app/data/artifacts`，将它作为 Agent 专属状态目录；不要挂载控制平台证据卷。其他挂载点应预先以运行用户 UID/GID 10001 创建并赋予 `0700`，不能让服务通过 root 或开放权限绕过写入故障。
+
+HTTP Runner 可使用干净控制镜像，另只读挂载 `integrations` 到 `/app/integrations` 以加载既有评分器，复制 `http-runner.example.toml` 到新私有目录。配置 API 地址、Agent origin、独立 state_dir 和实际槽位；在容器内部用发现命令发布目标，详见[统一 HTTP 接入](../../docs/agent-http-runtime.md)。Runner 凭据通过单独环境文件提供；Agent 只拿 Agent/model 凭据，不挂载项目管理或 Runner 环境文件。每个 Runner 使用自己的私有状态卷。分开执行/评分时，execute 凭据配置 score_slots=0，score 凭据配置 execution_slots=0。
+
+独立项目中读取 plugins 摘要、导入原三任务、发布评分器、创建实验及签发限定目标/工作类型的令牌后再启动 Runner；不要直接运行固定读写 `data/mewcode-integration` 的历史 publish/run 脚本。实际新环境、权限与首次失败见[本轮验收](../../docs/clean-deployment-permissions-20261011.md)。
+
 在 Windows 创建独立运行配置：
 
 ```powershell
