@@ -21,12 +21,12 @@
 | 版本、JSONL 导入与实验快照 | 已实现 | `contracts/dataset.py`、`server/catalog/service.py`、`server/experiments/service.py`；0001 版本/快照保护触发器 | 整体错误行校验、幂等、同事务入队；多轮 steps 不在已完成范围 |
 | HTTP/Python 接入与独立执行/评分进程 | 已实现 | `adapters/agent_http.py`、`adapters/http.py`、`adapters/python.py`、`runner/process.py`、`runner/worker.py` | Python 真实闭环及 2026-10-10 MewCode 统一 HTTP 3/3 执行与独立评分有记录；不能推广为全部可选/故障能力已验收 |
 | 认证、项目与 Runner 范围 | 已实现 | `server/api/dependencies.py`、`server/admin.py`、`server/scheduling/service.py` | read/manage/runner 边界已有代码；完整权限验收仍待补齐 |
-| 领取、执行/评分容量、租约、取消与未知额度保留 | 已实现 | `server/scheduling/service.py`、`server/storage/database.py` | advisory lock 与 SKIP LOCKED 协作；双 Python Agent 的峰值 3 任务和部分中断/取消有记录，完整故障矩阵未验收 |
+| 领取、执行/评分容量、租约、取消与未知额度保留 | 已实现 | `server/scheduling/service.py`、`server/storage/database.py` | advisory lock 与 SKIP LOCKED 协作；当前 Windows 环境的双 Agent 并发、中断、取消和完整故障矩阵仍需验收 |
 | SDK、事件去重、产物上传与固定清单 | 已实现 | `sdk/recorder.py`、`server/evidence/service.py`、`runner/outbox.py` | MewCode 有真实事件/产物记录；缺失、迟到、耗尽、过期等分支未全面验证 |
 | 规则/可信 Python 评分、证据等待、retry/rescore | 已实现 | `scorers/rules.py`、`server/evaluation/service.py`、0002 | 固定清单、引用/数值校验和历史保留有代码；重评分不自动替换最早评分汇总 |
 | 固定回归报告、Web 与 CLI 门槛 | 已实现 | `server/comparison/service.py`、`contracts/comparison.py`、`cli/main.py`、`frontend/src/components/ComparisonCreate.tsx` | 默认首个成功 Attempt 的最早 ScoreRun；历史有 fail/inconclusive，真实同目标版本改善/退化及 gate pass 尚缺证据 |
 | 多 Agent 批次 | 已实现 | `server/experiments/batches.py`、`contracts/work.py`、0004、`frontend/src/pages/Batches.tsx` | 原子分组、成员独立执行、派生状态与取消；不同任务集不合并质量通过率 |
-| 被动观测与流程图 | 已实现 | `server/observation/`、`contracts/observation.py`、0003、`frontend/src/pages/Observation.tsx` | Deta exporter 真实接入及一次离线补传有历史记录；exporter 不在本仓库源码中，当前外部实现未重新审查 |
+| 被动观测与流程图 | 已实现 | `server/observation/`、`contracts/observation.py`、0003、`frontend/src/pages/Observation.tsx` | 当前 Windows 环境的 exporter 接入及离线补传仍需验收；exporter 不在本仓库源码中，当前外部实现未重新审查 |
 | Compose、审计、实验证据保留与备份恢复 | 已实现 | `deploy/compose.yaml`、`server/operations/service.py`、`server/operations/backup.py` | 历史 Compose 和无 ready 产物恢复已运行；含完整事件/产物/评分的恢复、容量仍待验收 |
 | BUG-001～004 | 已实现，待验证 | Outbox 单项退避/孤立文件隔离、`LocalArtifactStore.check_ready`、Web 显式 ScoreRun 选择 | 保留现有 [故障修复计划](bug-fix-plan.md)，不重复建立修复清单；静态检查通过不等于行为验收 |
 
@@ -50,10 +50,10 @@
 | 阶段 | 当前状态 | 完整验收前必须补齐 |
 | --- | --- | --- |
 | M0 契约定稿 | 部分实现，未完整验收 | 四类契约、表/API/CLI 已存在；普通版本显式要求已落实并有部分真实 API 兼容记录，旧客户端/重传场景和两种接入完整逐项核对仍待验证；统一 Agent protocol_version 保持独立 |
-| M1 真实闭环 | HTTP/Python 基本闭环已验收，独立复现仍待验证 | Deta/Zeta/MewCode Python 及 MewCode 统一 HTTP 均有真实记录；HTTP 导入、执行、独立评分、证据和基础认证已补齐，干净环境独立接入及完整能力核对未覆盖 |
+| M1 真实闭环 | HTTP/Python 基本闭环已验收，独立复现仍待验证 | 当前 Windows 环境的 MewCode Python 及统一 HTTP 均有基础闭环记录；HTTP 导入、执行、独立评分、证据和基础认证已补齐，干净环境独立接入及完整能力核对未覆盖 |
 | M2 并发与恢复 | 部分实现、部分验收 | 已有多 Runner 峰值并发、受控工作进程中断和 unknown 额度保留；补齐 Runner 整体崩溃、网络/数据库异常、重传、停止确认、自动协调与隔离证据 |
 | M3 回归产品 | 已实现，验收无法确认完整通过 | 列表/详情/固定报告/CLI 已有；同一真实目标版本的一次改善和一次退化、gate pass 及评分追溯仍待验证；不同 Agent 的通过率差异不替代版本回归 |
-| M4 发布验收 | 工具已实现，验收无法确认完整通过 | 历史部署/迁移/无产物恢复已有；当前版本干净环境复现、权限、完整证据恢复、保留运维、依赖审计问题和容量/长期运行仍待验证 |
+| M4 发布验收 | 工具已实现，验收无法确认完整通过 | 当前版本干净环境部署复现、权限、完整证据恢复、保留运维、依赖审计问题和容量/长期运行仍待验证 |
 
 ## 待验证任务
 
@@ -79,9 +79,6 @@
 
 - [统一 HTTP 运行时真实验收](agent-http-validation.md)：2026-10-10，Docker 阻塞解除，真实 MewCode 3/3 执行和独立评分、12/12 功能检查、60 条 Eyes 事件/8 产物、认证/去重/终态服务重启核对；完整可选/故障矩阵未覆盖。
 - [Python/MewCode 真实闭环](mewcode-validation.md)：2026-10-09，3/3 执行、3/3 评分通过、53 条事件和 6 份产物；仅基础冒烟。
-- [双 Python Agent 并发与中断](../integrations/zeta/README.md)：2026-10-08，两个 Runner、峰值 3 任务；取消不代表远端停止已确认。
-- [历史平台与运维验证](platform-validation.md)：2026-10-03，PostgreSQL/Compose、固定报告、fail/inconclusive 及无业务产物恢复。
-- [历史后端验证](backend-validation.md)、[Web 说明](frontend.md)、[被动观测](observation.md)：按日期阅读；本计划不覆盖原始失败和环境限制。
 - [BUG-001～004 计划及检查记录](bug-fix-plan.md)：代码已实现，故障/浏览器行为待验收。
 
 

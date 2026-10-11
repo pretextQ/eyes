@@ -29,7 +29,7 @@ Eyes 把测试集、Agent 执行、评分依据和过程证据关联起来，帮
 | 独立评分      | 评分绑定固定证据清单，支持错误重试和重新评分，保留历史         |
 | 回归对比      | 逐用例可比性检查、改善/退化统计、固定报告及 CLI 质量门槛       |
 | Web 控制台    | 实验、批次、用例审阅、评分历史、回归报告、目录与运行状态       |
-| 被动观测      | 独立会话/任务事件入口、执行流程图；当前真实接入案例为 Deta CLI |
+| 被动观测      | 独立会话/任务事件入口、执行流程图；当前 Windows 环境接入待验收 |
 | 运维          | 数据库迁移、存储审计、证据保留、文件回收及数据库/证据备份恢复  |
 
 模型评分可以通过可信 Python 评分器接入。内置评分器不会自动判断任意业务任务，也不会把 Agent 自述当作任务已完成的证明。
@@ -48,7 +48,7 @@ Eyes 把测试集、Agent 执行、评分依据和过程证据关联起来，帮
 
 在 Agent 中照常发起任务 → exporter 上报实际事件 → Eyes 展示会话、模型和工具调用。
 
-此路径不需要测试集、评分器或 Runner，不创建评测实验。目前 Deta CLI 已有真实接入和离线补传记录；MewCode 当前通过主动评测的 Python 桥接接入。详见[被动观测说明](docs/observation.md)。
+此路径不需要测试集、评分器或 Runner，不创建评测实验。当前 Windows 环境的被动观测接入与离线补传仍待验收；MewCode 当前通过主动评测的 Python 桥接接入。详见[被动观测说明](docs/observation.md)。
 
 ## 系统结构
 
@@ -76,13 +76,13 @@ flowchart LR
 | ------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | 统一 HTTP 接入 | 2026-10-10：真实 MewCode 经 agent_http，3/3 执行、3/3 独立评分、12/12 功能检查；60 条事件、8 份产物、认证/去重/终态重启核对 | 可选取消/资源正向路径、活动崩溃、第二个统一协议实现及容量 |
 | MewCode 评测  | 2026-10-09：3/3 执行成功、3/3 独立评分通过，共 12/12 项功能检查；3/3 sealed，53 条事件、6 份产物及 Web 核对 | 完整 MewCode 服务、复杂仓库任务、远端取消、重启恢复与容量 |
-| 多 Agent 执行 | Deta/Zeta 两个 Python Agent 的真实并发，峰值 3 个任务；受控工作进程中断与批次取消                           | 真实 HTTP Agent、Runner 整体崩溃、网络/数据库故障         |
-| 回归与部署    | 固定报告、证据跳转、部分 CLI 门槛、历史 Compose 部署和数据库备份恢复                                        | 真实版本改善/退化、含完整事件和产物的恢复、生产容量       |
+| 多 Agent 执行 | 批次创建、成员实验与调度代码已实现 | 当前 Windows 环境的双 Agent 并发、中断、取消与故障恢复验收 |
+| 回归与部署    | 固定报告、证据跳转、CLI 门槛及备份恢复工具已实现                                        | 真实版本改善/退化、含完整事件和产物的恢复、生产容量       |
 | 本轮 Bug 修复 | 单项上传退避、孤立文件隔离、完整产物存储就绪检查、Web 历史评分选择已实现并通过相关静态检查/构建             | 故障注入及完整浏览器行为验收                              |
 
 MewCode 目前是 Eyes 的主要被测 Agent，用于验证平台能力。上述三任务结果是基础功能冒烟记录，不代表 MewCode 的完整编码能力或稳定性。
 
-最新证据见 [MewCode 验证记录](docs/mewcode-validation.md)、[双 Agent 记录](integrations/zeta/README.md)和 [Bug 修复计划](docs/bug-fix-plan.md)。早期文档保留当时状态，应结合日期和后续追加记录阅读。
+最新证据见 [MewCode 验证记录](docs/mewcode-validation.md)、[HTTP 验证记录](docs/agent-http-validation.md)和 [Bug 修复计划](docs/bug-fix-plan.md)。
 
 ## 启动控制平台
 
@@ -90,11 +90,11 @@ MewCode 目前是 Eyes 的主要被测 Agent，用于验证平台能力。上述
 
 需要 Docker Engine 与 Compose，或运行 Linux 容器的 Docker Desktop。在项目根目录执行：
 
-```sh
-cp deploy/.env.example deploy/.env
+```powershell
+Copy-Item deploy/.env.example deploy/.env
 ```
 
-将 `deploy/.env` 中的 `POSTGRES_PASSWORD` 改为自行生成的随机十六进制密码。PowerShell 可用 `Copy-Item deploy/.env.example deploy/.env` 复制文件。配置完成后：
+将 `deploy/.env` 中的 `POSTGRES_PASSWORD` 改为自行生成的随机十六进制密码。上述命令在 Windows PowerShell 中执行。配置完成后：
 
 ```sh
 docker compose --env-file deploy/.env -f deploy/compose.yaml up --build -d
@@ -112,31 +112,32 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml exec api eyes-admin
 
 Compose 包含 PostgreSQL、迁移、API、Scheduler 和 Web，**不包含可直接执行任意 Agent 的 Runner**。仅启动控制平台不会自动运行任务。数据库和证据使用独立数据卷。
 
-通用 Compose 方案有历史部署记录；本次 Windows/MewCode 实测使用的是独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，完整 Compose 部署未在该环境验收。其实际启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。
+本次 Windows/MewCode 实测使用的是独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，完整 Compose 部署未在该环境验收。其实际启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。
 
 ### 源码开发
 
-API 与 Runner 使用 Linux/macOS 的 POSIX 能力。Windows 上请将这两个组件放在 Linux 环境中运行；已有实测方案采用 Linux 容器。目录 `fsync`、进程组及资源限制尚不支持完整原生 Windows 路径。
+自 2026-10-11 起，项目只在当前 Windows 宿主机 `D:\projects\eyes` 开发，默认使用 PowerShell。开发约定见 [AGENT.md](AGENT.md#windows-开发环境)。验证证据以当前 Windows 宿主机及本机 Linux 容器的实际记录为准。
 
-准备 Python 3.14+、uv、Node.js 22.12+ 和可用的 PostgreSQL。Linux/macOS 上：
+API 与 Runner 依赖 POSIX 能力，在本机 Docker Desktop 的 Linux 容器中运行。目录 `fsync`、进程组及资源限制尚不支持完整原生 Windows 路径。已有 Windows 启动方式见 [MewCode 接入说明](integrations/mewcode/README.md#本机重启与再次评测)。
 
-```sh
+准备 Python 3.14+、uv、Node.js 22.12+、可用的 PostgreSQL 和运行 Linux 容器的 Docker Desktop。在项目根目录的 PowerShell 中：
+
+```powershell
 uv sync --frozen
-cp .env.example .env
+Copy-Item .env.example .env
 ```
 
-编辑 `.env` 的 `EYES_DATABASE_URL`，连接专用 PostgreSQL 数据库，再执行：
+编辑 `.env` 的 `EYES_DATABASE_URL`，连接专用 PostgreSQL 数据库。迁移和 bootstrap 可在 Windows PowerShell 执行：
 
-```sh
+```powershell
 uv run alembic upgrade head
 uv run eyes-admin bootstrap --name default
-uv run eyes-server
 ```
 
-在另一终端运行 `uv run eyes-scheduler`，API 与 Scheduler 使用相同数据库及调度配置。启动前端：
+API 在本机 Linux 容器内启动，配置数据库和证据卷；具体构建、网络及启动步骤见上述 MewCode 说明或 [Compose 部署](#docker-compose)。在另一 PowerShell 终端运行 `uv run eyes-scheduler`，API 与 Scheduler 使用相同数据库及调度配置。启动前端：
 
-```sh
-cd frontend
+```powershell
+Set-Location frontend
 npm ci
 npm run dev
 ```
@@ -151,9 +152,9 @@ npm run dev
 - 数据库迁移（PostgreSQL 18 服务容器）：在干净数据库上执行 `alembic upgrade head`，验证 `downgrade base` 后可重放，`alembic check` 确认模型与迁移无漂移，再启动 `eyes-server` 冒烟验证 `bootstrap` 和 `/health/ready`。
 - 前端（Node.js 24，与前端 Docker 构建一致）：`npm run lint`、`npm run format:check`、`npm run build`；构建包含 TypeScript 类型检查。
 
-本地运行同样的检查：
+在 Windows PowerShell 中运行同样的静态检查：
 
-```sh
+```powershell
 uv sync --frozen
 uv run --no-sync ruff check src migrations
 uv run --no-sync ruff format --check src migrations
@@ -164,16 +165,21 @@ npm run format:check
 npm run build
 ```
 
-迁移检查需要一个空的 PostgreSQL 数据库，通过 `EYES_DATABASE_URL` 指定后依次运行上述 alembic 命令和 `eyes-server`；本机 Docker 可用时可参照 `.github/workflows/ci.yml` 的服务容器配置。
+服务就绪检查中的 `eyes-server` 必须在本机 Linux 容器内运行。迁移检查需要一个空的 PostgreSQL 数据库，通过 `EYES_DATABASE_URL` 指定后依次运行上述 alembic 命令和 `eyes-server`；本机 Docker 可用时可参照 `.github/workflows/ci.yml` 的服务容器配置。
 
 这些检查覆盖代码规范、格式、类型、前端构建，以及干净库上的迁移可逆性与最小服务就绪验证，不运行外部 Agent 或真实评测，也不代表调度恢复或部署验收通过。产品的 `eyes gate` 回归质量门槛与仓库 CI 分开使用。
 
 ## 接入 Agent 与 Runner
 
-在目标所在的 Linux/macOS 环境安装 Eyes，复制并修改配置：
+Runner 在当前 Windows 的 Linux 容器内安装并运行，配置路径与目标解释器均使用容器内路径。可以先在项目根目录的 PowerShell 中复制并修改配置：
+
+```powershell
+Copy-Item deploy/runner.example.toml runner.toml
+```
+
+将配置放入容器后，在容器内执行：
 
 ```sh
-cp deploy/runner.example.toml runner.toml
 uv run eyes-runner --config runner.toml plugins
 uv run eyes-runner --config runner.toml status
 ```
@@ -228,7 +234,7 @@ uv run eyes-ops maintain
 | 回归、证据与运维   | [platform.md](docs/platform.md)                                                    |
 | 多 Agent 批次      | [multi-agent-batches.md](docs/multi-agent-batches.md)                              |
 | 被动观测           | [observation.md](docs/observation.md)                                              |
-| Web 与前端质量     | [frontend.md](docs/frontend.md)、[frontend-quality.md](docs/frontend-quality.md)   |
+| Web 与前端质量     | [frontend.md](docs/frontend.md)   |
 | MewCode 接入与实测 | [接入说明](integrations/mewcode/README.md)、[验证记录](docs/mewcode-validation.md) |
 | 故障处理修复进度   | [bug-fix-plan.md](docs/bug-fix-plan.md)                                            |
 | 当前开发与验收计划 | [PLAN.md](docs/PLAN.md)                                                            |

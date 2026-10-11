@@ -1,6 +1,6 @@
 # 控制后端开发说明
 
-当前实现 Eyes 的控制后端基础及配套 Runner。Agent 端入口、HTTP 协议、SDK 与评分器说明见 [接入文档](agent-integration.md)。源码按 AGENT.md 的模块边界组织；HTTP 路由负责认证和协议转换，领域模块负责校验、状态及事务。当前不具备 M1 真实闭环验收结果，具体证据见 [验证记录](backend-validation.md)。
+当前实现 Eyes 的控制后端基础及配套 Runner。Agent 端入口、HTTP 协议、SDK 与评分器说明见 [接入文档](agent-integration.md)。源码按 AGENT.md 的模块边界组织；HTTP 路由负责认证和协议转换，领域模块负责校验、状态及事务。当前 Windows/MewCode 基础闭环证据见 [验证记录](mewcode-validation.md)，M1 尚未完整验收。
 
 ## 当前实现与后续工作
 
@@ -17,36 +17,41 @@
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
 
-历史 PostgreSQL 验证覆盖迁移、报告持久化、排队取消和无产物数据库备份恢复，见 [平台验证记录](platform-validation.md)。后续已有双 Python Agent、多 Runner 并发与受控工作进程中断记录，以及 MewCode 执行/评分/证据闭环，见 [Zeta 接入记录](../integrations/zeta/README.md) 和 [MewCode 验证记录](mewcode-validation.md)。远端停止确认、Runner 整体重启、网络/数据库故障和含完整执行证据的恢复仍待验收。当前任务见 [开发计划](PLAN.md)。
+当前 Windows 环境已有 MewCode 执行/评分/证据基础闭环，见 [MewCode 验证记录](mewcode-validation.md)。双 Agent、多 Runner 并发、中断及完整部署需在当前环境验收。远端停止确认、Runner 整体重启、网络/数据库故障和含完整执行证据的恢复仍待验收。当前任务见 [开发计划](PLAN.md)。
 
 ## 本机运行
 
-需要 Python >=3.14、uv 和可连接的 PostgreSQL。依赖锁定在根目录 `uv.lock`；本次在 macOS ARM64、CPython 3.14.7 上安装成功。
+当前只在 Windows／PowerShell 开发，工作目录为 `D:\projects\eyes`。需要 Python >=3.14、uv 和可连接的 PostgreSQL，依赖锁定在根目录 `uv.lock`。API 在本机 Docker Desktop Linux 容器中运行；原生 Windows 目录 fsync 路径尚不支持。当前启动方式见 [README](../README.md#源码开发) 和 [Windows/MewCode 说明](../integrations/mewcode/README.md#本机重启与再次评测)。
 
-```sh
+```powershell
 uv sync --frozen
-cp .env.example .env
+Copy-Item .env.example .env
 ```
 
 编辑 `.env`，设置 `EYES_DATABASE_URL=postgresql+psycopg://用户名:密码@主机:端口/数据库`。特殊字符需按 URL 规则编码。服务只接受 PostgreSQL/psycopg 连接。
 
-```sh
+```powershell
 uv run alembic upgrade head
 uv run eyes-admin bootstrap --name default
+```
+
+API 启动命令在本机 Linux 容器内执行：
+
+```sh
 uv run eyes-server
 ```
 
 `bootstrap` 创建一个项目并输出 `project_id`、`credential_id`、管理 `token`。输出发生在事务提交后，令牌只能在签发时取得。保存该令牌，使用 `Authorization: Bearer <token>` 调用业务 API。
 
-另一个终端使用相同配置运行：
+另一个 Windows PowerShell 终端使用相同配置运行：
 
-```sh
+```powershell
 uv run eyes-scheduler
 ```
 
 `uv run eyes-scheduler --once` 执行一次到期扫描。默认每 5 秒扫描；租约 60 秒、停止请求协调期限 60 秒；全局执行容量 16、评分容量 4。项目默认执行容量 8、评分容量 2。这些是开发默认值，尚无容量实测依据。API 和调度进程必须使用一致的配置及数据库。
 
-API 默认监听 `127.0.0.1:8000`。更改监听参数可直接运行：
+API 默认监听 `127.0.0.1:8000`。更改监听参数可在本机 Linux 容器内运行：
 
 ```sh
 uv run uvicorn eyes.server.api.app:create_app --factory --host 127.0.0.1 --port 8000
@@ -56,9 +61,10 @@ uv run uvicorn eyes.server.api.app:create_app --factory --host 127.0.0.1 --port 
 
 ## Compose
 
-```sh
-cp deploy/.env.example deploy/.env
-openssl rand -hex 32
+```powershell
+Copy-Item deploy/.env.example deploy/.env
+# Windows 上使用 .NET 加密随机数生成十六进制密码。
+[Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 ```
 
 将生成的十六进制密码写入 `deploy/.env` 的 `POSTGRES_PASSWORD`，然后运行：
@@ -70,7 +76,7 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml exec api eyes-admin
 
 Compose 等待 PostgreSQL 健康后执行迁移，再启动 API 和调度进程。相关依赖条件见 [Docker Compose 文档](https://docs.docker.com/compose/how-tos/startup-order)。PostgreSQL 18 的持久卷挂载在 `/var/lib/postgresql`，与 [官方镜像的目录约定](https://hub.docker.com/_/postgres)一致。
 
-数据库和 API 端口都只映射到本机。数据库与证据分别使用独立数据卷。当前 Compose 包含控制端和 Web 控制台，本机前端端口为 8080；Runner 在目标宿主机独立运行。本轮部署的实际验证范围见 [平台验证记录](platform-validation.md)。
+数据库和 API 端口都只映射到本机。数据库与证据分别使用独立数据卷。当前 Compose 包含控制端和 Web 控制台，本机前端端口为 8080；Runner 在目标宿主机独立运行。完整 Compose 部署仍需在当前 Windows 环境验收。
 
 ## 令牌及项目范围
 

@@ -14,7 +14,7 @@
 
 ## 审查方法与证据层级
 
-已阅读 AGENT.md、README、PLAN、architecture，以及协议、接入、HTTP 运行时/验证、unknown-recovery、contract-version-migration/compatibility、既有后端/平台/MewCode 验证与四项 Bug 计划。按提交涉及文件和调用链阅读，没有扫描无关项目、数据库目录或凭据正文。
+已阅读 AGENT.md、README、PLAN、architecture，以及协议、接入、HTTP 运行时/验证、unknown-recovery、contract-version-migration/compatibility、MewCode 验证与四项 Bug 计划。按提交涉及文件和调用链阅读，没有扫描无关项目、数据库目录或凭据正文。
 
 本轮直接检查 Git 的提交内容与当前源码，并对私有原始 API 记录做必要字段的只读统计/比较，不只引用文档“完成”表述：
 

@@ -1,12 +1,12 @@
 # Eyes 首版架构方案
 
-本文把已确认的产品能力组织成可实施的框架，作为接口、数据库和开发工作的基线。系统定位为面向单团队自托管的 Agent 测试与执行观测平台。控制后端基础和 HTTP/Python Agent 接入代码已按本文实现，具体范围见 [后端开发说明](backend.md) 和 [Agent 接入文档](agent-integration.md)，运行证据见 [后端验证记录](backend-validation.md)。Web 控制台已实现主要页面和公开 API 操作，构建与验证边界见 [前端说明](frontend.md)。本文的完整能力和各阶段验收仍是交付目标。
+本文把已确认的产品能力组织成可实施的框架，作为接口、数据库和开发工作的基线。系统定位为面向单团队自托管的 Agent 测试与执行观测平台。控制后端基础和 HTTP/Python Agent 接入代码已按本文实现，具体范围见 [后端开发说明](backend.md) 和 [Agent 接入文档](agent-integration.md)，运行证据见 [Windows/MewCode 验证记录](mewcode-validation.md)。Web 控制台已实现主要页面和公开 API 操作，构建与验证边界见 [前端说明](frontend.md)。本文的完整能力和各阶段验收仍是交付目标。
 
 ## 系统边界
 
 Eyes 负责测试集与评分器版本、实验配置、任务调度、证据保存、评分和回归对比。目标 Agent 负责自身的推理、工具调度及业务行为。适配器负责翻译目标协议并声明其实际能力。
 
-HTTP Agent 和 Python 适配器两种通用接入与宿主机 Runner 已有代码实现；Python 路径已有 Deta、Zeta 和 MewCode 的真实运行记录，2026-10-10 真实 MewCode HTTP 基本闭环也已完成。单轮任务已有执行、评分与证据闭环；用例模型预留有序对话步骤，目前拒绝非空 `steps`，多轮驱动后续实现。模型代理作为后续采集适配器，不阻塞首版。统一 Agent 协议已接入 `agent_http` Runner 客户端与持久化参考服务，旧 HTTP/Python 保留，首次 Docker 阻塞已解除，见[运行时说明](agent-http-runtime.md)与[实际记录](agent-http-validation.md)。参考服务的 SQLite 仅保存外部接入端单机协议状态，不改变 Eyes PostgreSQL 架构或迁移；完整故障及能力矩阵仍待验收。
+HTTP Agent 和 Python 适配器两种通用接入与宿主机 Runner 已有代码实现；当前 Windows 环境的 Python 路径已有 MewCode 基础运行记录，2026-10-10 真实 MewCode HTTP 基本闭环也已完成。单轮任务已有执行、评分与证据闭环；用例模型预留有序对话步骤，目前拒绝非空 `steps`，多轮驱动后续实现。模型代理作为后续采集适配器，不阻塞首版。统一 Agent 协议已接入 `agent_http` Runner 客户端与持久化参考服务，旧 HTTP/Python 保留，首次 Docker 阻塞已解除，见[运行时说明](agent-http-runtime.md)与[实际记录](agent-http-validation.md)。参考服务的 SQLite 仅保存外部接入端单机协议状态，不改变 Eyes PostgreSQL 架构或迁移；完整故障及能力矩阵仍待验收。
 
 首版插件由项目维护者安装，按可信代码管理。独立进程提供故障隔离；开放任意用户代码执行前，需要另行设计容器或更强的隔离边界。
 
@@ -60,7 +60,7 @@ Web 与 CLI 使用同一套公开 API。业务规则不放在路由和前端中�
 | 前端 | React、TypeScript、Vite、shadcn/Base UI、Tailwind CSS 4 | 运行列表、执行详情和逐用例对比；组件选择已落地，见前端说明 |
 | 部署 | Docker Compose | 固定版本、数据卷、健康检查和迁移步骤；Runner 也可在宿主机独立运行 |
 
-当前项目保持 Python >=3.14。依赖锁定在 uv.lock；历史 Compose 部署及 PostgreSQL 迁移、报告持久化和无产物备份恢复已有运行记录，见 [平台验证记录](platform-validation.md)。当前迁移 head 为 `0005_reconciliation`。Windows/MewCode 记录使用 Linux API/Runner 与独立 PostgreSQL，不能作为原生 Windows API/Runner 或该环境完整 Compose 的验收；见 [MewCode 验证记录](mewcode-validation.md)。完整故障恢复与容量仍待验证。
+当前项目保持 Python >=3.14。依赖锁定在 uv.lock；完整 Compose 部署及备份恢复需在当前 Windows 环境验收。当前迁移 head 为 `0005_reconciliation`。Windows/MewCode 记录使用 Linux API/Runner 与独立 PostgreSQL，不能作为原生 Windows API/Runner 或该环境完整 Compose 的验收；见 [MewCode 验证记录](mewcode-validation.md)。完整故障恢复与容量仍待验证。
 
 PostgreSQL 的 `SKIP LOCKED` 可用于多个消费者领取队列表中的工作；它只解决领取时的行锁竞争，并不自动提供租约、并发限额、公平性或外部执行幂等。[PostgreSQL SELECT 文档](https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE)
 
@@ -235,12 +235,12 @@ contracts 不依赖 server；Runner、SDK 和 CLI 依赖公共契约，不能依
 
 各阶段均保留原始运行记录、版本和执行命令。M1 包含基础 API 与 Runner 认证；M4 完成共享部署的访问控制验收。M1 及以后同时维护接入文档，不把文档集中留到发布阶段。
 
-当前平台已实现回归报告/CI、证据等待、实验证据保留清理和备份恢复工具，见 [平台说明](platform.md)。Python 真实闭环与双 Python Agent 的部分并发/中断场景已有记录；真实 HTTP 基本闭环已补齐，可选能力正向、完整并发故障恢复、真实版本改善/退化和容量验收仍有缺口，M0～M4 均不能标为完整验收。当前功能状态、待开发与待验证任务见 [开发计划](PLAN.md)。历史检查保留在各验证文档中。
+当前平台已实现回归报告/CI、证据等待、实验证据保留清理和备份恢复工具，见 [平台说明](platform.md)。当前 Windows 的 MewCode Python 基础闭环已有记录；双 Agent 并发/中断仍需验收；真实 HTTP 基本闭环已补齐，可选能力正向、完整并发故障恢复、真实版本改善/退化和容量验收仍有缺口，M0～M4 均不能标为完整验收。当前功能状态、待开发与待验证任务见 [开发计划](PLAN.md)。验证证据以当前 Windows 及本机 Linux 容器记录为准。
 
 ## 尚需通过真实接入确定的事项
 
-- 首批 Python 案例已有 Deta/Zeta/MewCode，HTTP 基本验收目标为 MewCode；其取消/资源明确不支持，其他真实目标及完整停止、幂等故障与隔离条件仍需核对。
-- 明确发布支持的环境矩阵；已有 macOS 和 Windows/Linux 混合环境记录，原生 Windows API/Runner 尚不支持完整路径。
+- 当前 Windows 的 Python 与 HTTP 基本验收目标为 MewCode；其取消/资源明确不支持，其他真实目标及完整停止、幂等故障与隔离条件仍需核对。
+- 后续开发仅使用当前 Windows 宿主机及 PowerShell，API/Runner 在本机 Linux 容器运行。明确发布支持的运行环境矩阵；原生 Windows API/Runner 尚不支持完整路径。
 - 目标超时、租约、心跳、证据等待期限和容量默认值，根据真实任务耗时与故障演练确定。
 
 这些事项影响配置和适配细节，不改变本文的模块边界。实现中若要改变公共协议、状态含义或已确认范围，先更新本设计并说明迁移影响。

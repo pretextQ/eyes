@@ -195,15 +195,18 @@ Runner 通过认证后的 API 交互，不直接连接平台数据库。业务�
 - 每个数据视图覆盖加载、空数据、错误和部分数据状态。
 - 交互元素提供适用的 hover、focus-visible 和 disabled 状态。
 - 有意识地设计手机、平板和桌面布局。
-- 视觉修改在项目主要浏览器中检查相关断点；项目要求或涉及浏览器特定行为时，Safari 可用则一并检查。
+- 视觉修改在当前 Windows 可用的浏览器中检查相关断点；涉及浏览器特定行为时，按实际可用的 Edge、Chrome 或内置浏览器补查。
 - 演示数据必须标注，不能用固定成功画面代替真实 API 行为。
 
-## macOS 开发环境
+## Windows 开发环境
 
-- 默认 macOS Apple Silicon 和 zsh。GNU coreutils、findutils、gnu-sed、grep、gawk、make、diffutils、gnu-tar 已配置优先使用；解析有疑问时用 `command -v` 或 `type -a` 确认。
-- GNU 工具支持的参数可使用；宿主机仍是 macOS，不能假定存在 `/proc`、`ip`、`ss`、`systemctl` 或 Linux 版 `ps`。Linux 容器内另行判断。
-- Homebrew 位于 `/opt/homebrew`，构造项目路径优先使用 `brew --prefix`；不使用 apt、dnf 或 pacman。
-- 含空格路径必须正确引用。按需使用 `open`、`pbcopy` 和 `pbpaste`。
+- 自 2026-10-11 起，项目只在当前 Windows 宿主机开发，工作目录为 `D:\projects\eyes`，默认 Shell 为 PowerShell。后续设计、命令和验证均以此环境为准。
+- 搜索优先使用 `rg`；确认命令位置使用 `Get-Command`。文件操作使用 PowerShell 的 `Get-Content`、`Copy-Item`、`Move-Item`、`Remove-Item` 等命令，路径按需使用 `-LiteralPath`。
+- Windows 虚拟环境使用 `.venv\Scripts\python.exe` 或 `uv run`；环境变量使用 `$env:变量名 = '值'`。复制令牌使用 `Set-Clipboard`，不得将令牌输出到日志或提交到仓库。
+- API 与 Runner 仍依赖 POSIX 目录 fsync、文件锁、进程组和资源限制，在当前 Windows 的 Docker Desktop Linux 容器内运行；前端、CLI、Scheduler 和静态检查可在 Windows 原生执行。容器是本机运行环境，不是另一个开发宿主机。原生 Windows API/Runner 支持尚未完成，不得因文档变更宣称已兼容。
+- 宿主机与 Linux 容器的命令、路径、解释器和网络地址必须区分；仅明确标为容器内的示例使用 POSIX Shell，不默认使用 WSL 或其他开发机器。Windows 上不假定存在 Linux 系统命令。
+- 含空格路径必须正确引用；调用带引号的可执行文件路径使用 PowerShell 调用运算符 `&`。后台进程使用 `Start-Process -WindowStyle Hidden`，避免干扰活动窗口。
+- 仓库不再保留旧 Mac 验证记录；后续验证记录当前 Windows 宿主机及本机 Linux 容器的实际环境、命令和结果，不得改写历史结果冒充当前验收。当前启动与接入方式以 README 和 Windows/MewCode 说明为准。
 - 保持文件名大小写准确，特别检查仅大小写变化的重命名。
 - 除非任务需要，不启动 GUI 应用、不更改系统设置、不干扰活动窗口或进程。
 

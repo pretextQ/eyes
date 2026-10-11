@@ -1,6 +1,6 @@
 # 2026-10-09：Windows / MewCode 真实评测
 
-本次完成单 Agent 功能闭环，不覆盖版本回归、故障恢复或容量验收。接入方式、凭据边界与重启步骤见 [MewCode 接入](../integrations/mewcode/README.md)。历史 Deta/Zeta 的 macOS 验证仍是历史记录，不能作为本机 Windows 能力证明。
+本次完成单 Agent 功能闭环，不覆盖版本回归、故障恢复或容量验收。接入方式、凭据边界与重启步骤见 [MewCode 接入](../integrations/mewcode/README.md)。双 Agent 并发与完整故障恢复需在当前 Windows 环境另行验收。
 
 ## 实际结果
 
