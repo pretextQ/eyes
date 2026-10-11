@@ -40,6 +40,72 @@ jobs:
       - name: Check Python formatting
         run: uv run --no-sync ruff format --check src migrations
 
+  migrations:
+    name: Migration checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: eyes
+          POSTGRES_PASSWORD: eyes
+          POSTGRES_DB: eyes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eyes"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      EYES_DATABASE_URL: postgresql+psycopg://eyes:eyes@127.0.0.1:5432/eyes
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.2"
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Apply migrations to a clean database
+        run: uv run --no-sync alembic upgrade head
+
+      - name: Verify downgrade path
+        run: uv run --no-sync alembic downgrade base
+
+      - name: Re-apply migrations
+        run: uv run --no-sync alembic upgrade head
+
+      - name: Check models match migrations
+        run: uv run --no-sync alembic check
+
+      - name: Check service readiness on the migrated database
+        run: |
+          uv run --no-sync eyes-admin bootstrap --name ci | grep -q '"project_id"'
+          uv run --no-sync eyes-server > /tmp/eyes-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health/ready; then
+              echo
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "eyes-server did not become ready within 30s"
+          cat /tmp/eyes-server.log
+          exit 1
+
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest

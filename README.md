@@ -145,9 +145,10 @@ npm run dev
 
 ## 仓库 CI
 
-[GitHub Actions 工作流](.github/workflows/ci.yml) 在推送、Pull Request 和手动触发时并行执行两组检查，使用 `uv.lock` 和 `frontend/package-lock.json` 安装固定依赖。Python 锁文件使用官方 PyPI 下载地址；Git 属性将前端文本文件统一为 LF 换行，避免 Windows 检出后的格式检查差异。
+[GitHub Actions 工作流](.github/workflows/ci.yml) 在推送、Pull Request 和手动触发时并行执行三组检查，使用 `uv.lock` 和 `frontend/package-lock.json` 安装固定依赖。Python 锁文件使用官方 PyPI 下载地址；Git 属性将前端文本文件统一为 LF 换行，避免 Windows 检出后的格式检查差异。
 
 - 后端（Python 3.14）：`ruff check src migrations`、`ruff format --check src migrations`。
+- 数据库迁移（PostgreSQL 18 服务容器）：在干净数据库上执行 `alembic upgrade head`，验证 `downgrade base` 后可重放，`alembic check` 确认模型与迁移无漂移，再启动 `eyes-server` 冒烟验证 `bootstrap` 和 `/health/ready`。
 - 前端（Node.js 24，与前端 Docker 构建一致）：`npm run lint`、`npm run format:check`、`npm run build`；构建包含 TypeScript 类型检查。
 
 本地运行同样的检查：
@@ -163,7 +164,9 @@ npm run format:check
 npm run build
 ```
 
-这些检查覆盖代码规范、格式、类型和前端构建，不启动 PostgreSQL 或外部 Agent，也不代表真实评测、调度恢复或部署验收通过。产品的 `eyes gate` 回归质量门槛与仓库 CI 分开使用。
+迁移检查需要一个空的 PostgreSQL 数据库，通过 `EYES_DATABASE_URL` 指定后依次运行上述 alembic 命令和 `eyes-server`；本机 Docker 可用时可参照 `.github/workflows/ci.yml` 的服务容器配置。
+
+这些检查覆盖代码规范、格式、类型、前端构建，以及干净库上的迁移可逆性与最小服务就绪验证，不运行外部 Agent 或真实评测，也不代表调度恢复或部署验收通过。产品的 `eyes gate` 回归质量门槛与仓库 CI 分开使用。
 
 ## 接入 Agent 与 Runner
 
