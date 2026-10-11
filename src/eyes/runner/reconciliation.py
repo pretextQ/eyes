@@ -82,7 +82,7 @@ def recover(service):
             service.outbox.enqueue(key, job, persisted=True)
         except OutboxCapacityError:
             logger.warning("query_journal_waiting_for_capacity query=%s", path.parent.name)
-        except (ValueError, KeyError, TypeError) as error:
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
             journal.corrupt(path.parent, source, error)
         except OSError as error:
             logger.warning("query_journal_disk_error file=%s errno=%s", source, error.errno)
