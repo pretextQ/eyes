@@ -9,7 +9,7 @@ RUN uv sync --frozen --no-dev
 COPY alembic.ini ./
 COPY migrations ./migrations
 RUN useradd --create-home --uid 10001 eyes && mkdir -p /app/data/artifacts \
-    && chown -R eyes:eyes /app/data
+    && chown -R eyes:eyes /app/data && chmod 0700 /app/data/artifacts
 ENV PATH="/app/.venv/bin:$PATH"
 USER eyes
 CMD ["uvicorn", "eyes.server.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

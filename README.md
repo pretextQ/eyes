@@ -112,6 +112,8 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml exec api eyes-admin
 
 Compose 包含 PostgreSQL、迁移、API、Scheduler 和 Web，**不包含可直接执行任意 Agent 的 Runner**。仅启动控制平台不会自动运行任务。数据库和证据使用独立数据卷。
 
+控制镜像以 `eyes`（UID/GID 10001）运行；新建证据卷的根目录为该用户所有、权限 `0700`，产物文件为 `0600`。升级镜像不会修改已有卷权限。部署者应核对实际卷的所有权和权限，以服务用户执行 `eyes-ops audit`，再检查 readiness 和授权下载；已有卷若需交接，按[恢复说明](docs/platform.md#恢复)定向处理，不要放宽为全用户可读写。独立干净 Compose 的实际检查见[部署与权限验收](docs/clean-deployment-permissions-20261011.md)。
+
 本次 Windows/MewCode 实测使用的是独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，完整 Compose 部署未在该环境验收。其实际启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。
 
 ### 源码开发
