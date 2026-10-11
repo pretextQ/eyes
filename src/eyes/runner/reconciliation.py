@@ -3,16 +3,20 @@
 import asyncio
 import json
 import logging
+from pathlib import Path
 from urllib.parse import quote
 
 import httpx
 
 from eyes.adapters.agent_http import AgentHttpAdapter, target_capabilities
 from eyes.contracts.agent_protocol import AgentCapabilities, AgentRun
+from eyes.contracts.base import read_stored_contract
 from eyes.contracts.target import TargetPublish, http_origin
 from eyes.contracts.work import ReconciliationAssignment
+from eyes.runner import journal
 from eyes.runner.client import ApiError
 from eyes.runner.files import redact, resolve_secrets, write_json
+from eyes.runner.outbox import OutboxCapacityError
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +56,36 @@ def recover(service):
     if not directory.exists():
         return
     for path in directory.glob("*/result.json"):
-        if (path.parent / "ack.json").exists():
+        if (path.parent / "ack.json").exists() or (path.parent / "corrupt.json").exists():
             continue
+        source = path.parent / "assignment.json"
         try:
+            query = read_stored_contract(
+                ReconciliationAssignment, json.loads(source.read_bytes()), source="query_assignment"
+            ).model_dump(mode="json")
+            if query["lease_token"] != path.parent.name:
+                raise ValueError("query identity does not match directory")
+            source = path
             job = json.loads(path.read_bytes())
-            service.outbox.enqueue(f"query-{path.parent.name}", job, persisted=True)
-        except ValueError, OSError:
-            logger.warning("query_journal_waiting query=%s", path.parent.name)
+            key = f"query-{path.parent.name}"
+            # Validate envelope and associated identity before it enters the queue.
+            from eyes.runner.outbox import stored_job
+
+            wire = stored_job(job)
+            if (
+                wire["work_id"] != query["work_item_id"]
+                or wire["body"]["lease_token"] != query["lease_token"]
+                or wire["path"] != f"v1/work/{query['work_item_id']}/reconciliation-result"
+                or Path(wire["journal_dir"]).resolve() != path.parent.resolve()
+            ):
+                raise ValueError("query result differs from assignment")
+            service.outbox.enqueue(key, job, persisted=True)
+        except OutboxCapacityError:
+            logger.warning("query_journal_waiting_for_capacity query=%s", path.parent.name)
+        except (ValueError, KeyError, TypeError) as error:
+            journal.corrupt(path.parent, source, error)
+        except OSError as error:
+            logger.warning("query_journal_disk_error file=%s errno=%s", source, error.errno)
 
 
 async def run_one(service):

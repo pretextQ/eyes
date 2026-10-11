@@ -112,6 +112,11 @@ def main():
                         "orphaned_upload_files": len(
                             list((config.state_dir / "outbox-orphaned").glob("*"))
                         ),
+                        "corrupted_uploads": len(
+                            list((config.state_dir / "outbox-corrupt").glob("*/diagnostic.json"))
+                        ),
+                        "corrupted_journals": len(list(work.glob("*/corrupt.json")))
+                        + len(list((config.state_dir / "reconciliation").glob("*/corrupt.json"))),
                         "retained_work": len(list(work.glob("*/assignment.json"))),
                         "quarantined_work": len(list(work.glob("*/quarantine.json"))),
                     },

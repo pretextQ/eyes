@@ -12,10 +12,10 @@ from eyes.contracts.evidence import ArtifactMetadata, ExecutionEvent
 from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput
 from eyes.contracts.target import ExecutionInput, ExecutionResult
 from eyes.contracts.work import ClaimedWork
-from eyes.runner import reconciliation
+from eyes.runner import journal, reconciliation
 from eyes.runner.client import ApiError, ControlClient
 from eyes.runner.files import error_text, file_digest, redact, resolve_secrets, write_json
-from eyes.runner.outbox import Outbox
+from eyes.runner.outbox import Outbox, OutboxCapacityError
 from eyes.runner.process import ProcessWorker, WorkerError
 
 logger = logging.getLogger(__name__)
@@ -203,31 +203,42 @@ class RunnerService:
         for directory in self.work_dir.iterdir():
             if not directory.is_dir() or not (directory / "assignment.json").exists():
                 continue
-            work = json.loads((directory / "assignment.json").read_bytes())
-            self.collect(directory, work)
-            if (directory / "ack.json").exists():
-                self.queue_evidence_close(directory, work)
-            if (directory / "result.json").exists() and not (directory / "ack.json").exists():
-                try:
-                    self.queue_completion(
-                        directory,
-                        work,
-                        json.loads((directory / "result.json").read_bytes()),
-                        persisted=True,
+            if (directory / "corrupt.json").exists():
+                continue
+            source = directory / "assignment.json"
+            try:
+                work = journal.assignment(directory)
+                source = directory / "result.json"
+                body = journal.submission(directory, work) if source.exists() else None
+                if body is None and (directory / "ack.json").exists():
+                    raise ValueError("acknowledged journal has no result")
+                self.collect(directory, work)
+                if (directory / "ack.json").exists():
+                    self.queue_evidence_close(directory, work)
+                if body is not None and not (directory / "ack.json").exists():
+                    self.queue_completion(directory, work, body, persisted=True)
+                elif restarting and body is None:
+                    # Never re-execute uncertain work or kill a stored PID after restart.
+                    write_json(
+                        directory / "quarantine.json",
+                        {
+                            "reason": "Runner restarted; reconcile the missing result "
+                            "through the API"
+                        },
                     )
-                except ValueError:
-                    logger.warning("journal_waiting_for_outbox_space work=%s", work["work_item_id"])
-            elif restarting and not (directory / "result.json").exists():
-                # Never re-execute uncertain work or kill a stored PID after restart.
-                write_json(
-                    directory / "quarantine.json",
-                    {"reason": "Runner restarted; reconcile the missing result through the API"},
-                )
+            except OutboxCapacityError:
+                logger.warning("journal_waiting_for_outbox_space directory=%s", directory)
+            except (ValueError, KeyError, TypeError) as error:
+                journal.corrupt(directory, source, error)
+            except OSError as error:
+                logger.warning("journal_read_disk_error file=%s errno=%s", source, error.errno)
 
     def queue_evidence_close(self, directory, work):
         if work["kind"] != "execute" or (directory / "evidence-ack.json").exists():
             return
-        result = json.loads((directory / "result.json").read_bytes())["result"]
+        if (directory / "corrupt.json").exists():
+            return
+        result = journal.submission(directory, work)["result"]
         if result["status"] == "unknown":
             return
         pending, rejected = self.outbox.evidence(work["work_item_id"])
@@ -283,7 +294,7 @@ class RunnerService:
                     },
                 },
             )
-        except ValueError:
+        except OutboxCapacityError:
             logger.warning("evidence_close_waiting_for_outbox_space work=%s", work["work_item_id"])
 
     async def complete(self, directory, work, lease, result):
@@ -622,15 +633,27 @@ class RunnerService:
 
     def reap(self):
         for directory in self.work_dir.iterdir():
-            if (directory / "ack.json").exists() and not (directory / "quarantine.json").exists():
-                # Retain scoring traces locally until the operator's retention job.
-                if (directory / "assignment.json").exists() and json.loads(
-                    (directory / "assignment.json").read_bytes()
-                )["kind"] == "score":
-                    shutil.rmtree(directory / "workspace", ignore_errors=True)
-                    continue
-                if (directory / "evidence-ack.json").exists():
-                    shutil.rmtree(directory)
+            if (directory / "ack.json").exists() and not any(
+                (directory / name).exists() for name in ["quarantine.json", "corrupt.json"]
+            ):
+                source = directory / "assignment.json"
+                try:
+                    work = journal.assignment(directory)
+                    source = directory / "result.json"
+                    journal.submission(directory, work)
+                    self.reap_work(directory, work)
+                except (ValueError, KeyError, TypeError) as error:
+                    journal.corrupt(directory, source, error)
+                except OSError as error:
+                    logger.warning("journal_reap_disk_error file=%s errno=%s", source, error.errno)
+
+    def reap_work(self, directory, work):
+        # Retain scoring traces locally until the operator's retention job.
+        if work["kind"] == "score":
+            shutil.rmtree(directory / "workspace", ignore_errors=True)
+            return
+        if (directory / "evidence-ack.json").exists():
+            shutil.rmtree(directory)
 
     async def run(self, once=False):
         self.recover()
