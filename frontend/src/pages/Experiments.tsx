@@ -590,7 +590,9 @@ export function CreateExperiment({
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["experiments"] }),
-        queryClient.invalidateQueries({ queryKey: ["comparison-experiments"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["comparison-experiment-options"],
+        }),
         queryClient.invalidateQueries({ queryKey: ["operations"] }),
       ]);
       onClose();

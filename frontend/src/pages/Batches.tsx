@@ -462,6 +462,9 @@ function CreateBatch({ onClose }: { onClose: () => void }) {
       await Promise.all([
         client.invalidateQueries({ queryKey: ["batches"] }),
         client.invalidateQueries({ queryKey: ["experiments"] }),
+        client.invalidateQueries({
+          queryKey: ["comparison-experiment-options"],
+        }),
         client.invalidateQueries({ queryKey: ["operations"] }),
       ]);
       onClose();
