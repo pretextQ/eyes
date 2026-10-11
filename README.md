@@ -114,7 +114,7 @@ Compose 包含 PostgreSQL、迁移、API、Scheduler 和 Web，**不包含可直
 
 控制镜像以 `eyes`（UID/GID 10001）运行；新建证据卷的根目录为该用户所有、权限 `0700`，产物文件为 `0600`。升级镜像不会修改已有卷权限。部署者应核对实际卷的所有权和权限，以服务用户执行 `eyes-ops audit`，再检查 readiness 和授权下载；已有卷若需交接，按[恢复说明](docs/platform.md#恢复)定向处理，不要放宽为全用户可读写。独立干净 Compose 的实际检查见[部署与权限验收](docs/clean-deployment-permissions-20261011.md)。
 
-本次 Windows/MewCode 实测使用的是独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，完整 Compose 部署未在该环境验收。其实际启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。
+此前 Windows/MewCode 实测使用独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。2026-10-11 已在独立项目/新卷按锁文件无缓存构建并启动完整控制 Compose、迁移 0005、首次 bootstrap 和真实 HTTP 三任务闭环；具名权限请求及剩余观测/发布边界见[本轮验收](docs/clean-deployment-permissions-20261011.md)，不代表全部 M4 或容量验收。
 
 ### 源码开发
 
