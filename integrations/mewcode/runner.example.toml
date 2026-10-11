@@ -1,23 +1,31 @@
+# Direct Python binding, run inside this Windows host's Linux container.
+# Paths refer to the built MewCode runtime image; adjust for actual mounts.
 server_url = "http://host.docker.internal:18044"
 name = "mewcode-linux-runner"
-state_dir = "/app/data/mewcode-integration/runner"
+state_dir = "/app/data/mewcode-python/runner"
 execution_slots = 1
 score_slots = 1
+# Only the model credential may reach Agent/score workers; never allowlist EYES_RUNNER_TOKEN.
 secret_env_allowlist = ["MEWCODE_MODEL_KEY"]
 
 [python_agents.mewcode]
 entry_point = "integrations.mewcode.bridge:execute"
+python = "/app/.venv/bin/python"
 import_paths = ["/app", "/opt/mewcode"]
 prepare = "integrations.mewcode.bridge:prepare"
 cleanup = "integrations.mewcode.bridge:cleanup"
 execution_scope = "external"
 session_isolation = true
 environment_isolation = false
+idempotency = false
+# No cancel/reconcile hook: killing a worker does not confirm remote model stop.
 cpu_seconds = 300
 memory_bytes = 2147483648
 
 [python_scorers.deta_code]
+# Reuse the original acceptance scorer; publish its current plugins digest.
 entry_point = "integrations.deta.scorer:score"
+python = "/app/.venv/bin/python"
 import_paths = ["/app"]
 cpu_seconds = 30
 memory_bytes = 536870912

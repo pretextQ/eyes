@@ -1,109 +1,98 @@
-# MewCode 单 Agent 真实评测接入
+# MewCode 接入
 
-最新重新验证位于 [MewCode/2026-10-11-rerun](../../MewCode/2026-10-11-rerun/REPORT.md)：当前 Windows 的独立数据库与统一 HTTP 接入，3/3 执行及评分通过，12/12 功能检查通过。该记录保留首次部署失败，使用独立端口和运行目录。
+本项目在当前 Windows／PowerShell 开发，API 与 Runner 在本机 Docker Desktop Linux 容器中运行。MewCode 源码项目为 `D:\projects\MewCode`；Eyes 根目录的 `MewCode/` 保存验证记录。
 
-2026-10-09（Asia/Shanghai）在 Windows 宿主机完成真实闭环：独立 PostgreSQL → Eyes API/Scheduler → Linux Runner → MewCode Agent → DeepSeek → 文件/命令工具 → 产物上传 → 原有独立评分器 → Web。没有修改 MewCode 核心源码、Eyes 核心源码、仓库测试或评测用例，没有 Git 提交或推送。
+## 三份核心文件
 
-最终实验：`087a0f7c-bfd5-44d0-b27c-d812fc45cbd9`。执行成功 3/3，有效评分 3/3，通过 3/3；证据 sealed 3/3，清理成功 3/3。每项原有 4 个验收检查通过。详见 [本机验证记录](../../docs/mewcode-validation.md)。
-
-## 接口选择
-
-检查了 MewCode 的 `MEWCODE.md`、README、Windows/权限说明、配置加载、`__main__.py`、Agent、工具及 service 接口。
-
-- `mewcode -p ... --output-format json --config ...` 是真实无头 CLI；JSON 输出包含结果、usage、工具计数及 session ID。内部使用 `Agent.run_to_completion`，callback 没有完整工具结果。
-- `mewcode serve` 提供 `/webhook/manual`、`/webhook/alert`、`/jobs`、报告及健康接口，围绕告警、git worktree、验证、PR/CI 组织，不直接匹配 Eyes 现有 HTTP 任务契约。当前 `serve --config` 路径还在 `_serve` 内重新调用默认配置发现；本轮没有使用或修改这条路径。
-- 本轮采用已有 Python Adapter，直接调用 MewCode 的真实 `Agent.run(ConversationManager)` 事件流，保留模型 usage、工具参数/结果、回合和循环结束事实。不是启动 TUI，也不是调用完整告警服务。六个默认工具为 ReadFile、WriteFile、EditFile、Bash、Glob、Grep；禁用的扩展能力没有注册，包括 MCP、team、子 Agent、自动记忆和 hooks。这些边界影响可比性，不能把结果推广到完整 MewCode 服务。
-- 复用 `integrations/deta/coding-smoke.jsonl` 和 `integrations/deta/scorer.py`，没有复制评分逻辑或建立第二套 HTTP 接入。`docs/agent-protocol.md` 的统一协议仍未进入 Eyes 运行时，本轮没有宣称完成迁移。
-
-## 配置与秘密
-
-`prepare_local.py` 读取已有 `D:\projects\MewCode\.mewcode\config.yaml`，选用已有 `openai-compat` provider。本轮为 `https://api.deepseek.com`、`deepseek-flash`、thinking=false、context_window=128000、max_output_tokens=8192。保留这些配置，权限模式显式使用 `dontAsk`、最多 12 次迭代，Eyes 截止 300 秒。`dontAsk` 仍经过 MewCode 危险命令检测和文件路径检查；shell 不是安全沙箱。
-
-密钥仅存 Git 忽略的本机 `model.env`，发布快照仅引用 `env:MEWCODE_MODEL_KEY`。管理/Runner 凭据与模型密钥分开，Runner 仅授权本轮目标及 execute/score。Runner 子进程环境不继承平台令牌。轨迹对已解析密钥的字面值和已知敏感字段脱敏；代码产物本身不自动脱敏。可信 shell 与同一 Runner 容器可访问容器挂载内容，不能视为凭据的安全隔离；不接入不可信任务。
-
-私有配置位于 `data/mewcode-integration/`，Windows ACL 取消继承并只授予当前用户。不要输出、提交或分享整个目录。模型列表验证返回 200 且包含配置模型；没有把模型别名当作固定远端权重版本。
-
-## 实际运行拓扑
-
-| 组件 | 实际环境/地址 |
+| 文件 | 职责 |
 | --- | --- |
-| PostgreSQL | Windows PostgreSQL 15.17，独立数据目录，127.0.0.1:55435 |
-| API | `eyes-mewcode-api` Linux 容器，127.0.0.1:18044 |
-| Scheduler | Windows CPython 3.14.4 独立进程，同一数据库配置 |
-| Runner / Agent / scorer | `eyes-mewcode-runner` Linux 容器，CPython 3.14.7 |
-| Web | Node 22.14.0/Vite，127.0.0.1:18081，代理 API |
+| [README.md](README.md) | 接口、配置、启动步骤和验证边界 |
+| [bridge.py](bridge.py) | prepare、execute、cleanup；调用真实 MewCode 并采集事件与轨迹 |
+| [runner.example.toml](runner.example.toml) | Python Adapter 入口、解释器、路径、资源限制和独立评分器 |
 
-Runner 的 fcntl、resource、POSIX 进程组以及原评分器的 killpg 使其不能原生运行在 Windows。API 产物存储也使用目录 fsync，原生 Windows 实测失败，最终使用 Linux API。原有 Windows PostgreSQL 服务保持运行，本轮使用单独 initdb 实例，不修改其数据库。
+这三份文件构成直接 Python 接入。统一 HTTP 接入复用同一 bridge，由 [http_service.py](http_service.py) 提供协议服务，并使用 [http-runner.example.toml](http-runner.example.toml)。Docker、发布和采集脚本是配套工具，运行记录见 [MewCode 验证目录](../../MewCode/README.md)。
 
-两个 Python 3.14 官方 Docker 镜像和 PostgreSQL 18.6 的拉取发生短读 EOF；最终 Dockerfile 从本机缓存的 Python 3.12 基础镜像通过 uv 安装 CPython 3.14.7，并创建 `/app/.venv`。执行进程实际为 3.14.7，未降低项目要求。Eyes 锁定环境因清华镜像 403 未成功安装；组合环境用官方 PyPI 按两项目约束解析，实际环境冻结在 `linux-dependencies.txt` 和 `windows-dependencies.txt`，不宣称等于两个项目原锁文件。发布后不要重新构建移动依赖并冒充相同环境；实际镜像 ID 已保存。
+## bridge 接口
 
-`compose.yaml` 是对 Eyes 原部署文件的构建/完整容器部署覆盖示例，已校验配置并用于构建；本轮完整 Compose 启动因镜像拉取失败，不能把它记为全栈 Compose 部署验收。实际服务按上述混合拓扑运行。
+- `prepare(request, context)`：把 input.files 写入独立任务目录，拒绝越界路径、目录本身和保留的 `.mewcode/` 路径。
+- `execute(request, context)`：读取目标 parameters 和 `context.secrets["model"]`，创建独立 Agent、工具、会话和对话，执行真实 Agent.run。
+- `cleanup(request, context)`：完成生命周期；本接入没有持久外部服务需要关闭，保留轨迹和产物供上传及评分。
+
+业务输入如下，预期答案和评分口径不放进 prompt：
+
+```json
+{
+  "prompt": "读取 stats.py 并修复 mean 函数，随后用 Python 检查。",
+  "files": {
+    "stats.py": "def mean(values):\n    return sum(values) / (len(values) - 1)\n"
+  }
+}
+```
+
+输出为带 `schema_version="1.0"` 的 ExecutionResult，保存 answer、session_id、model、input_tokens、output_tokens、loop_completed 和错误。只有收到 LoopComplete 且没有 ErrorEvent 才返回 succeeded。流式文本保存在轨迹中，其他实际模型/工具事件通过 SDK 上报；`.mewcode/eyes-trajectory.json` 上传为 `mewcode-trajectory.json`。用例要求的代码文件由 Runner 按 artifact_requirements 采集。
+
+## 安装与配置
+
+Linux 运行环境需要 Python 3.14+、当前 Eyes 和 MewCode。模板使用 `/app/.venv/bin/python`，Eyes/integrations 位于 `/app`，MewCode 位于 `/opt/mewcode`。按实际挂载调整解释器、import_paths 和 server_url，不能把 Windows 路径填入容器配置。
+
+在 Windows 创建独立运行配置：
+
+```powershell
+New-Item -ItemType Directory -Path data/mewcode-python -Force
+Copy-Item integrations/mewcode/runner.example.toml data/mewcode-python/runner.toml
+```
+
+将该目录挂载到 `/app/data/mewcode-python`。它已被 Git 忽略；凭据限制本机访问权限。Runner 环境提供 EYES_RUNNER_TOKEN 和 MEWCODE_MODEL_KEY，模板只把模型密钥列入 worker 环境白名单。
+
+发布 Python 目标时使用以下字段：
+
+| 字段 | 配置 |
+| --- | --- |
+| schema_version | 顶层及 capabilities 均为 1.0 |
+| external_version | 实际 MewCode commit 与源码摘要 |
+| capabilities.adapter | python |
+| capabilities | session_isolation=true，environment_isolation=false，cancellation/idempotency/reconciliation=false，observation=[task, sdk] |
+| config.agent | mewcode，对应模板中的 python_agents.mewcode |
+| config.parameters.provider | 当前真实 provider 的 name、protocol、base_url、model、thinking、context_window、max_output_tokens；不包含 api_key |
+| config.parameters | permission_mode=dontAsk、max_iterations=12，按实际需求固定 |
+| secret_refs.model | env:MEWCODE_MODEL_KEY |
+| concurrency_limit | 1 |
+
+接入使用 external 执行范围、并发 1。独立目录与权限检查不构成操作系统安全沙箱，停止本地进程不证明远端模型停止。直接 Python 接入没有取消、幂等和查询恢复钩子；HTTP 接入的幂等/查询由持久化协议服务提供。
+
+## 发布与运行
+
+先核对各实际解释器加载的 Eyes、bridge 和 scorer 源码，避免缓存镜像中的 `/app/integrations` 遮蔽新代码。在容器内读取能力与评分器摘要：
+
+```sh
+eyes-runner --config /app/data/mewcode-python/runner.toml plugins
+eyes-runner --config /app/data/mewcode-python/runner.toml status
+```
+
+通过公开 API 发布目标、导入原有 `integrations/deta/coding-smoke.jsonl`，发布 plugin=deta_code 的评分器。implementation_digest 使用 plugins 输出；评分器要求 output、events、artifacts、sealed，超时 40 秒。创建实验时固定版本、并发 1、执行超时 300 秒。通用步骤见 [Agent 接入说明](../../docs/agent-integration.md)。
+
+签发限制到该项目、目标及 execute/score 的 Runner 令牌，在容器环境提供后运行：
+
+```sh
+eyes-runner --config /app/data/mewcode-python/runner.toml run
+```
+
+每个 Runner 使用独立令牌和 state_dir。重跑创建新实验；修改桥接、参数或评分器后发布新版本，保留旧结果。配套旧脚本固定使用 data/mewcode-integration，新目录使用上述直接命令与公开 API，避免覆盖既有记录。
 
 ## 本机重启与再次评测
 
-当前所有组件均保留运行。若已停止，在 Eyes 根目录按需执行以下命令。先确认没有同名进程，避免重复启动 Scheduler 或 Web。
+最新实际验证为 [2026-10-11 HTTP 记录](../../MewCode/2026-10-11-rerun/REPORT.md)：API 18060、Agent 19050、Web 18082、PostgreSQL 55440，私有配置位于 MewCode/2026-10-11-rerun/private。此环境使用 http-runner 配置，与上面的 Python 模板分别运行。
+
+数据库按该次私有部署配置启动后，在 PowerShell 启动本次已有容器：
 
 ```powershell
-# 独立数据库；路径对应本轮机器，不连接其他 PostgreSQL 数据目录。
-& 'D:\software\tools\postgreSQL\15\bin\pg_ctl.exe' -D 'D:\projects\eyes\data\mewcode-integration\postgres' -l 'D:\projects\eyes\data\mewcode-integration\postgres.log' -o '-h 127.0.0.1 -p 55435' -w start
-docker start eyes-mewcode-api
-.venv\Scripts\python.exe integrations\mewcode\local_service.py scheduler
-.venv\Scripts\python.exe integrations\mewcode\local_service.py web
-docker start eyes-mewcode-runner
+docker start eyes-mewcode-rerun-api eyes-mewcode-rerun-agent
 ```
 
-Scheduler/Web 是长运行命令，分别在终端执行或用 `Start-Process -WindowStyle Hidden` 启动并重定向日志。API readiness：`http://127.0.0.1:18044/health/ready`。
+确认 `/health/ready` 为 200。需要新实验时再启动 eyes-mewcode-rerun-scheduler 和 eyes-mewcode-rerun-runner，以该项目 manage 身份创建关联实验，每次另建记录子目录。Web 设置 EYES_API_PROXY_TARGET 指向本次 API，启动方式见 [前端说明](../../docs/frontend.md)。
 
-浏览器刷新会丢失内存中的项目令牌。可在本机复制已有项目管理令牌，再粘贴到连接设置；不要复制模型密钥：
+## 验证边界
 
-```powershell
-(Get-Content data/mewcode-integration/manage.json -Raw | ConvertFrom-Json).token | Set-Clipboard
-```
+[最新 HTTP 记录](../../MewCode/2026-10-11-rerun/REPORT.md)实际通过 3/3 执行、3/3 独立评分与 12/12 功能检查，并保留首次缓存安装不一致的 unknown。此前直接 Python 基础闭环见 [Windows/MewCode 记录](../../docs/mewcode-validation.md)。
 
-再次运行同一配置，在最终实验详情选择“关联重跑”；这会创建新的真实业务执行，保留旧结果。`publish.py` 使用持久化请求键恢复同一次发布/创建，本地存在 `published.json` 时复用已发布版本；它不是变更桥接/配置后发布新版本的工具。变更后需准备新的状态目录、版本、镜像和目标范围凭据，不能直接覆盖既有版本证据。
-
-采集已有实验的原始记录：
-
-```powershell
-.venv\Scripts\python.exe integrations\mewcode\collect.py
-.venv\Scripts\python.exe integrations\mewcode\summarize.py
-```
-
-`collect.py` 从公开 API 下载结果、事件、清单及产物，用保留的 Runner 评分输入元数据核对产物 SHA-256/大小。评分输入来源为该 Runner 曾获授权的冻结视图，不是控制端数据库直读。评分 trace/payload 已保留，正常执行目录已回收。
-
-## 能力声明
-
-每次执行具有独立 Agent 实例、session ID、工作目录和对话；session_isolation=true，environment_isolation=false，并发=1。容器没有 Docker socket、MewCode 私有配置或宿主源码挂载，但 API/Runner/评分共用运行环境且有网络与可信 shell 权限；独立目录不构成 OS 安全沙箱，也没有完成对抗性隔离验收。
-
-execution_scope=external；取消、目标幂等、远端查询与恢复均为 false。停止本地进程不证明远端模型停止。Eyes outbox 重传不等于 MewCode 业务去重，模型调用失败后的 Agent 内部重试也不能保证远端请求只执行一次。本轮没有验证取消、Runner 整体重启、故障恢复、版本回归或容量；不从本轮 incidental 产物重传推广恢复承诺。
-
-sealed 表示明确声明的 SDK/Runner 采集边界封存。轨迹包含流式文本、真实模型/工具事件和对话，不包含全部内部状态、完整提供方 HTTP 报文或远端思考过程。原评分器只覆盖冻结代码的 12 项功能检查，不完整检查指令遵循、输入不可变、文件变更范围或解释质量。
-
-## 2026-10-10：统一 HTTP 接入（真实基本闭环已验收）
-
-新增 `http_service.py`，以 `eyes.agent_service.http.create_app` 接入持久化协议服务，回调复用本目录 `bridge.prepare/execute/cleanup` 的真实 MewCode Agent 事件循环。没有修改 MewCode 核心，没有复制或修改原三任务和独立评分器。旧 Python 接入和上述 2026-10-09 历史记录保持原样；该历史 3/3 不是 HTTP 路径结果。
-
-HTTP 目标只接收 `prompt` / 可选 `files` 业务输入和统一身份。provider、模型密钥、权限和迭代配置由接入服务本机加载；Eyes 的预期、评分配置及 Runner/管理令牌不发送给 MewCode。模型/工具原始事件由 `custom.mewcode.*` 封装，代码文件和真实轨迹作为外部产物持久化，Runner 校验后上传内部证据，由原 `integrations/deta/scorer.py` 独立执行冻结代码。
-
-能力保持会话隔离=true、环境隔离=false、并发=1、取消=false、输入资源=false；代码准备使用 input.files。新增的幂等与按键/状态查询由 HTTP 接入端持久化映射提供，不代表模型提供方幂等或自动重放 MewCode。服务重启后不确定业务记录为 unknown，保留容量；截止时间中断不声明远端模型停止。工作目录与原始协议记录保留在新的私有 `data/mewcode-http/`，不能用原 `publish.py` 覆盖历史发布和运行记录。
-
-以下是通用复现步骤。Docker 恢复后已按此路径完成真实基本验收；本机本轮新 API 为 18046（保留原 18044 容器），完整版本、具体命令、首次准备失败及结果见[记录](../../docs/agent-http-validation.md)。必须同步 Runner 的安装代码，仅覆盖 Supervisor 的 PYTHONPATH 不能升级隔离子进程：
-
-1. 恢复原 Linux Eyes API（18044）、PostgreSQL 与 Scheduler，确认 readiness。使用含本轮 Eyes 源码的 Linux 环境及已安装真实 MewCode 的环境。现有 Dockerfile 可构建该环境，但需保存实际镜像 ID/依赖版本，不能把移动镜像标签当作版本。
-2. 新建私有 `data/mewcode-http/`，配置独立随机 `AGENT_HTTP_TOKEN`（至少 32 字符，写入私有 agent.env）。沿用原 `data/mewcode-integration/model.env` 和 `parameters.json`，不输出或复制模型密钥进目标 JSON。环境变量 `MEWCODE_HTTP_STATE` 指向新的接入端目录，`MEWCODE_PARAMETERS_FILE` 指向已有参数文件，`MEWCODE_HTTP_VERSION` 填本次真实 MewCode commit/源码摘要及桥接版本。
-3. 在 Agent 的 Linux 环境加载模型与 Agent 凭据后运行：
-
-   ```sh
-   uvicorn integrations.mewcode.http_service:app --factory \
-     --host 0.0.0.0 --port 19045 --workers 1 --no-access-log
-   ```
-
-   loopback HTTP 模式下，将 Runner 与 Agent 放在同一 Linux 主机或同一容器网络 namespace（Docker 的 `--network container:<agent-container>`），使 Runner 使用 `http://127.0.0.1:19045`。不把 host.docker.internal 明文 HTTP 作为远程安全认证路径。独立远端部署必须配置 HTTPS。参考服务单进程并锁定独立状态卷，模型凭据只提供给 Agent，Runner 只取得 Agent Bearer 凭据。
-4. 从该 Runner 环境执行 `python -m eyes.adapters.agent_http http://127.0.0.1:19045 --name 'MewCode unified HTTP' --token-env AGENT_HTTP_TOKEN`，保存新 target.json 后通过管理 API `/v1/targets` 发布；不能沿用旧 Python TargetVersion。复制 `http-runner.example.toml`，调整实际路径，执行 `eyes-runner --config ... plugins` 保存当前评分器摘要。通过原 API 发布评分器，仍为 `deta_code`，required_evidence 仍为 output/events/artifacts/sealed，timeout=40。
-5. 使用 `eyes --url http://127.0.0.1:18044 import-dataset --name 'Existing coding smoke HTTP' --file integrations/deta/coding-smoke.jsonl` 导入原数据集。`EYES_TOKEN` 仅是管理身份。创建新的 experiment.json，填写新目标/数据集/评分器 UUID、concurrency=1、timeout_seconds=300、evidence_wait_seconds=15，再运行 `eyes --url http://127.0.0.1:18044 create --file ... --key <本轮持久化请求键>`。保存新实验身份到独立目录。
-6. 使用控制端 `eyes-admin issue-token --project-id ... --role runner --target-id ... --work-kind execute --work-kind score` 签发新目标范围凭据，保存为私有 Runner 凭据；不要将旧 Runner 的授权范围强行扩展。Runner 环境加载 `EYES_RUNNER_TOKEN`，运行 `eyes-runner --config ... run`。HTTP Runner 配置没有 Python Agent 绑定，实际业务必须经过协议 HTTP 接口。
-7. 经公开 API 获取新实验 results、case-runs、attempts、events、manifests、score-runs 及 artifact content，保存原始响应与字节摘要，核对评分引用。另核对 Agent 提交/按键查询/状态/结果/事件/产物的认证、同键重放与冲突；独立评分必须实际执行，不能只核对 Agent 自述。保持原历史文件不变，原 `collect.py` 固定写旧目录，本轮应在新目录按相同公开端点采集。
-
-首次 Docker 阻塞与失败保留在[检查记录](../../docs/agent-http-validation.md)。恢复后的最终实验 `e93b6f02-0d9e-4a0d-abba-47e48e305847`：3/3 执行、3/3 原独立评分通过（12/12 功能检查），3/3 sealed，48 条外部事件对应到 60 条 Eyes 事件，8 份产物的两侧字节/大小/摘要一致。认证、同键重放/冲突、已完成 Agent 服务重启映射已核对；首次缓存安装不同步导致的失败实验另行保留。没有修改 MewCode 核心、原任务或评分器。
-
-实际运行为 `eyes-agent-http-api`（18046）、`eyes-agent-http-mewcode`（19045）、`eyes-agent-http-scheduler`、原专用 PostgreSQL（55435）；本轮 Runner `eyes-agent-http-runner` 在验收结束后停止，防止继续领取工作。新私有目录 `data/mewcode-http/` 保存原始响应、证据、版本、部署日志和凭据，不提交。可选取消/资源的正向流程及活动任务故障需要实际支持的目标另行补证据。
+本次整理三份接入文件不新增验收结论。完整告警服务、扩展工具、复杂仓库能力、安全隔离、活动崩溃恢复、双 Agent 并发及容量仍需相应验收。

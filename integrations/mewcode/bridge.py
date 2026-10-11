@@ -1,4 +1,13 @@
-"""Eyes Python integration for the existing MewCode Agent event loop."""
+"""MewCode binding for Eyes' Python Adapter and the optional HTTP service.
+
+prepare(request, context) materializes input.files inside the assigned workspace.
+execute(request, context) runs the real Agent with input.prompt and target-local
+parameters, then returns ExecutionResult and publishes the captured trajectory.
+cleanup(request, context) completes the binding lifecycle without deleting evidence.
+
+Runner supplies model credentials through context.secrets; the binding never reads
+Eyes credentials or expected answers. Runtime paths are Linux container paths.
+"""
 
 import json
 from dataclasses import asdict
@@ -21,6 +30,7 @@ from eyes.runner.files import redact
 
 
 def prepare(request, context):
+    """Write the supplied starting files within the assigned task workspace."""
     for name, content in request.input.get("files", {}).items():
         path = (context.workspace / name).resolve()
         if not path.is_relative_to(context.workspace) or path == context.workspace:
@@ -32,6 +42,7 @@ def prepare(request, context):
 
 
 async def execute(request, context):
+    """Run MewCode and record its actual model/tool events and completion facts."""
     parameters = request.target.config["parameters"]
     key = context.secrets["model"]
     provider = ProviderConfig(api_key=key, **parameters["provider"])
@@ -107,4 +118,8 @@ async def execute(request, context):
 
 
 def cleanup(request, context):
-    """No persistent external service is owned by this integration."""
+    """Keep captured evidence; this binding owns no persistent external service.
+
+    Local cleanup does not prove a remote model request stopped. Cancellation and
+    reconciliation remain undeclared for the direct Python binding.
+    """
