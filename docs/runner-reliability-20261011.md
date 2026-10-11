@@ -55,7 +55,7 @@
 | 整体 Runner 退出、原操作查询 | whole-positive-kill/history/detail：Attempt `8b11356a-db43-47fb-ae34-1716bc0dca3f` 从 running/claimed/reserved → unknown/reserved → succeeded/completed/unreserved。PostgreSQL 该 CaseRun 只有一个 Attempt，真实 Agent 原键只有一个 run `11fd47af-fd67-4bef-b053-56a94a8b2d67`，结果包含真实停止确认 |
 | 竞争、查询租约接管与重复核对 | competition-claims：两个 Runner 同时领取只有一个获得 query。confirmed-before-query-expiry/after-restart 的 token/count/due_at 保持；租约到期追加 expired 诊断，另一查询接管。late-query-repeated-responses 返回 200，再次 duplicate=true |
 | 迟到与可信终态只释放一次 | confirmed-final-detail/work：Attempt `40fd0f62-b5e9-4c35-a6a4-dacf2a05477a` 只有一个 Attempt/远端 run；applied=true 的观察只有一次，迟到观察 late=true/applied=false。旧 Runner 恢复后的结果被拒绝；当前 reserved=false，原 terminal snapshot 与 Agent 持久化结果一致 |
-| 失败退避跨重启、unknown 占额 | query-failed-work/after-control-restart-work：原未知工作 `92a3adfc-c64d-4124-b4de-3389fe62db20` 的查询次数/下一时间保留。当前仍 unknown/reserved=true，原 CaseRun 只有一个 Attempt，未确认分支 applied=0；后续同项目工作没有绕过原限额执行 |
+| 失败退避跨重启、unknown 占额 | query-failed-work/after-control-restart-work：原未知工作 `92a3adfc-c64d-4124-b4de-3389fe62db20` 的查询计数没有重置，退避继续推进。后续只读复核明确这两份记录之间有新查询，count 为 1→2、due_at 向后推进，并非整份 JSON 相同；持有中查询的重启字段一致另见上一行。仍 unknown/reserved=true，原 CaseRun 只有一个 Attempt，未确认分支 applied=0；后续同项目工作没有绕过原限额执行 |
 
 这关闭本轮指定的安全恢复必需门槛。仍不等于整个 M2 的所有目标/取消/资源能力或故障组合全部验收。
 
@@ -69,6 +69,8 @@
 四项行为条件通过；不是同目标版本改善/退化验收，报告仍可合理显示 inconclusive。
 
 ## 剩余边界与收尾
+
+后续部署/回归轮次已经再次只读核实本页安全恢复必需材料，完成同一真实 MewCode 两版本的无变化回归、历史评分/旧报告/引用/分母和 CLI 门槛，见[后续验收](deployment-regression-20261011.md)。本页下述“本轮未开展版本回归”保留为本页对应轮次的范围，不能理解为当前完全没有版本运行证据。
 
 本轮指定必需项无环境阻塞。没有将所有磁盘故障码、截止早于租约的独立评分故障、全部 HTTP 状态或缺版本历史组合逐一注入；相应边界有源码检查，不能推广为穷尽故障验证。缺版本历史普通读取继续沿用既有策略，本轮没有伪造历史或开展版本兼容回归。
 

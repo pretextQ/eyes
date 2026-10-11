@@ -1,6 +1,6 @@
 # 回归、证据与运维
 
-校准日期：2026-10-09。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 已是 `0005_reconciliation`。公开 API、开发者 CLI、本地运维 CLI 和 Web 固定回归报告均已有实现；Web 显式选择历史评分的 BUG-004 行为条件已核实，见 [Runner 可靠性验收](runner-reliability-20261011.md#bug-001004)。Python 真实接入已有记录，统一 HTTP 基本闭环见开发计划。当前 Windows 环境的完整运维验收仍待完成，当前进度见 [开发计划](PLAN.md)。
+状态同步：2026-10-11。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0005_reconciliation`。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化和完整 Windows 环境运维验收仍待补齐，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 
@@ -112,6 +112,8 @@ CI 应以 `eyes gate` 的退出码决定结果：
 
 取消实验现在同时处理执行任务、等待证据、排队评分和活动评分。等待/排队评分记录 skipped；活动评分收到心跳停止请求，其后提交的结果不再计为有效分数。未按时结束或失去租约保留 error 诊断。对外部执行仍保留原规则：取消未确认保持未知状态和配额，不因租约过期自动重新执行。
 
+实验 completed 只表示调度结束，取消用例仍计入计划分母并由 cancelled_runs 及逐用例 cancelled 展示；比较报告保留 execution_not_successful 等原因，不把取消算为质量退化。排队取消已经通过实际 API/Web 核对，实验级请求审计不足另列设计缺口，见[取消验收](deployment-regression-20261011.md#审查-2取消语义与审计缺口)。
+
 评分失败可以调用 `POST /v1/score-runs/{id}/retry`：新建 ScoreRun，保留原评分器和原清单，不执行目标。`rescore` 则使用最新清单；初始证据等待尚未结束时拒绝提前重新评分。汇总仍选择最早评分，使用新评分做回归时要在报告请求中明确指定对应 ScoreRun。
 
 ## 3. 证据生命周期与部署运维
@@ -186,7 +188,7 @@ HTML/SPA 和 assets 的缓存 location 显式声明既有安全头，避免 ngin
 
 Compose 包含 PostgreSQL、一次性迁移、API、Scheduler、Web 及可选维护进程。API/数据库仅映射本机；可通过 `EYES_API_PORT`、`EYES_POSTGRES_PORT`、`EYES_WEB_PORT` 改变宿主机端口，默认 8000/5432/8080。`EYES_CONTROL_IMAGE` 设置控制端共用镜像名。证据使用单机卷，未引入外部消息中间件。恢复、迁移和清理均有实际命令，不能据此宣称高可用。
 
-当前配置上限仍为 JSON 请求 8 MiB、单产物 32 MiB、评分输入 32 MiB、单实验最多 100000 个 CaseRun。回归报告读取所选两次实验的评分记录，审计/备份遍历完整记录和文件；大型数据集需要预留维护时间和内存。尚无真实 Agent 吞吐、并发故障恢复和容量实测，不提供未经测量的性能承诺。
+当前配置上限仍为 JSON 请求 8 MiB、单产物 32 MiB、评分输入 32 MiB、单实验最多 100000 个 CaseRun。回归报告读取所选两次实验的评分记录，审计/备份遍历完整记录和文件；大型数据集需要预留维护时间和内存。指定安全恢复和 Runner 故障子集已有真实记录，但没有吞吐、容量及长期运行实测，不提供未经测量的性能承诺。
 
 ### Compose 命名卷的停写备份与恢复
 
@@ -243,4 +245,4 @@ docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml up -d
 恢复后核对 unknown 工作，再签发新 Runner 令牌。降级迁移不会恢复已清除的证据载荷；要恢复旧版本完整数据，使用升级前的备份。
 
 
-2026-10-11 的统一 agent_http 未知任务自动核对、人工 resolve 边界及 0005 升降级要求见[恢复操作](unknown-recovery.md)。本次只通过静态检查和 PostgreSQL 离线迁移 SQL 生成，Docker/API/Agent 不可达，实际迁移及故障矩阵仍待验证。
+统一 agent_http 未知任务自动核对、人工 resolve 边界及 0005 升降级要求见[恢复操作](unknown-recovery.md)。初始实现轮次的 Docker/API/Agent 阻塞已保留为历史；之后独立 PostgreSQL 实际迁移和指定安全恢复必需项分别完成验证，见[兼容验收](contract-compatibility-validation.md)及[Runner 可靠性](runner-reliability-20261011.md)。它们不代替本节完整证据备份恢复或完整故障矩阵。

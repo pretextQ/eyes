@@ -13,11 +13,11 @@
 | 证据 | 事件去重、冲突诊断、固定清单、迟到清单、受控产物上传及查询 |
 | 评分 | 固定清单绑定、前置证据检查、结果校验、重新评分历史及明确分母的结果查询 |
 | 部署 | Alembic 0001～0005 迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移/Web 服务 |
-| 实际执行组件 | 宿主机 Runner、HTTP/Python 适配器、独立规则/Python 评分进程、SDK、插件摘要与本地状态 CLI 已实现；Python 真实接入有记录，HTTP 仍待验收 |
+| 实际执行组件 | HTTP/Python 适配器、独立执行/评分进程、SDK、插件摘要与 Runner CLI 已实现；MewCode Python 与统一 HTTP 基础闭环已有真实记录，完整能力矩阵仍待验收 |
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
 
-当前 Windows 环境已有 MewCode 执行/评分/证据基础闭环，见 [MewCode 验证记录](mewcode-validation.md)。双 Agent、多 Runner 并发、中断及完整部署需在当前环境验收。远端停止确认、Runner 整体重启、网络/数据库故障和含完整执行证据的恢复仍待验收。当前任务见 [开发计划](PLAN.md)。
+当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行/评分/证据基础闭环。安全恢复指定必需项及评分读取的 API 中断、数据库 503、鉴权与租约故障已有真实子集证据，见 [Runner 可靠性验收](runner-reliability-20261011.md)。同一 Agent 两版本的无变化报告、历史选择与 CLI 门槛通过核对，见 [部署与回归验收](deployment-regression-20261011.md)。双 Agent、完整故障/权限矩阵、真实改善/退化、完整部署和含完整证据的备份恢复仍保留 [开发计划](PLAN.md)。
 
 ## 本机运行
 
@@ -191,6 +191,8 @@ ScorerVersion 冻结插件标识、实现摘要、配置、证据要求、超时
 
 实验 `completed` 表示调度工作已结束；可能仍有执行失败、评分错误或证据不足。存在未知工作时为 `completed_with_unresolved`。结果查询同时展示计划运行数、成功数、评分数、通过数及未解决数，比例返回明确的 numerator/denominator。初版汇总选首个成功 Attempt 和其最早的 ScoreRun；重新评分的完整历史在用例详情中读取，汇总不会自动换成新分数。comparison 模块可选择固定 ScoreRun 并生成不可变回归报告。
 
+取消后的用例/尝试状态与 cancelled_runs 独立于实验调度状态；排队取消不创建虚构 Attempt，也不从计划分母移除。当前没有实验级取消请求的独立持久审计记录，这是需另行评估的设计缺口，不能据此新增公共 cancelled 终态。实际取消页面/报告核对见[验收记录](deployment-regression-20261011.md#审查-2取消语义与审计缺口)。
+
 ## 证据、产物与敏感内容
 
 事件按项目、生产者和 event_id 去重，对原始规范化内容计算摘要。相同 ID、不同内容返回 409 并记录不含载荷的诊断。输入输出、事件、产物均通过清单引用关联；清单冻结执行结果。后到事件或产物产生新清单，原评分继续引用原清单。未报告的丢弃数量为未知，不能默认当作零。
@@ -209,11 +211,11 @@ API 使用 OTel SDK 创建实际 HTTP 请求 span，接收 W3C Trace Context，�
 
 已提供 `eyes-server`、`eyes-scheduler`、`eyes-admin`、`eyes-runner`、开发者 CLI `eyes` 和运维 CLI `eyes-ops`。新增回归、封存和评分重试端点见 [平台说明](platform.md)。
 
-HTTP 与 Python 通用接入功能已有实现；Python 路径已有真实闭环，仍需补齐真实 HTTP Agent 的导入、领取、执行、证据查询和独立评分。多 Runner 已有部分并发证据，完整租约、取消、迟到上报和评分故障恢复仍需验证。原始结果须按 [AGENT.md](../AGENT.md) 的阶段要求保存；本次文档校准不新增运行验收。
+HTTP 与 Python 接入功能已有实现；MewCode Python 与统一 HTTP 的导入、领取、执行、证据和独立评分基础闭环已记录。安全恢复和评分故障子集见 [可靠性验收](runner-reliability-20261011.md)，完整租约/取消/恢复矩阵仍未全面验证。原始结果按 [AGENT.md](../AGENT.md) 的阶段要求保存；本次文档同步不新增运行验收。
 
 多 Agent 批次新增公开 API 和 CLI，在同一事务创建多份独立实验，详见 [多 Agent 批次](multi-agent-batches.md)。
 
 
 ## 2026-10-11：未知原操作自动核对
 
-统一 agent_http 新增独立查询领取与上报端点 `/v1/reconciliation/claim` 和 `/v1/work/{id}/reconciliation-result`。查询只关联原 Attempt/幂等键/远端运行，查询租约和退避持久化于 0005 的 work_items.reconciliation，来源事实追加到不可变 resolutions。只有协议可信终态及停止确认释放原额度；失败、非终态、身份冲突和能力不足继续 unknown。旧业务 lease 校验不变，迟到查询只追加事实。通用 HTTP/Python 仍需人工 resolve。升级、历史数据、原评分/证据保留及本次故障验收阻塞见[恢复说明](unknown-recovery.md)。
+统一 agent_http 新增独立查询领取与上报端点 `/v1/reconciliation/claim` 和 `/v1/work/{id}/reconciliation-result`。查询只关联原 Attempt/幂等键/远端运行，查询租约和退避持久化于 0005 的 work_items.reconciliation，来源事实追加到不可变 resolutions。只有协议可信终态及停止确认释放原额度；失败、非终态、身份冲突和能力不足继续 unknown。旧业务 lease 校验不变，迟到查询只追加事实。通用 HTTP/Python 仍需人工 resolve。升级、历史边界和指定必需项的真实证据见[恢复说明](unknown-recovery.md)。

@@ -4,6 +4,8 @@
 
 ## 发布并执行统一协议目标
 
+当前 Windows 宿主机使用 PowerShell；本页 POSIX 路径和 Runner/服务命令用于本机 Linux 容器，具体启动参考 [MewCode 接入](../integrations/mewcode/README.md)。后续指定安全恢复门槛见[可靠性验收](runner-reliability-20261011.md)，真实不同版本无变化回归与改善/退化缺口见[部署/回归记录](deployment-regression-20261011.md)。这些结果没有扩大目标声明的取消或资源能力。
+
 外部服务实现[协议 v1](agent-protocol.md)。在接入服务和 Runner 使用独立的 Agent Bearer 凭据，Runner 将该环境变量列入 `secret_env_allowlist`；Eyes 管理、Runner 和模型凭据不得复用。远程使用 HTTPS；loopback HTTP 只用于同机调试。Runner 不跟随重定向，不读取系统代理配置。
 
 先发现实际能力，保存不含秘密的发布请求：
@@ -65,7 +67,7 @@ Runner 的安装环境也必须升级到相同版本，不能仅通过 Superviso
 
 `context.event(type, data)` 持久化事件；`context.resource(ref)` 读取已确认的输入字节；`context.artifact(name, bytes, media_type)` 校验并持久化产物。结果只能引用本运行已发布的产物。参考限制为单事件 64 KiB、10000 事件、每运行最多 100 产物、单文件 32 MiB；限额损失进入证据状态。接入方负责事件语义、脱敏、deadline、工具与后台任务停止确认、隔离和清理；回调异常保守转 unknown，异常文本不返回调用方。
 
-参考服务无限期保留记录、资源及产物，不自动过期或回收，满足终态最短保留期但需要部署者规划磁盘容量和备份。资源与结果均在同一私有 SQLite 存储，避免文件已写而映射未确认；输入文件名不用于磁盘路径。SQLite 仅用于外部接入端的单机协议状态，Eyes 控制端仍为 PostgreSQL，**没有平台数据库迁移**。接入端状态文件新增独立数据库，不触及 Eyes 的 0001～0004。
+参考服务无限期保留记录、资源及产物，不自动过期或回收，满足终态最短保留期但需要部署者规划磁盘容量和备份。资源与结果均在同一私有 SQLite 存储，避免文件已写而映射未确认；输入文件名不用于磁盘路径。SQLite 仅用于外部接入端的单机协议状态，Eyes 控制端仍为 PostgreSQL；引入参考接入端本身没有平台数据库迁移。当前控制端 head 为 `0005_reconciliation`，该迁移是后续控制端未知任务查询状态，不是接入端 SQLite 的迁移。
 
 可靠的后端人工核对可通过接入方进程内 `app.state.resolve_run(AgentResult)` 追加 unknown → 确定结果；没有开放无认证 HTTP 修改入口，也不实现后台自动重跑。原明确终态保留，竞争回调不覆盖它。恢复文件锁后仍有外部执行存活时，接入方必须核对真实业务事实再解除 unknown。
 

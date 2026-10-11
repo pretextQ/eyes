@@ -64,4 +64,4 @@
 
 私有记录包含 versions、runtime-inspection、baseline/final case-runs/operations、两组 rescore 请求、旧 outbox 来源摘要、27 次失败及 6 个实际响应、outbox 最终状态、全部组件日志、评分 journal 和 summary。Docker 启动的 Inference/Secrets 两次失败及临时目录备份均保留；首次停止后进程尚未退出的检查阻止了目录移动，确认退出后才继续。
 
-本次完成的范围是：既有完成载荷的旧版真实网络重传，以及以上两个旧 SDK/冻结评分器组合。仍未覆盖：真正缺少版本的历史 outbox、首次提交响应丢失、旧 SDK 与所有外部 exporter/插件二进制、多进程竞争、更早 evidence_wait_seconds 缺省快照重放。未知远端任务的整体 Runner 崩溃/停止确认矩阵属于前一任务，仍未验收；本次没有启动 Agent，不宣称 M0/M2 全面通过。
+本次完成的范围是：既有完成载荷的旧版真实网络重传，以及以上两个旧 SDK/冻结评分器组合。仍未覆盖：真正缺少版本的历史 outbox、首次提交响应丢失、旧 SDK 与所有外部 exporter/插件二进制、多进程竞争、更早 evidence_wait_seconds 缺省快照重放。本兼容轮次没有启动 Agent，当时未知任务的整体退出/停止确认尚未验收；之后指定安全恢复门槛由独立[可靠性轮次](runner-reliability-20261011.md)补齐，并在[部署/回归轮次](deployment-regression-20261011.md#安全恢复前置条件复核)再次核实。各轮范围分别记录，不宣称 M0/M2 全面通过。

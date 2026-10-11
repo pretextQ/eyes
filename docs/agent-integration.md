@@ -6,7 +6,7 @@
 
 接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 维护统一客户端。2026-10-10 已实现 `agent_http` Runner 客户端、能力发现/兼容校验和持久化参考 HTTP 服务，见[统一运行时接入](agent-http-runtime.md)。下文仍保留既有 HTTP/Python 使用方式；旧目标不自动迁移。真实 MewCode HTTP 基本闭环已验收，3/3 执行/评分通过，见[实际记录](agent-http-validation.md)。
 
-当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的宿主机 Runner。Deta 与 MewCode 的接入组件保留在 integrations 中，当前 Windows 环境的双 Agent 并发验收仍待完成。2026-10-10 已补齐真实 MewCode 统一 HTTP 基本闭环；Runner 整体重启及网络/数据库故障恢复仍待验收；下文的通用协议示例不代表运行成功。Windows Python 基础闭环见 [MewCode 验证记录](mewcode-validation.md)。
+当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的 Runner。MewCode Python 和统一 HTTP 基础闭环已有真实记录；2026-10-11 的整体退出/原操作核对、安全额度和评分 API/数据库故障子集见 [Runner 可靠性验收](runner-reliability-20261011.md)。双 Agent 并发、完整故障与目标能力矩阵仍待完成；下文协议示例不代表运行成功。Windows Python 基础闭环见 [MewCode 验证记录](mewcode-validation.md)。
 
 ## 1. 启动宿主机 Runner
 
@@ -241,8 +241,11 @@ Runner 使用服务端 deadline 控制墙钟超时；心跳只续租，不延长
 | `result.json` / `ack.json` | 完整上报载荷 / 服务端确认接收记录 |
 | `workspace/` / `capture/` | 隔离目录、事件、产物快照和采集计数 |
 | `quarantine.json` | 中断、未知执行或清理异常的保留原因 |
+| `corrupt.json` | 损坏工作载荷的定位诊断；原 assignment/result/capture 保留，禁止正常恢复、封存或回收 |
 | `outbox/pending/` | 等待确认的事件、产物和结果 |
 | `outbox/rejected/` | 服务端永久拒绝的原上报及错误码 |
+| `outbox-corrupt/` | 损坏 outbox 与配对 content 的原字节和诊断；不占发送容量 |
+| `outbox-orphaned/` | 没有正常任务 JSON 的孤立内容与中断写入文件；供维护者核对 |
 
 本地 JSON 和产物先写临时文件、fsync，再原子替换。业务结果先保存 journal，再加入有界磁盘 outbox；空间不足保留 journal，后续轮询或重启继续尝试入队。outbox 达到 75% 时暂停领取新工作，活跃任务继续停止、记录和上报。网络错误、408/425/429/5xx 保留原载荷重传；401/403/409/422 等进入 rejected，不修改原提交来绕过身份、领取令牌或幂等校验。
 
@@ -256,13 +259,17 @@ Runner 使用服务端 deadline 控制墙钟超时；心跳只续租，不延长
 
 `status` 显示 pending、rejected、保留工作和隔离工作数量。正常执行目录在完成确认后回收；未知/清理异常目录和评分 trace 保留供排障。每项采集和 outbox 有界，历史保留目录的总量仍需部署者设置保留策略，首版不提供自动历史清理。目录包含任务输入和租约信息，使用私有权限，维护者应按敏感运行数据管理。
 
+领取和恢复入口校验 UUID、工作目录和出站请求身份。单个损坏载荷隔离后健康项继续处理；临时磁盘错误保留重试，不作为容量不足或损坏清除。损坏身份指纹拒绝使用该状态目录；未知归属隔离数据保守阻止封存，不能仅删除目录绕过证据缺口。status 另显示损坏 journal/outbox 计数。实际故障与保留策略见 [Runner 可靠性](runner-reliability-20261011.md#损坏载荷隔离与恢复身份)。
+
+评分输入/产物读取的可重试 API 或传输故障最多四次，间隔 0.5/1/2 秒，受原 deadline、有效租约和取消约束。最终基础设施、鉴权、租约或完整性错误为 error；只有固定证据明确不可用/过期，或明确证据缺失时才归类 insufficient_evidence。重试读取不会重跑 Agent 或替换历史汇总，见[错误分类和实际场景](runner-reliability-20261011.md#评分基础设施错误)。
+
 ## 6. 兼容性与验收边界
 
 2026-10-11 普通 Contract 已改为默认要求显式 schema_version，包括本机桥接/评分器返回的完整 ExecutionResult/ScoreOutput；业务输出字典和 Agent 统一协议的 protocol_version 不混用。升级顺序、旧 outbox 及历史快照读取、固定截止的显式兼容窗口见[迁移说明](contract-version-migration.md)。修改插件源码后须获取新摘要并发布新版本，不能覆盖旧评分器摘要。原真实三任务 JSONL 已显式版本，本次没有修改其用例。
 
 此前给 `ExecutionResult` 增加可选 `evidence_details`，给 `ScoreInput` 增加可选 `execution_root_span_id` 和 `deadline`，给 `ExecutionInput` 增加可选 `artifact_requirements`。本次审查修复增加注册字段 `python_agents/http_origins`、结果字段 `completed_at`、契约 `ScoreAssignment` 和读取完整评分输入的接口，改变评分领取 payload 的结构。它们使用已有 JSON 字段和截止时间，不需要数据库迁移。协议仍是未发布原型的 1.0，控制端、scheduler 与 Runner 必须同步升级到本源码版本。旧注册缺少别名或 origin 时，不会获得相应 Python/HTTP 工作；持有额度时不能改变注册能力，应在升级前结束或核对旧工作。
 
-已实现的通用接口不意味着所有目标已通过验证。当前 Windows 的 Python 路径已有 MewCode 基础执行、评分和证据记录；MewCode 统一 HTTP 基本闭环已有本轮记录，HTTP 可选能力正向、Runner 整体崩溃、网络/数据库故障及远端取消停止确认仍待验收。固定回归报告、CI 质量门槛、实验证据保留清理和备份恢复已有实现，完整部署需在当前 Windows 环境验收。Web 已有固定报告及证据审阅，近期历史评分选择仍待完整浏览器验收，见 [修复计划](bug-fix-plan.md)。M0～M4 的剩余工作见 [开发计划](PLAN.md)。
+已实现的接口不意味着所有目标已通过验证。MewCode Python/统一 HTTP 基础闭环、安全恢复指定必需项、评分基础设施故障子集和 BUG-001～004 已有真实证据。Web 历史评分选择和同一 Agent 两版本的无变化报告、引用、分母、CLI 0/1/2/3 已核对，见[部署与回归验收](deployment-regression-20261011.md)。HTTP 取消/资源正向、第二个统一实现、完整故障/权限矩阵、真实改善/退化、完整部署及含完整证据的备份恢复仍未全面验收。M0～M4 的剩余门槛见 [开发计划](PLAN.md)。
 
 
 ## 2026-10-03：证据等待和封存

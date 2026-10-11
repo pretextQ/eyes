@@ -2,6 +2,8 @@
 
 一个批次可包含 1–32 个 Agent 目标版本。每个成员独立选择测试集、评分器、任务并发、超时和重复次数；也可以复用相同测试集进行对照。一个目标版本在同一批次只能出现一次。不同版本若属于同一个 Target，仍共享该 Target 的容量。
 
+2026-10-11 已在真实项目通过单成员 Web 批次创建、比较选项及时更新及排队取消核对，见[验收记录](deployment-regression-20261011.md)。这是关联入口的定向验证，不能代替多 Agent 并发/隔离或版本改善/退化验收。
+
 ## 使用流程
 
 1. 在「目标 Agent」发布各 Agent 的真实接入配置和能力；在目标所在环境配置 Runner 的 Python 入口或 HTTP origin。接入清单不是仅选择一个全局 Agent，Runner 可注册多个入口，也可以部署多个 Runner。
@@ -54,6 +56,8 @@ eyes cancel-batch <batch-id>
 ## 数据升级
 
 新迁移为 `0004_experiment_batches`，在 `0003_observation` 后增加批次表与可空的 `experiments.batch_id`。旧实验保持独立且可读取，不回填为批次，不覆盖历史快照。
+
+0004 是引入批次时的历史迁移编号；当前部署必须升级到 head `0005_reconciliation`，不能停在 0004 运行当前服务。后续普通 schema_version 严格要求与旧请求窗口见[版本迁移](contract-version-migration.md)，升级需核对控制端、Scheduler、Runner 的实际安装版本。
 
 先按现有运维流程备份并停止控制端/调度器，再执行 `uv run alembic upgrade head`，随后以当前代码重启控制端和调度器。Runner 协议未变化，可以继续使用已有配置。API 就绪检查要求迁移达到当前 head。
 
