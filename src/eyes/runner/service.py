@@ -3,6 +3,7 @@ import json
 import logging
 import shutil
 from datetime import UTC, datetime
+from uuid import UUID
 
 import httpx
 
@@ -26,6 +27,10 @@ def remaining(deadline):
 
 
 class StopWork(Exception):
+    pass
+
+
+class EvidenceUnavailable(Exception):
     pass
 
 
@@ -492,20 +497,73 @@ class RunnerService:
             "artifact_ids": list(artifact_ids),
         }
 
+    async def score_read(self, lease, deadline, operation):
+        """Retry only reads of the assigned manifest, within the live lease."""
+
+        async def bounded(call):
+            budget = min(
+                (deadline - datetime.now(UTC)).total_seconds(),
+                (lease.valid_until - datetime.now(UTC)).total_seconds(),
+            )
+            if budget <= 0 or lease.stop.is_set() or self.stopping.is_set():
+                raise StopWork("scoring deadline, shutdown or lease loss")
+            task = asyncio.create_task(call())
+            stopped = asyncio.create_task(lease.stop.wait())
+            shutdown = asyncio.create_task(self.stopping.wait())
+            try:
+                done, _ = await asyncio.wait(
+                    [task, stopped, shutdown],
+                    timeout=budget,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if stopped in done or shutdown in done:
+                    raise StopWork("scoring interrupted")
+                if task in done:
+                    return await task
+                raise TimeoutError("scoring read exceeded deadline or lease")
+            finally:
+                for pending in [task, stopped, shutdown]:
+                    if not pending.done():
+                        pending.cancel()
+                await asyncio.gather(task, stopped, shutdown, return_exceptions=True)
+
+        for attempt in range(4):
+            try:
+                return await bounded(operation)
+            except ApiError as error:
+                if not error.retryable or attempt == 3:
+                    raise
+                logger.warning(
+                    "score_read_retry work=%s status=%s attempt=%s",
+                    lease.work["work_item_id"],
+                    error.status,
+                    attempt + 1,
+                )
+            except httpx.TransportError, TimeoutError:
+                if attempt == 3:
+                    raise
+                logger.warning(
+                    "score_read_transport_retry work=%s attempt=%s",
+                    lease.work["work_item_id"],
+                    attempt + 1,
+                )
+            await bounded(lambda attempt=attempt: asyncio.sleep(0.5 * 2**attempt))
+
     async def score(self, work, lease, directory):
         assignment = ScoreAssignment.model_validate(work["payload"])
         deadline = assignment.deadline
         secrets = {}
         worker = ProcessWorker(self.config, lambda value: asyncio.sleep(0))
         try:
-            payload = await asyncio.wait_for(
-                self.client.request(
+            payload = await self.score_read(
+                lease,
+                deadline,
+                lambda: self.client.request(
                     "POST",
                     f"v1/work/{work['work_item_id']}/score-input",
                     json=lease.body,
                     max_bytes=self.config.max_score_input_bytes,
                 ),
-                remaining(deadline),
             )
             request = ScoreInput.model_validate(payload)
             if (
@@ -515,6 +573,8 @@ class RunnerService:
                 or request.deadline != deadline
             ):
                 raise ValueError("score input does not match its frozen assignment")
+            if request.evidence.status in {"unavailable", "expired"}:
+                raise EvidenceUnavailable("assigned evidence is unavailable or expired")
             binding = self.config.python_scorers.get(request.scorer.plugin)
             if request.scorer.plugin != "rules" and binding is None:
                 raise ValueError("Python scorer alias is not configured on this Runner")
@@ -528,13 +588,16 @@ class RunnerService:
             for item in artifacts:
                 if lease.stop.is_set() or remaining(deadline) <= 0.02:
                     raise StopWork("score cancelled or timed out")
-                identifier = str(item["id"])
+                identifier = str(UUID(item["id"]))
                 metadata = read_stored_contract(
                     ArtifactMetadata, item["metadata_content"], source="scoring_artifact_metadata"
                 )
-                content = await asyncio.wait_for(
-                    self.client.artifact(identifier, self.config.max_artifact_bytes),
-                    remaining(deadline),
+                content = await self.score_read(
+                    lease,
+                    deadline,
+                    lambda identifier=identifier: self.client.artifact(
+                        identifier, self.config.max_artifact_bytes
+                    ),
                 )
                 import hashlib
 
@@ -561,6 +624,15 @@ class RunnerService:
             except WorkerError, TimeoutError, OSError:
                 pass
         except ApiError as error:
+            result = ScoreOutput(
+                schema_version="1.0",
+                status="insufficient_evidence"
+                if error.status == 410
+                and error.code in {"evidence_expired", "artifact_unavailable"}
+                else "error",
+                reason=error_text(error),
+            )
+        except EvidenceUnavailable as error:
             result = ScoreOutput(
                 schema_version="1.0", status="insufficient_evidence", reason=error_text(error)
             )

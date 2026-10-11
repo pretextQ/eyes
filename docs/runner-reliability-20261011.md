@@ -14,3 +14,10 @@
 ## 验收边界
 
 复查 `data/safety-acceptance-20261011/` 已有真实记录，逐项核对后补齐缺口；私有材料、凭据、日志和运行数据不提交。本轮不开展版本回归或备份恢复，不新增/修改仓库测试、用例、fixtures 或 mocks。
+
+## 评分基础设施错误
+
+- 评分输入和固定清单中的产物读取，对 408/425/429/5xx、传输错误和超时最多读取四次，间隔 0.5/1/2 秒；每次请求与退避都受原截止时间、当前有效租约、取消及 Runner 退出信号限制。身份/清单不匹配不重试；不重新领取业务、不重新执行 Agent、不调用 rescore、不自动改历史汇总。
+- 认证、租约、最终 API/传输故障与本地读写/完整性失败记录 `error`。仅固定证据视图明确 unavailable/expired，或平台明确返回 410 evidence_expired/artifact_unavailable 时记录 `insufficient_evidence`；评分器自身的明确证据不足结果继续保留。
+- 产物下载保留真实 API 错误码，不能将所有 HTTP 失败统一包装成 artifact_unavailable；冻结清单中的产物标识在写目录/请求前进行 UUID 解析。
+- 相关 Ruff check/format、字节编译与 diff 空白检查通过；未用模拟 API、评分或 Agent 输出替代真实运行。

@@ -1,4 +1,12 @@
+import json
+
 import httpx
+
+
+def response_code(value):
+    error = value.get("error") if isinstance(value, dict) else None
+    code = error.get("code") if isinstance(error, dict) else None
+    return code if isinstance(code, str) else "http_error"
 
 
 class ApiError(Exception):
@@ -42,12 +50,7 @@ class ControlClient:
                     raise ApiError(response.status_code, "http_error") from None
                 raise ValueError("control API returned invalid JSON") from None
             if response.status_code >= 300:
-                code = (
-                    value.get("error", {}).get("code", "http_error")
-                    if isinstance(value, dict)
-                    else "http_error"
-                )
-                raise ApiError(response.status_code, code)
+                raise ApiError(response.status_code, response_code(value))
             return value
 
     async def artifact(self, artifact_id: str, max_bytes: int) -> bytes:
@@ -55,7 +58,18 @@ class ControlClient:
         size = 0
         async with self.client.stream("GET", f"v1/artifacts/{artifact_id}/content") as response:
             if response.status_code != 200:
-                raise ApiError(response.status_code, "artifact_unavailable")
+                # Preserve explicit API diagnostics; a 5xx/auth failure does not
+                # establish that the assigned evidence is missing.
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > self.max_bytes:
+                        raise ApiError(response.status_code, "http_error")
+                    chunks.append(chunk)
+                try:
+                    code = response_code(json.loads(b"".join(chunks)))
+                except ValueError:
+                    code = "http_error"
+                raise ApiError(response.status_code, code)
             async for chunk in response.aiter_bytes():
                 size += len(chunk)
                 if size > max_bytes:
