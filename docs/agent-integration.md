@@ -6,7 +6,7 @@
 
 接入方向已确定为 [统一 Agent 协议](agent-protocol.md)：由外部接入端实现一致的生命周期接口，Eyes 维护统一客户端。2026-10-10 已实现 `agent_http` Runner 客户端、能力发现/兼容校验和持久化参考 HTTP 服务，见[统一运行时接入](agent-http-runtime.md)。下文仍保留既有 HTTP/Python 使用方式；旧目标不自动迁移。真实 MewCode HTTP 基本闭环已验收，3/3 执行/评分通过，见[实际记录](agent-http-validation.md)。
 
-当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的宿主机 Runner。Deta 与 Zeta 的接入组件保留在 integrations 中，当前 Windows 环境的重新接入与双 Agent 并发验收仍待完成。2026-10-10 已补齐真实 MewCode 统一 HTTP 基本闭环；Runner 整体重启及网络/数据库故障恢复仍待验收；下文的通用协议示例不代表运行成功。Windows Python 基础闭环见 [MewCode 验证记录](mewcode-validation.md)。
+当前源码提供通用 HTTP 接入、本地 Python 接入、独立执行与评分进程、SDK 采集，以及通过认证 API 领取、续租和上报的宿主机 Runner。Deta 与 MewCode 的接入组件保留在 integrations 中，当前 Windows 环境的双 Agent 并发验收仍待完成。2026-10-10 已补齐真实 MewCode 统一 HTTP 基本闭环；Runner 整体重启及网络/数据库故障恢复仍待验收；下文的通用协议示例不代表运行成功。Windows Python 基础闭环见 [MewCode 验证记录](mewcode-validation.md)。
 
 ## 1. 启动宿主机 Runner
 

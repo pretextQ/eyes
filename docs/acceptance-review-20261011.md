@@ -62,7 +62,7 @@ MewCode 明确 cancellation=false/resources=false，拒绝端点 422 已运行�
 - `src/eyes/contracts/base.py:36` 普通 Contract 必填 schema_version；`server/api/middleware.py:29` 显式兼容头与管理员截止双条件；`server/config.py:36` 截止上限固定 2026-11-01T00:00Z（北京时间 08:00）。版本错误、未知字段仍拒绝。
 - `contracts/agent_protocol.py:37` 独立 Message 必填 protocol_version；Git 对比确认外部模型及 agent-protocol-v1.schema.json 没随后三次提交改变。普通窗口不能补 Agent 版本。
 - `contracts/base.py:55/:64` 只在持久化读取/指定迁移边界复制补普通版本，不改非版本值；`runner/outbox.py:39/:163` 持久化发送投影与新入队严格校验区分。`cli/main.py:27` 提供 migrate-schema，不覆盖原文件，JSONL 逐行整体校验。
-- 3aa7e50 同步 Web 实验/批次/目标/评分器/resolve/比较的顶层及嵌套版本，CLI、Runner、SDK、规则评分、Deta/Zeta/MewCode 构造和发布脚本；JSONL 原任务已有显式版本，未改评测用例。
+- 3aa7e50 同步 Web 实验/批次/目标/评分器/resolve/比较的顶层及嵌套版本，CLI、Runner、SDK、规则评分、Deta/MewCode 构造和发布脚本；JSONL 原任务已有显式版本，未改评测用例。
 - `server/scheduling/service.py`、`evaluation/service.py:126` 和核对领取对历史 Target/Scorer 出站投影；发布/实验摘要不在存储中重写。版本任务无新数据库结构迁移；桥接/评分器代码改变须发布新摘要，不冒充旧冻结插件。
 
 真实 API 记录支持旧请求和显式副本的同键规范化摘要一致；6 份原完成 journal 本来含版本，其严格 API 的网络补传不是“真正缺字段材料”验证。新 Supervisor 配旧 Worker/SDK/冻结评分器、旧 Runner 完整组合均有运行证据，不能推广到旧插件直接加载新严格 SDK 或外部 exporter。副本前后原结果/清单/评分相同；未调用创建报告接口，本轮也未改历史报告，但没有全面报告数据库前后摘要核验材料。
