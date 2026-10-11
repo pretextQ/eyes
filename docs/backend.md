@@ -17,7 +17,7 @@
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
 
-当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行/评分/证据基础闭环。安全恢复指定必需项及评分读取的 API 中断、数据库 503、鉴权与租约故障已有真实子集证据，见 [Runner 可靠性验收](runner-reliability-20261011.md)。同一 Agent 两版本的无变化报告、历史选择与 CLI 门槛通过核对，见 [部署与回归验收](deployment-regression-20261011.md)。双 Agent、完整故障/权限矩阵、真实改善/退化、完整部署和含完整证据的备份恢复仍保留 [开发计划](PLAN.md)。
+当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行/评分/证据基础闭环。安全恢复指定必需项及评分读取的 API 中断、数据库 503、鉴权与租约故障已有真实子集证据，见 [Runner 可靠性验收](runner-reliability-20261011.md)。同一 Agent 两版本无变化回归已验证，真实改善/退化仍阻塞。完整真实证据恢复、干净控制 Compose、新环境 HTTP 和本轮具名权限请求已通过相应范围；双 Agent、观测正向、完整故障/权限矩阵和长期运行仍待验证，详见 [独立验收](acceptance-followup-20261011.md) 与 [开发计划](PLAN.md)。
 
 ## 本机运行
 

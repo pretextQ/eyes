@@ -4,6 +4,10 @@
 
 状态含义：**已实现**表示找到对应代码；**部分实现**表示设计中仍有实现缺口；**未实现**表示已明确保留为计划且未找到运行时实现；**无法确认**表示缺少足够运行证据。功能实现与里程碑验收分别判断，静态核对不能证明可靠性或容量。优先级 P1 为首版闭环/可信度阻塞，P2 为发布验收，P3 为后续扩展。
 
+## 最新独立验收结论
+
+2026-10-11 对 `d5adbc9` 的源码、提交及私有原始材料复核：真实版本候选检查已完成，改善/退化仍阻塞；干净部署和本轮权限范围通过；有界读取/评分测量通过，长期运行整体部分通过。131 份权限响应与矩阵逐项对应、8 份下载重新计算大小/摘要一致、优化后 18 个原始评分 completed/pass；本次没有重跑业务或长期负载，M3/M4 不升级。方法、证据和剩余条件见 [后续三轮独立验收](acceptance-followup-20261011.md)。
+
 ### 历史轮次摘要
 
 下述原审查与可靠性轮次按时间保留，当前汇总见后面的“下一阶段顺序”和能力/里程碑表；其中“本轮”仅指各自记录对应轮次。
@@ -43,7 +47,7 @@
 | 固定回归报告、Web 与 CLI 门槛 | 已实现，部分真实验收 | `server/comparison/service.py`、`contracts/comparison.py`、`cli/main.py`、`frontend/src/components/ComparisonCreate.tsx` | 同一 Agent 两个不同真实版本均 3/3，通过无变化报告、默认/显式评分、引用/分母、旧报告及 gate 0/1/2/3；真实改善/退化仍缺证据 |
 | 多 Agent 批次 | 已实现 | `server/experiments/batches.py`、`contracts/work.py`、0004、`frontend/src/pages/Batches.tsx` | 原子分组、成员独立执行、派生状态与取消；不同任务集不合并质量通过率 |
 | 被动观测与流程图 | 已实现 | `server/observation/`、`contracts/observation.py`、0003、`frontend/src/pages/Observation.tsx` | 当前 Windows 环境的 exporter 接入及离线补传仍需验收；exporter 不在本仓库源码中，当前外部实现未重新审查 |
-| Compose、审计、实验证据保留与备份恢复 | 已实现，完整真实材料恢复通过本轮范围 | `deploy/compose.yaml`、`server/operations/service.py`、`server/operations/backup.py` | 47 ready 产物及完整事件/清单/评分/报告/unknown 占额已在独立空目标恢复并核对；服务用户权限交接后 audit/HTTP 通过；干净 Compose、其他生命周期分支及容量另待验收 |
+| Compose、审计、实验证据保留与备份恢复 | 已实现，完整真实材料恢复及干净控制部署通过已覆盖范围 | `deploy/compose.yaml`、`server/operations/service.py`、`server/operations/backup.py` | 47 ready 产物及完整事件/清单/评分/报告/unknown 占额恢复通过；随后干净 Compose、新环境 HTTP 与具名权限验收通过；其他生命周期分支、观测正向及长期运行仍待验证 |
 | BUG-001～004 | 已实现，指定行为验收通过 | Outbox 单项退避/孤立文件隔离、`LocalArtifactStore.check_ready`、Web 显式 ScoreRun 选择 | 独立真实故障、浏览器和持久化材料已核实，见 [Runner 可靠性](runner-reliability-20261011.md)；完整故障矩阵另列 |
 | nginx 安全头与比较选项缓存 | 已修复，定向真实验收通过 | `frontend/nginx.conf`、`pages/Experiments.tsx`、`pages/Batches.tsx` | nginx 1.30.5 实际 HTTP 200/304/404；普通/批次创建后比较选项及时更新，见 [部署验收](deployment-regression-20261011.md) |
 
@@ -99,6 +103,8 @@
 已有四项修复、真实版本回归与完整备份恢复保留原计划。2026-10-11 前一任务完成第 2 项实现，真实故障验收阻塞；本任务只推进第 3 项，未扩展其他功能，未改写已有历史实验、摘要或评分数据。完整旧客户端/重传验收仍待真实环境完成。
 
 ## 证据入口
+
+- [后续三轮独立验收](acceptance-followup-20261011.md)：直接核对原始权限响应、下载字节摘要、评分及短时采样；区分版本验收阻塞、部署范围通过和容量部分通过。
 
 - [容量与持续运行测量](capacity-validation-20261011.md)：环境/有限负载、真实重评分前后、读取/锁/数据库/循环/资源实测、模型预算和长期观测边界；修复 `70c4330` 已推送。
 

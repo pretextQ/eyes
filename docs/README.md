@@ -11,9 +11,10 @@
 | BUG-001～004 | 单项上传退避、孤立文件隔离、readiness 发布探测及 Web 历史评分选择行为条件通过 | [修复记录](bug-fix-plan.md) |
 | nginx 与比较选项缓存 | HTML/assets 安全头经真实 HTTP 验证；普通/批次创建的新实验及时进入比较选项 | [部署与回归验收](deployment-regression-20261011.md) |
 | 同一 Agent 不同版本回归 | 原样 MewCode `9282caa` / `3f10408` 各 3/3 执行和评分通过，正反向均无变化；历史选择、引用、分母、旧报告和 CLI 0/1/2/3 已核对 | [真实版本结果](deployment-regression-20261011.md#同一真实-agent-的不同版本) |
+| 干净部署与权限 | 冻结依赖构建、完整控制 Compose、新环境 HTTP 三任务闭环和 131 份具名权限请求通过本轮范围；观测正向和其他接入/权限组合仍缺材料 | [部署与权限](clean-deployment-permissions-20261011.md) |
 | 完整证据备份恢复 | 47 ready 产物及事件/清单/评分/报告/unknown 占额在独立空目标恢复；全行摘要、字节、引用及服务用户权限复验通过本轮范围 | [恢复与发布风险核查](backup-release-review-20261011.md) |
 | 有界容量与持续运行 | 真实证据重评分和读取、报告锁竞争、心跳/资源短时采集已有结果；补槽等待已最小修复。执行容量、大报告/积压/慢盘、24 小时和多日活跃窗口仍待验证 | [环境、实测和限制](capacity-validation-20261011.md) |
-| M3 / M4 剩余门槛 | M3 仍缺真实改善和退化；干净部署、完整权限/故障与生命周期矩阵、容量及长期运行仍未全面验收 | [下一阶段](PLAN.md#下一阶段顺序) |
+| M3 / M4 剩余门槛 | M3 真实改善/退化当前阻塞；干净部署已通过本轮范围，观测正向、第二个 Agent、剩余权限/故障与生命周期组合、执行容量及长期运行仍待验证 | [下一阶段](PLAN.md#下一阶段顺序) |
 
 实验 completed 表示调度结束，取消事实由用例/尝试及 cancelled_runs 展示；实验级取消请求的持久审计仍是独立设计缺口。CLI 1/2 的本轮真实条件来自排队取消，不是版本质量退化。首轮源码遮蔽运行保留并排除版本验收，详情见部署与回归记录。M0～M4 均未宣称全面通过。
 
@@ -30,6 +31,7 @@
 | 使用 Web、历史评分与固定报告 | [前端](frontend.md)、[平台与 CLI](platform.md) |
 | 创建批次与被动观测 | [多 Agent 批次](multi-agent-batches.md)、[观测](observation.md) |
 | 阅读原前三个任务的历史审查 | [验收审查](acceptance-review-20261011.md) |
+| 阅读后续三轮的独立复核 | [最新验收结论与证据](acceptance-followup-20261011.md) |
 | 查询语言无关契约 | [控制契约 Schema](control-contracts-v1.schema.json)、[Agent 协议 Schema](agent-protocol-v1.schema.json) |
 
 当前开发宿主机为 Windows / PowerShell，API 与 Runner 在本机 Docker Linux 容器运行。具体接入与本机重启参考 [MewCode 说明](../integrations/mewcode/README.md)。原始载荷、凭据、数据库、组件日志和私有产物留在忽略目录；公开文档只记录必要版本、方法与结论。
