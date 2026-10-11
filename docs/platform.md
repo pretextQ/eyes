@@ -1,6 +1,6 @@
 # 回归、证据与运维
 
-校准日期：2026-10-09。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 已是 `0005_reconciliation`。公开 API、开发者 CLI、本地运维 CLI 和 Web 固定回归报告均已有实现；Web 支持显式选择历史评分，行为验收尚未完成。Python 真实接入已有记录，HTTP 仍待验收。当前 Windows 环境的完整运维验收仍待完成，当前进度见 [开发计划](PLAN.md)。
+校准日期：2026-10-09。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 已是 `0005_reconciliation`。公开 API、开发者 CLI、本地运维 CLI 和 Web 固定回归报告均已有实现；Web 显式选择历史评分的 BUG-004 行为条件已核实，见 [Runner 可靠性验收](runner-reliability-20261011.md#bug-001004)。Python 真实接入已有记录，统一 HTTP 基本闭环见开发计划。当前 Windows 环境的完整运维验收仍待完成，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 
