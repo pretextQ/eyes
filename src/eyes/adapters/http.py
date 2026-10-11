@@ -135,6 +135,7 @@ class HttpAdapter:
         if status == 202:
             if not self.operation_id or not self.config.reconcile_url:
                 return ExecutionResult(
+                    schema_version="1.0",
                     status="unknown",
                     error="remote operation accepted without a usable reconciliation endpoint",
                     remote_operation_id=self.operation_id,
@@ -157,6 +158,7 @@ class HttpAdapter:
             if not isinstance(output, dict):
                 raise ValueError("HTTP output must be a JSON object")
             result = ExecutionResult(
+                schema_version="1.0",
                 status="succeeded",
                 output=output,
                 cleanup_status="pending",

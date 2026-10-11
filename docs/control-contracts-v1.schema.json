@@ -1,0 +1,2215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:eyes:control-contracts:1.0",
+  "$defs": {
+    "AgentArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "name",
+        "media_type",
+        "size_bytes",
+        "sha256"
+      ],
+      "title": "AgentArtifact",
+      "type": "object"
+    },
+    "AgentEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "collecting",
+            "sealed",
+            "partial",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "dropped_events": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dropped Events"
+        },
+        "details": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "status",
+        "dropped_events"
+      ],
+      "title": "AgentEvidence",
+      "type": "object"
+    },
+    "AgentProblem": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[a-z][a-z0-9_]{0,99}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "AgentProblem",
+      "type": "object"
+    },
+    "AgentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "timed_out",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payload"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentProblem"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stopped_confirmed": {
+          "title": "Stopped Confirmed",
+          "type": "boolean"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Completed At"
+        },
+        "cleanup_status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "unknown"
+          ],
+          "title": "Cleanup Status",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/AgentEvidence"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/AgentArtifact"
+          },
+          "maxItems": 100,
+          "title": "Artifacts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run_id",
+        "status",
+        "output",
+        "error",
+        "stopped_confirmed",
+        "completed_at",
+        "cleanup_status",
+        "evidence"
+      ],
+      "title": "AgentResult",
+      "type": "object"
+    },
+    "AgentRun": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RunState"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run_id",
+        "task_id",
+        "attempt_id",
+        "status",
+        "revision",
+        "observed_at",
+        "result"
+      ],
+      "title": "AgentRun",
+      "type": "object"
+    },
+    "ArtifactMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "media_type": {
+          "default": "application/octet-stream",
+          "maxLength": 120,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "size",
+        "sha256"
+      ],
+      "title": "ArtifactMetadata",
+      "type": "object"
+    },
+    "CaseDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "case_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "input": {
+          "$ref": "#/$defs/Payload"
+        },
+        "expectations": {
+          "$ref": "#/$defs/Payload"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Tags",
+          "type": "array"
+        },
+        "environment": {
+          "$ref": "#/$defs/Payload"
+        },
+        "artifact_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Artifact Requirements",
+          "type": "array"
+        },
+        "preparation_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preparation Version"
+        },
+        "environment_limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Environment Limitations",
+          "type": "array"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/Payload"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "case_id",
+        "input"
+      ],
+      "title": "CaseDefinition",
+      "type": "object"
+    },
+    "ClaimedWork": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "work_item_id": {
+          "format": "uuid",
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "execute",
+            "score"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "lease_expires_at": {
+          "format": "date-time",
+          "title": "Lease Expires At",
+          "type": "string"
+        },
+        "lease_seconds": {
+          "minimum": 1,
+          "title": "Lease Seconds",
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "schema_version",
+        "work_item_id",
+        "kind",
+        "lease_token",
+        "lease_expires_at",
+        "lease_seconds",
+        "payload"
+      ],
+      "title": "ClaimedWork",
+      "type": "object"
+    },
+    "ComparisonCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "baseline_id": {
+          "format": "uuid",
+          "title": "Baseline Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "format": "uuid",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "scorer_pairs": {
+          "items": {
+            "$ref": "#/$defs/ScorerPair"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Scorer Pairs",
+          "type": "array"
+        },
+        "baseline_score_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100000,
+          "title": "Baseline Score Ids",
+          "type": "array"
+        },
+        "candidate_score_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100000,
+          "title": "Candidate Score Ids",
+          "type": "array"
+        },
+        "gate": {
+          "$ref": "#/$defs/GatePolicy"
+        }
+      },
+      "required": [
+        "schema_version",
+        "baseline_id",
+        "candidate_id",
+        "scorer_pairs"
+      ],
+      "title": "ComparisonCreate",
+      "type": "object"
+    },
+    "DatasetImport": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "jsonl": {
+          "minLength": 1,
+          "title": "Jsonl",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "jsonl"
+      ],
+      "title": "DatasetImport",
+      "type": "object"
+    },
+    "EventBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ExecutionEvent"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "events"
+      ],
+      "title": "EventBatch",
+      "type": "object"
+    },
+    "EvidenceClose": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "sealed",
+            "partial",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "dropped_events": {
+          "minimum": 0,
+          "title": "Dropped Events",
+          "type": "integer"
+        },
+        "details": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "dropped_events"
+      ],
+      "title": "EvidenceClose",
+      "type": "object"
+    },
+    "EvidenceView": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "manifest_id": {
+          "format": "uuid",
+          "title": "Manifest Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "sealed",
+            "partial",
+            "unavailable",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "references": {
+          "items": {
+            "type": "string"
+          },
+          "title": "References",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/Payload"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/Payload"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "dropped_events": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dropped Events"
+        }
+      },
+      "required": [
+        "schema_version",
+        "manifest_id",
+        "status",
+        "references",
+        "events",
+        "artifacts",
+        "dropped_events"
+      ],
+      "title": "EvidenceView",
+      "type": "object"
+    },
+    "ExecutionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "producer_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Producer Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "span_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Span Id",
+          "type": "string"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{16}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Span Id"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "runner",
+            "sdk",
+            "target_trace"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "linked_trace_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Linked Trace Ids",
+          "type": "array"
+        },
+        "data": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "schema_version",
+        "event_id",
+        "producer_id",
+        "attempt_id",
+        "trace_id",
+        "span_id",
+        "sequence",
+        "occurred_at",
+        "type",
+        "source"
+      ],
+      "title": "ExecutionEvent",
+      "type": "object"
+    },
+    "ExecutionInput": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "experiment_id": {
+          "format": "uuid",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "case_run_id": {
+          "format": "uuid",
+          "title": "Case Run Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "deadline": {
+          "format": "date-time",
+          "title": "Deadline",
+          "type": "string"
+        },
+        "traceparent": {
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-01$",
+          "title": "Traceparent",
+          "type": "string"
+        },
+        "input": {
+          "$ref": "#/$defs/Payload"
+        },
+        "environment": {
+          "$ref": "#/$defs/Payload"
+        },
+        "artifact_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Artifact Requirements",
+          "type": "array"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetPublish"
+        }
+      },
+      "required": [
+        "schema_version",
+        "experiment_id",
+        "case_run_id",
+        "attempt_id",
+        "idempotency_key",
+        "deadline",
+        "traceparent",
+        "input",
+        "environment",
+        "target"
+      ],
+      "title": "ExecutionInput",
+      "type": "object"
+    },
+    "ExecutionProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "preparing",
+            "running"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "remote_operation_id": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remote Operation Id"
+        }
+      },
+      "required": [
+        "schema_version",
+        "state"
+      ],
+      "title": "ExecutionProgress",
+      "type": "object"
+    },
+    "ExecutionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "timed_out",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "error": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "remote_operation_id": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remote Operation Id"
+        },
+        "stopped_confirmed": {
+          "default": false,
+          "title": "Stopped Confirmed",
+          "type": "boolean"
+        },
+        "cleanup_status": {
+          "enum": [
+            "pending",
+            "succeeded",
+            "failed",
+            "unknown"
+          ],
+          "title": "Cleanup Status",
+          "type": "string"
+        },
+        "cleanup_error": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cleanup Error"
+        },
+        "evidence_status": {
+          "enum": [
+            "sealed",
+            "partial",
+            "unavailable"
+          ],
+          "title": "Evidence Status",
+          "type": "string"
+        },
+        "dropped_events": {
+          "minimum": 0,
+          "title": "Dropped Events",
+          "type": "integer"
+        },
+        "evidence_details": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "cleanup_status",
+        "evidence_status",
+        "dropped_events"
+      ],
+      "title": "ExecutionResult",
+      "type": "object"
+    },
+    "ExecutionSubmission": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/ExecutionResult"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "lease_token",
+        "result"
+      ],
+      "title": "ExecutionSubmission",
+      "type": "object"
+    },
+    "ExperimentBatchCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "experiments": {
+          "items": {
+            "$ref": "#/$defs/ExperimentCreate"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Experiments",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "experiments"
+      ],
+      "title": "ExperimentBatchCreate",
+      "type": "object"
+    },
+    "ExperimentCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "target_version_id": {
+          "format": "uuid",
+          "title": "Target Version Id",
+          "type": "string"
+        },
+        "dataset_version_id": {
+          "format": "uuid",
+          "title": "Dataset Version Id",
+          "type": "string"
+        },
+        "scorer_version_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Scorer Version Ids",
+          "type": "array"
+        },
+        "concurrency": {
+          "default": 1,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Concurrency",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "repetitions": {
+          "default": 1,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Repetitions",
+          "type": "integer"
+        },
+        "evidence_wait_seconds": {
+          "default": 60,
+          "maximum": 86400,
+          "minimum": 0,
+          "title": "Evidence Wait Seconds",
+          "type": "integer"
+        },
+        "attempt_selection": {
+          "const": "first_success",
+          "default": "first_success",
+          "title": "Attempt Selection",
+          "type": "string"
+        },
+        "parent_experiment_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Experiment Id"
+        }
+      },
+      "required": [
+        "schema_version",
+        "target_version_id",
+        "dataset_version_id",
+        "scorer_version_ids"
+      ],
+      "title": "ExperimentCreate",
+      "type": "object"
+    },
+    "GatePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "max_regressions": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Max Regressions",
+          "type": "integer"
+        },
+        "min_comparable_coverage": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Comparable Coverage",
+          "type": "number"
+        },
+        "min_candidate_pass_rate": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Candidate Pass Rate",
+          "type": "number"
+        },
+        "min_execution_success_rate": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Execution Success Rate",
+          "type": "number"
+        },
+        "numeric_tolerance": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Numeric Tolerance",
+          "type": "number"
+        }
+      },
+      "required": [
+        "schema_version"
+      ],
+      "title": "GatePolicy",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LeaseRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "lease_token"
+      ],
+      "title": "LeaseRequest",
+      "type": "object"
+    },
+    "ObservationBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "session_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "agent": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Agent",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "capture_body": {
+          "default": false,
+          "title": "Capture Body",
+          "type": "boolean"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ObservationEvent"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "run_id",
+        "session_id",
+        "agent",
+        "model",
+        "events"
+      ],
+      "title": "ObservationBatch",
+      "type": "object"
+    },
+    "ObservationEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "run_start",
+            "run_end",
+            "turn_start",
+            "turn_end",
+            "input",
+            "message_end",
+            "tool_start",
+            "tool_end",
+            "model_start",
+            "model_end",
+            "model_input",
+            "compaction_start",
+            "compaction_end"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "turn": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Turn"
+        },
+        "tool_call_id": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Call Id"
+        },
+        "trace_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Id"
+        },
+        "span_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{16}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Span Id"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{16}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Span Id"
+        },
+        "data": {
+          "$ref": "#/$defs/Payload"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "event_id",
+        "sequence",
+        "occurred_at",
+        "type"
+      ],
+      "title": "ObservationEvent",
+      "type": "object"
+    },
+    "ObservationSourceCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name"
+      ],
+      "title": "ObservationSourceCreate",
+      "type": "object"
+    },
+    "Payload": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "ProgressSubmission": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "progress": {
+          "$ref": "#/$defs/ExecutionProgress"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "lease_token",
+        "progress"
+      ],
+      "title": "ProgressSubmission",
+      "type": "object"
+    },
+    "ReconciliationAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "work_item_id": {
+          "format": "uuid",
+          "title": "Work Item Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "lease_expires_at": {
+          "format": "date-time",
+          "title": "Lease Expires At",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "case_run_id": {
+          "format": "uuid",
+          "title": "Case Run Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "remote_operation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remote Operation Id"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetPublish"
+        }
+      },
+      "required": [
+        "schema_version",
+        "work_item_id",
+        "lease_token",
+        "lease_expires_at",
+        "attempt_id",
+        "case_run_id",
+        "idempotency_key",
+        "remote_operation_id",
+        "target"
+      ],
+      "title": "ReconciliationAssignment",
+      "type": "object"
+    },
+    "ReconciliationClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id"
+      ],
+      "title": "ReconciliationClaim",
+      "type": "object"
+    },
+    "ReconciliationSubmission": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentRun"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "diagnostic": {
+          "enum": [
+            "query_failed",
+            "capability_mismatch",
+            "snapshot_received"
+          ],
+          "title": "Diagnostic",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "lease_token",
+        "diagnostic"
+      ],
+      "title": "ReconciliationSubmission",
+      "type": "object"
+    },
+    "Resolution": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "timed_out"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "stopped_confirmed": {
+          "const": true,
+          "title": "Stopped Confirmed",
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "reason",
+        "stopped_confirmed"
+      ],
+      "title": "Resolution",
+      "type": "object"
+    },
+    "RunState": {
+      "enum": [
+        "accepted",
+        "queued",
+        "running",
+        "cancel_requested",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "timed_out",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "RunnerRegister": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "supported_schema_versions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Supported Schema Versions",
+          "type": "array"
+        },
+        "adapters": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Adapters",
+          "type": "array"
+        },
+        "scorers": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Scorers",
+          "type": "array"
+        },
+        "python_agents": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TargetCapabilities"
+          },
+          "maxProperties": 1000,
+          "title": "Python Agents",
+          "type": "object"
+        },
+        "http_origins": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Http Origins",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "supported_schema_versions"
+      ],
+      "title": "RunnerRegister",
+      "type": "object"
+    },
+    "ScoreAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "score_run_id": {
+          "format": "uuid",
+          "title": "Score Run Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "manifest_id": {
+          "format": "uuid",
+          "title": "Manifest Id",
+          "type": "string"
+        },
+        "deadline": {
+          "format": "date-time",
+          "title": "Deadline",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "score_run_id",
+        "attempt_id",
+        "manifest_id",
+        "deadline"
+      ],
+      "title": "ScoreAssignment",
+      "type": "object"
+    },
+    "ScoreInput": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "score_run_id": {
+          "format": "uuid",
+          "title": "Score Run Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "case": {
+          "$ref": "#/$defs/Payload"
+        },
+        "result": {
+          "$ref": "#/$defs/Payload"
+        },
+        "evidence": {
+          "$ref": "#/$defs/EvidenceView"
+        },
+        "scorer": {
+          "$ref": "#/$defs/ScorerPublish"
+        },
+        "traceparent": {
+          "title": "Traceparent",
+          "type": "string"
+        },
+        "execution_trace_id": {
+          "title": "Execution Trace Id",
+          "type": "string"
+        },
+        "execution_root_span_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Root Span Id"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        }
+      },
+      "required": [
+        "schema_version",
+        "score_run_id",
+        "attempt_id",
+        "case",
+        "result",
+        "evidence",
+        "scorer",
+        "traceparent",
+        "execution_trace_id"
+      ],
+      "title": "ScoreInput",
+      "type": "object"
+    },
+    "ScoreOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "error",
+            "insufficient_evidence",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "verdict": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verdict"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "reason": {
+          "maxLength": 5000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "reason"
+      ],
+      "title": "ScoreOutput",
+      "type": "object"
+    },
+    "ScoreSemantics": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "minimum": {
+          "title": "Minimum",
+          "type": "number"
+        },
+        "maximum": {
+          "title": "Maximum",
+          "type": "number"
+        },
+        "direction": {
+          "enum": [
+            "higher",
+            "lower"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "threshold": {
+          "title": "Threshold",
+          "type": "number"
+        },
+        "aggregation": {
+          "const": "mean",
+          "default": "mean",
+          "title": "Aggregation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "minimum",
+        "maximum",
+        "direction",
+        "threshold"
+      ],
+      "title": "ScoreSemantics",
+      "type": "object"
+    },
+    "ScoreSubmission": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/ScoreOutput"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "lease_token",
+        "result"
+      ],
+      "title": "ScoreSubmission",
+      "type": "object"
+    },
+    "ScorerPair": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "baseline_id": {
+          "format": "uuid",
+          "title": "Baseline Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "format": "uuid",
+          "title": "Candidate Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "baseline_id",
+        "candidate_id"
+      ],
+      "title": "ScorerPair",
+      "type": "object"
+    },
+    "ScorerPublish": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "plugin": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Plugin",
+          "type": "string"
+        },
+        "implementation_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Implementation Digest",
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/$defs/Payload"
+        },
+        "secret_refs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Secret Refs",
+          "type": "object"
+        },
+        "required_evidence": {
+          "items": {
+            "enum": [
+              "input",
+              "output",
+              "events",
+              "artifacts",
+              "sealed"
+            ],
+            "type": "string"
+          },
+          "title": "Required Evidence",
+          "type": "array"
+        },
+        "numeric": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScoreSemantics"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeout_seconds": {
+          "default": 60,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "plugin",
+        "implementation_digest"
+      ],
+      "title": "ScorerPublish",
+      "type": "object"
+    },
+    "TargetCapabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "adapter": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Adapter",
+          "type": "string"
+        },
+        "session_isolation": {
+          "title": "Session Isolation",
+          "type": "boolean"
+        },
+        "environment_isolation": {
+          "title": "Environment Isolation",
+          "type": "boolean"
+        },
+        "cancellation": {
+          "default": false,
+          "title": "Cancellation",
+          "type": "boolean"
+        },
+        "idempotency": {
+          "default": false,
+          "title": "Idempotency",
+          "type": "boolean"
+        },
+        "reconciliation": {
+          "default": false,
+          "title": "Reconciliation",
+          "type": "boolean"
+        },
+        "observation": {
+          "items": {
+            "enum": [
+              "task",
+              "sdk",
+              "target_trace"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Observation",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "adapter",
+        "session_isolation",
+        "environment_isolation",
+        "observation"
+      ],
+      "title": "TargetCapabilities",
+      "type": "object"
+    },
+    "TargetPublish": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "external_version": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Version"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/TargetCapabilities"
+        },
+        "config": {
+          "$ref": "#/$defs/Payload"
+        },
+        "secret_refs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Secret Refs",
+          "type": "object"
+        },
+        "concurrency_limit": {
+          "default": 1,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Concurrency Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "capabilities"
+      ],
+      "title": "TargetPublish",
+      "type": "object"
+    },
+    "WorkClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "execute",
+            "score"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "kind"
+      ],
+      "title": "WorkClaim",
+      "type": "object"
+    }
+  },
+  "title": "Eyes control contracts 1.0"
+}

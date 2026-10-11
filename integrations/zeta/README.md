@@ -24,9 +24,11 @@ cp integrations/zeta/runner.example.toml data/zeta-integration/runner.toml
 
 ```json
 {
+  "schema_version": "1.0",
   "name": "Zeta read-only agent",
   "external_version": "<commit-and-source-digest>",
   "capabilities": {
+    "schema_version": "1.0",
     "adapter": "python",
     "session_isolation": true,
     "environment_isolation": true,

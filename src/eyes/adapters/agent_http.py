@@ -64,6 +64,7 @@ class AgentHttpConfig(BaseModel):
 
 def target_capabilities(discovery):
     return TargetCapabilities(
+        schema_version="1.0",
         adapter="agent_http",
         session_isolation=discovery.session_isolation,
         environment_isolation=discovery.environment_isolation,
@@ -358,6 +359,7 @@ class AgentHttpAdapter:
                 self.gaps.add("required artifact missing")
         evidence = result.evidence
         return ExecutionResult(
+            schema_version="1.0",
             status=result.status,
             output=result.output,
             error=result.error.message if result.error else None,
@@ -429,6 +431,7 @@ def main():
     if args.token_env:
         config["bearer_secret_ref"] = "agent_auth"
     target = TargetPublish(
+        schema_version="1.0",
         name=args.name,
         external_version=discovery.agent_version,
         capabilities=target_capabilities(discovery),

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import httpx
 
 from eyes.adapters.python import PythonAdapter
+from eyes.contracts.base import read_stored_contract
 from eyes.contracts.evidence import ArtifactMetadata, ExecutionEvent
 from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput
 from eyes.contracts.target import ExecutionInput, ExecutionResult
@@ -137,9 +138,9 @@ class RunnerService:
         gaps = 0
         for path in sorted((evidence / "events").glob("*.json")):
             try:
-                event = ExecutionEvent.model_validate_json(path.read_bytes()).model_dump(
-                    mode="json"
-                )
+                event = read_stored_contract(
+                    ExecutionEvent, json.loads(path.read_bytes()), source="runner_event_journal"
+                ).model_dump(mode="json")
                 if work["kind"] == "execute":
                     self.outbox.enqueue(
                         f"event-{event['event_id']}",
@@ -157,9 +158,11 @@ class RunnerService:
                 gaps += 1
         for path in sorted((evidence / "artifacts").glob("*/metadata.json")):
             try:
-                metadata = ArtifactMetadata.model_validate_json(path.read_bytes()).model_dump(
-                    mode="json"
-                )
+                metadata = read_stored_contract(
+                    ArtifactMetadata,
+                    json.loads(path.read_bytes()),
+                    source="runner_artifact_journal",
+                ).model_dump(mode="json")
                 content = path.with_name("content").read_bytes()
                 if (
                     len(content) != metadata["size"]
@@ -181,7 +184,7 @@ class RunnerService:
                 gaps += 1
         return gaps
 
-    def queue_completion(self, directory, work, body):
+    def queue_completion(self, directory, work, body, *, persisted=False):
         endpoint = "execution-result" if work["kind"] == "execute" else "score-result"
         self.outbox.enqueue(
             f"result-{work['work_item_id']}",
@@ -192,6 +195,7 @@ class RunnerService:
                 "body": body,
                 "journal_dir": str(directory),
             },
+            persisted=persisted,
         )
 
     def recover(self, restarting=True):
@@ -206,7 +210,10 @@ class RunnerService:
             if (directory / "result.json").exists() and not (directory / "ack.json").exists():
                 try:
                     self.queue_completion(
-                        directory, work, json.loads((directory / "result.json").read_bytes())
+                        directory,
+                        work,
+                        json.loads((directory / "result.json").read_bytes()),
+                        persisted=True,
                     )
                 except ValueError:
                     logger.warning("journal_waiting_for_outbox_space work=%s", work["work_item_id"])
@@ -348,6 +355,7 @@ class RunnerService:
             )
             if result is None:
                 result = ExecutionResult(
+                    schema_version="1.0",
                     status=reason if confirmed else "unknown",
                     stopped_confirmed=bool(confirmed),
                     error=None
@@ -362,6 +370,7 @@ class RunnerService:
             # binding can report its local exception as failed after group stop.
             known = not intended or bool(binding and binding.execution_scope == "process")
             result = ExecutionResult(
+                schema_version="1.0",
                 status="failed" if known else "unknown",
                 error=error_text(error, secrets.values()),
                 cleanup_status="unknown",
@@ -509,7 +518,9 @@ class RunnerService:
                 if lease.stop.is_set() or remaining(deadline) <= 0.02:
                     raise StopWork("score cancelled or timed out")
                 identifier = str(item["id"])
-                metadata = ArtifactMetadata.model_validate(item["metadata_content"])
+                metadata = read_stored_contract(
+                    ArtifactMetadata, item["metadata_content"], source="scoring_artifact_metadata"
+                )
                 content = await asyncio.wait_for(
                     self.client.artifact(identifier, self.config.max_artifact_bytes),
                     remaining(deadline),
@@ -539,9 +550,13 @@ class RunnerService:
             except WorkerError, TimeoutError, OSError:
                 pass
         except ApiError as error:
-            result = ScoreOutput(status="insufficient_evidence", reason=error_text(error))
+            result = ScoreOutput(
+                schema_version="1.0", status="insufficient_evidence", reason=error_text(error)
+            )
         except (WorkerError, StopWork, TimeoutError, OSError, ValueError, httpx.HTTPError) as error:
-            result = ScoreOutput(status="error", reason=error_text(error, secrets.values()))
+            result = ScoreOutput(
+                schema_version="1.0", status="error", reason=error_text(error, secrets.values())
+            )
         finally:
             if not await worker.stop():
                 write_json(
@@ -570,6 +585,7 @@ class RunnerService:
             if not (directory / "result.json").exists():
                 result = (
                     ExecutionResult(
+                        schema_version="1.0",
                         status="failed",
                         error="Runner preparation failed; inspect local configuration",
                         cleanup_status="unknown",
@@ -577,7 +593,11 @@ class RunnerService:
                         dropped_events=0,
                     )
                     if work["kind"] == "execute"
-                    else ScoreOutput(status="error", reason="Runner scoring configuration failed")
+                    else ScoreOutput(
+                        schema_version="1.0",
+                        status="error",
+                        reason="Runner scoring configuration failed",
+                    )
                 )
                 # If an exception escaped after intent, its journal determines the
                 # safe result; never classify an untracked execution as failed.

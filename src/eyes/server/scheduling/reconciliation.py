@@ -6,7 +6,8 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from sqlalchemy import select
 
 from eyes.contracts.agent_protocol import TERMINAL_STATES
-from eyes.contracts.target import Resolution
+from eyes.contracts.base import explicit_versions
+from eyes.contracts.target import Resolution, TargetPublish
 from eyes.server.domain import DomainError, digest, scoped
 from eyes.server.evidence.service import redact
 from eyes.server.scheduling import service
@@ -100,6 +101,7 @@ def claim(session, credential, request):
             )
             runner.last_seen_at = current
             return {
+                "schema_version": "1.0",
                 "work_item_id": work.id,
                 "lease_token": token,
                 "lease_expires_at": expires,
@@ -107,7 +109,7 @@ def claim(session, credential, request):
                 "case_run_id": work.case_run_id,
                 "idempotency_key": attempt.idempotency_key,
                 "remote_operation_id": attempt.remote_operation_id,
-                "target": target,
+                "target": explicit_versions(TargetPublish, target, source="reconciliation_target"),
             }
     return None
 
@@ -199,6 +201,7 @@ def submit(session, credential, work_id, request):
                 credential,
                 attempt.id,
                 Resolution(
+                    schema_version="1.0",
                     status=result.status,
                     reason="confirmed terminal outcome from original Agent operation",
                     stopped_confirmed=result.stopped_confirmed,

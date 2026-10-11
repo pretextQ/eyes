@@ -5,8 +5,16 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from eyes.contracts.base import explicit_versions
 from eyes.contracts.scorer import ScoreAssignment, ScoreOutput
-from eyes.contracts.target import ExecutionProgress, ExecutionResult, Resolution, http_origin
+from eyes.contracts.target import (
+    ExecutionProgress,
+    ExecutionResult,
+    Resolution,
+    TargetCapabilities,
+    TargetPublish,
+    http_origin,
+)
 from eyes.contracts.work import LeaseRequest, RunnerRegister, WorkClaim
 from eyes.server.config import Settings
 from eyes.server.domain import DomainError, digest, scoped
@@ -90,7 +98,9 @@ def reservations(session: Session, kind: str, **filters):
 
 
 def supports_target(capabilities: dict, target: dict) -> bool:
-    requested = target["capabilities"]
+    requested = explicit_versions(
+        TargetCapabilities, target["capabilities"], source="target_capabilities_snapshot"
+    )
     adapter = requested["adapter"]
     if adapter == "python":
         available = capabilities.get("python_agents", {}).get(target["config"].get("agent"))
@@ -267,7 +277,9 @@ def claim(session: Session, credential: Credential, request: WorkClaim, settings
                     "input": case.content["input"],
                     "environment": case.content["environment"],
                     "artifact_requirements": case.content["artifact_requirements"],
-                    "target": target.content,
+                    "target": explicit_versions(
+                        TargetPublish, target.content, source="target_snapshot"
+                    ),
                 }
             else:
                 score = session.get(ScoreRun, work.score_run_id)
@@ -276,6 +288,7 @@ def claim(session: Session, credential: Credential, request: WorkClaim, settings
                     seconds=session.get(ScorerVersion, score.scorer_id).content["timeout_seconds"]
                 )
                 payload = ScoreAssignment(
+                    schema_version="1.0",
                     score_run_id=score.id,
                     attempt_id=score.attempt_id,
                     manifest_id=score.manifest_id,
@@ -466,7 +479,10 @@ def finish(
             )
         if score.cancel_requested_at:
             result = ScoreOutput(
-                status="skipped", reason="scoring cancelled", completed_at=result.completed_at
+                schema_version="1.0",
+                status="skipped",
+                reason="scoring cancelled",
+                completed_at=result.completed_at,
             )
         evaluation.complete(session, score, result, store)
         work.status = "completed"
@@ -518,9 +534,9 @@ def cancel(session: Session, project_id: UUID, experiment_id: UUID):
         score = session.get(ScoreRun, work.score_run_id)
         if work.status == "queued":
             score.status = "skipped"
-            score.result = ScoreOutput(status="skipped", reason="experiment cancelled").model_dump(
-                mode="json"
-            )
+            score.result = ScoreOutput(
+                schema_version="1.0", status="skipped", reason="experiment cancelled"
+            ).model_dump(mode="json")
             work.status = "cancelled"
         elif score.cancel_requested_at is None:
             score.cancel_requested_at = now()
@@ -611,7 +627,9 @@ def sweep(session: Session, settings: Settings):
             if expired or submission_deadline <= current_time or cancelled:
                 score.status = "error"
                 score.result = ScoreOutput(
-                    status="error", reason="score lease lost or submission window ended"
+                    schema_version="1.0",
+                    status="error",
+                    reason="score lease lost or submission window ended",
                 ).model_dump(mode="json")
                 work.status = "completed"
                 work.reserved = False

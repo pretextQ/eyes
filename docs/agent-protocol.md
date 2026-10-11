@@ -30,6 +30,8 @@ uv run python -m eyes.contracts.agent_protocol > docs/agent-protocol-v1.schema.j
 
 每个 JSON 消息显式携带 `protocol_version: "1.0"`，缺失版本不自动按当前版本解释。不认识的字段或版本明确拒绝；不静默忽略并继续运行。未来兼容性变化需发布明确的新契约，不能只修改某个接入端的私有行为。
 
+2026-10-11 普通 Eyes 控制契约也已要求显式 `schema_version`，但它与本文 `protocol_version` 属于不同边界。普通请求的短期兼容窗口不会补 Agent 消息的 protocol_version，不能把 schema_version 写进 AgentTask/AgentRun 替代它。本协议模型及外部 Schema 没有改变；内部请求生产端、旧 outbox 和历史读取规则见[版本迁移说明](contract-version-migration.md)。
+
 ## 3. HTTP 绑定
 
 基地址由接入方配置，以下路径相对于基地址。JSON 使用 UTF-8，普通响应为 `application/json`；所有成功响应中的身份必须与请求一致。标准响应不返回实现栈、凭据或完整请求头。
@@ -105,7 +107,7 @@ v1 先固定 HTTP+JSON，不同时引入 stdio、WebSocket 和多种推送路径
 
 `AgentResult` 将 `output`、执行错误、`stopped_confirmed`、`completed_at`、清理状态、证据状态及产物分别表达。四种明确终态都要求已确认停止和完成时间。unknown 不填写已确认的结果完成时间，但可以单独报告“已知停止、结果仍丢失”；停止事实不等同于业务成功事实。
 
-对于停止未确认的 unknown，Eyes 必须保留相应执行额度。已确认停止但结果未知的情况，只能通过明确核对路径释放额度，同时保留未知结果，不能伪造成功或失败。当前客户端支持有效租约内查询，控制端尚无重启后的自动核对；内部 unknown 继续保留额度，需要显式核对。
+对于停止未确认的 unknown，Eyes 必须保留相应执行额度。已确认停止但结果未知的情况，只能通过明确核对路径判断额度，不能伪造成功或失败。2026-10-11 控制端已为统一 agent_http 实现重启后的独立只读核对，当前规则只有可信终态才释放原额度，unknown 即使报告停止仍保留；能力不足仍需人工核对。详见[恢复边界](unknown-recovery.md)，真实崩溃/网络故障仍待验证。
 
 明确终态的结果不可覆盖，重新执行生成新 attempt/run。unknown 后若获得可靠事实，可以提升 revision 转为确定终态，并保留原观察与核对来源。证据后补不能覆盖旧结果引用的证据或旧评分，应走补充证据及显式重新评分流程。
 

@@ -104,6 +104,7 @@ async def execute(request, context):
         )
         context.artifact(".zeta/trajectory.json", name="zeta-trajectory.json")
     return ExecutionResult(
+        schema_version="1.0",
         status=status,
         output={
             "answer": answer,

@@ -3,6 +3,7 @@ import type { RecordBase, Summary } from "../types";
 export type Classification =
   "regressed" | "improved" | "unchanged" | "inconclusive";
 export interface GatePolicy {
+  schema_version: "1.0";
   max_regressions: number;
   min_comparable_coverage: number;
   min_candidate_pass_rate: number;
@@ -13,7 +14,11 @@ export interface ComparisonRequest {
   schema_version: "1.0";
   baseline_id: string;
   candidate_id: string;
-  scorer_pairs: { baseline_id: string; candidate_id: string }[];
+  scorer_pairs: {
+    schema_version: "1.0";
+    baseline_id: string;
+    candidate_id: string;
+  }[];
   gate: GatePolicy;
   baseline_score_ids?: string[];
   candidate_score_ids?: string[];

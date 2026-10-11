@@ -377,6 +377,7 @@ function BatchView({ id }: { id: string }) {
 
 type Draft = ExperimentRequest & { key: string };
 const newDraft = (): Draft => ({
+  schema_version: "1.0",
   key: crypto.randomUUID(),
   target_version_id: "",
   dataset_version_id: "",
@@ -437,8 +438,10 @@ function CreateBatch({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     const body = {
+      schema_version: "1.0",
       name: name.trim(),
       experiments: members.map((member) => ({
+        schema_version: "1.0",
         target_version_id: member.target_version_id,
         dataset_version_id: member.dataset_version_id,
         scorer_version_ids: member.scorer_version_ids,

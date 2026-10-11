@@ -24,7 +24,7 @@ class ComparisonCreate(Contract):
     scorer_pairs: list[ScorerPair] = Field(min_length=1, max_length=20)
     baseline_score_ids: list[UUID] = Field(default_factory=list, max_length=100000)
     candidate_score_ids: list[UUID] = Field(default_factory=list, max_length=100000)
-    gate: GatePolicy = Field(default_factory=GatePolicy)
+    gate: GatePolicy = Field(default_factory=lambda: GatePolicy(schema_version="1.0"))
 
     @model_validator(mode="after")
     def distinct(self):

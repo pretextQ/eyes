@@ -66,6 +66,8 @@ flowchart LR
 
 控制后端管理版本、实验、调度状态、评分和证据；Runner 主动通过认证 API 领取、续租并上报，不直接连接数据库。目标 Agent 负责自己的推理和工具执行，适配器负责转换接入接口。
 
+普通控制契约现在要求显式 `schema_version: "1.0"`，包括 JSONL 行及已提供的嵌套契约；统一 Agent 的 `protocol_version` 保持独立。旧客户端、请求文件、outbox 和历史快照的升级边界见[版本迁移说明](docs/contract-version-migration.md)。
+
 主要技术：Python 3.14+、FastAPI、Pydantic、SQLAlchemy、PostgreSQL、OpenTelemetry，以及 React、TypeScript、Vite 和 shadcn/Base UI。
 
 ## 当前验证进度

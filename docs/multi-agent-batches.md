@@ -31,6 +31,7 @@
 新增接口，原单 Agent 实验接口及 Runner 协议保持兼容：
 
 - `POST /v1/experiment-batches`：需要 manage 令牌和 `Idempotency-Key`。
+- 批次顶层和 experiments 中的每个 ExperimentCreate 都要求显式 `schema_version: "1.0"`；旧请求的有限窗口及文件迁移见[版本迁移](contract-version-migration.md)。
 - `GET /v1/experiment-batches?limit=50&offset=0`：分页读取批次摘要。
 - `GET /v1/experiment-batches/{id}`：批次快照、各成员实验与任务进度。
 - `POST /v1/experiment-batches/{id}/cancel`：请求取消全部成员。

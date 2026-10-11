@@ -33,19 +33,27 @@ class Check(BaseModel):
 def score(request, context):
     rules = request.scorer.config.get("checks")
     if not isinstance(rules, list) or not 1 <= len(rules) <= 100:
-        return ScoreOutput(status="error", reason="rules scorer requires 1..100 checks")
+        return ScoreOutput(
+            schema_version="1.0", status="error", reason="rules scorer requires 1..100 checks"
+        )
     outcomes, refs, reasons = [], set(), []
     for index, rule in enumerate(rules):
         try:
             rule = Check.model_validate(rule).model_dump(exclude_unset=True)
         except ValidationError:
-            return ScoreOutput(status="error", reason=f"check {index} has invalid configuration")
+            return ScoreOutput(
+                schema_version="1.0",
+                status="error",
+                reason=f"check {index} has invalid configuration",
+            )
         kind = rule.get("kind", "equals")
         if kind in {"equals", "contains"}:
             output = request.result.get("output")
             if output is None:
                 return ScoreOutput(
-                    status="insufficient_evidence", reason="execution output is missing"
+                    schema_version="1.0",
+                    status="insufficient_evidence",
+                    reason="execution output is missing",
                 )
             try:
                 actual = pointer(output, rule.get("pointer", ""))
@@ -56,6 +64,7 @@ def score(request, context):
                 )
             except KeyError, IndexError, TypeError, ValueError:
                 return ScoreOutput(
+                    schema_version="1.0",
                     status="insufficient_evidence",
                     reason=f"check {index} has a missing output or expectation path",
                 )
@@ -66,11 +75,15 @@ def score(request, context):
                     passed = expected in actual
                 except TypeError:
                     return ScoreOutput(
-                        status="error", reason=f"check {index} contains operands are incompatible"
+                        schema_version="1.0",
+                        status="error",
+                        reason=f"check {index} contains operands are incompatible",
                     )
             else:
                 return ScoreOutput(
-                    status="error", reason=f"check {index} contains requires text or a collection"
+                    schema_version="1.0",
+                    status="error",
+                    reason=f"check {index} contains requires text or a collection",
                 )
             refs.add(f"attempt:{request.attempt_id}:output")
             if "value" not in rule:
@@ -80,6 +93,7 @@ def score(request, context):
         elif kind == "event":
             if request.evidence.status != "sealed" or request.evidence.dropped_events != 0:
                 return ScoreOutput(
+                    schema_version="1.0",
                     status="insufficient_evidence",
                     reason="event presence scoring requires sealed, loss-free evidence",
                 )
@@ -94,11 +108,14 @@ def score(request, context):
             refs.update(ref for ref in request.evidence.references if ref.startswith("event:"))
             if not refs:
                 return ScoreOutput(
-                    status="insufficient_evidence", reason="no event references are available"
+                    schema_version="1.0",
+                    status="insufficient_evidence",
+                    reason="no event references are available",
                 )
         elif kind == "artifact":
             if request.evidence.status != "sealed":
                 return ScoreOutput(
+                    schema_version="1.0",
                     status="insufficient_evidence",
                     reason="artifact presence scoring requires sealed evidence",
                 )
@@ -119,12 +136,15 @@ def score(request, context):
                 )
                 if not observed_missing:
                     return ScoreOutput(
+                        schema_version="1.0",
                         status="insufficient_evidence",
                         reason="artifact was neither captured nor observed missing",
                     )
                 refs.update(ref for ref in request.evidence.references if ref.startswith("event:"))
         else:
-            return ScoreOutput(status="error", reason=f"unsupported rule kind: {kind}")
+            return ScoreOutput(
+                schema_version="1.0", status="error", reason=f"unsupported rule kind: {kind}"
+            )
         outcomes.append(passed)
         reasons.append(f"check {index + 1}: {'pass' if passed else 'fail'}")
     value = None
@@ -141,6 +161,7 @@ def score(request, context):
             else value <= semantics.threshold
         )
     return ScoreOutput(
+        schema_version="1.0",
         status="completed",
         verdict="pass" if passed else "fail",
         value=value,

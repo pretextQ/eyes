@@ -44,6 +44,8 @@ Runner 在私有 `state_dir/reconciliation/<query-id>/` 原子保存 assignment.
 
 控制协议 1.0 增加新契约/端点，旧业务领取、心跳、结果、人工 resolve 请求形状不变；外部 Agent 协议和 Schema 不变。旧 Runner 不会主动调用新接口，未知工作等待新 Runner 或人工核对。新 Runner 配旧 API 的核对端点不可用，无法自动恢复，部署应先升级控制端。本任务不推进普通契约显式版本迁移。
 
+随后独立任务已落实普通契约的显式 schema_version 要求：最新源码的升级顺序、旧请求窗口及 outbox 读取规则见[版本迁移说明](contract-version-migration.md)。这不改变本页未知结果、查询身份与额度规则，也不补 AgentRun 的 protocol_version。
+
 降级到 0004 会丢弃查询租约/退避字段，必须先停止所有新 Runner 查询与 API/Scheduler 写入，再执行 downgrade；原不可变 resolutions 保留。降级不会撤销已经确认的终态或恢复已释放额度。恢复旧版整体运行数据应使用升级前备份，不能用降级迁移推测远端事实。
 
 ## 人工恢复操作

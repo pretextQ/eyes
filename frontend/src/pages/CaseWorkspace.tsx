@@ -730,6 +730,7 @@ function ResolveDialog({ id, onClose }: { id: string; onClose: () => void }) {
       )
         throw new Error("成功输出必须为 JSON 对象。");
       await api!.post(`/v1/attempts/${id}/resolve`, {
+        schema_version: "1.0",
         status,
         reason: reason.trim(),
         stopped_confirmed: true,

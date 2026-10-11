@@ -121,6 +121,7 @@ async def execute(request, context):
     context.artifact(".deta/spans.jsonl", name="deta-spans.jsonl")
     completed = result.status == "completed"
     return ExecutionResult(
+        schema_version="1.0",
         status="succeeded" if completed else "failed",
         output={
             "answer": result.answer,

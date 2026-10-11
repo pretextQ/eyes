@@ -8,9 +8,11 @@ from uuid import UUID
 
 import httpx
 
+from eyes.contracts.base import explicit_versions
 from eyes.contracts.comparison import ComparisonCreate
-from eyes.contracts.dataset import DatasetImport
-from eyes.contracts.target import http_origin
+from eyes.contracts.dataset import CaseDefinition, DatasetImport
+from eyes.contracts.scorer import ScorerPublish
+from eyes.contracts.target import TargetPublish, http_origin
 from eyes.contracts.work import ExperimentBatchCreate, ExperimentCreate
 
 EXIT = {"pass": 0, "fail": 1, "inconclusive": 2}
@@ -28,6 +30,14 @@ def main():
     parser.add_argument("--token-env", default="EYES_TOKEN")
     parser.add_argument("--timeout", type=float, default=30)
     commands = parser.add_subparsers(dest="command", required=True)
+    migration = commands.add_parser("migrate-schema", help="write an explicitly versioned copy")
+    migration.add_argument(
+        "--kind",
+        choices=["target", "scorer", "create", "create-batch", "compare", "dataset"],
+        required=True,
+    )
+    migration.add_argument("--file", type=Path, required=True)
+    migration.add_argument("--output", type=Path, required=True)
     dataset = commands.add_parser("import-dataset")
     dataset.add_argument("--name", required=True)
     dataset.add_argument("--file", type=Path, required=True)
@@ -61,6 +71,29 @@ def main():
         listing.add_argument("--offset", type=int, default=0)
     args = parser.parse_args()
     try:
+        if args.command == "migrate-schema":
+            model = {
+                "target": TargetPublish,
+                "scorer": ScorerPublish,
+                "create": ExperimentCreate,
+                "create-batch": ExperimentBatchCreate,
+                "compare": ComparisonCreate,
+                "dataset": CaseDefinition,
+            }[args.kind]
+            source = args.file.read_text(encoding="utf-8")
+            values = source.splitlines() if args.kind == "dataset" else [source]
+            migrated = [
+                explicit_versions(model, json.loads(value), source="cli_file_migration")
+                for value in values
+            ]
+            if not migrated:
+                raise ValueError("empty source")
+            content = "\n".join(json.dumps(value, ensure_ascii=False) for value in migrated) + "\n"
+            # Never overwrite the source, an existing request, or a published record.
+            with args.output.open("x", encoding="utf-8") as output:
+                output.write(content)
+            print(json.dumps({"schema_version": "1.0", "migrated_records": len(migrated)}))
+            return
         http_origin(args.url)
         if args.timeout <= 0:
             raise ValueError("timeout must be positive")
@@ -77,9 +110,11 @@ def main():
             path, method, payload, headers = "v1/experiments", "GET", None, {}
             if args.command == "import-dataset":
                 path, method = "v1/datasets/import", "POST"
-                payload = DatasetImport(name=args.name, jsonl=args.file.read_text()).model_dump(
-                    mode="json"
-                )
+                payload = DatasetImport(
+                    schema_version="1.0",
+                    name=args.name,
+                    jsonl=args.file.read_text(encoding="utf-8"),
+                ).model_dump(mode="json")
             elif args.command in {"create", "create-batch", "compare"}:
                 model, path = {
                     "create": (ExperimentCreate, "v1/experiments"),

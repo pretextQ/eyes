@@ -410,6 +410,7 @@ function PublishDialog({
       } else if (kind === "targets") {
         path = "/v1/targets";
         const content: TargetContent = {
+          schema_version: "1.0",
           name: name.trim(),
           external_version: externalVersion.trim() || null,
           config: parseObject(config, "接入配置"),
@@ -419,12 +420,13 @@ function PublishDialog({
           >,
           concurrency_limit: limit,
           capabilities: {
+            schema_version: "1.0",
             adapter: adapter.trim(),
             ...capabilities,
             observation,
           },
         };
-        body = { schema_version: "1.0", ...content };
+        body = content;
       } else {
         path = "/v1/scorers";
         body = {
@@ -435,7 +437,13 @@ function PublishDialog({
           config: parseObject(config, "评分配置"),
           secret_refs: parseObject(secrets, "密钥引用"),
           required_evidence: requiredEvidence,
-          numeric: JSON.parse(numeric),
+          numeric:
+            numeric.trim() === "null"
+              ? null
+              : {
+                  schema_version: "1.0",
+                  ...parseObject(numeric, "数值语义"),
+                },
           timeout_seconds: timeout,
         };
       }
@@ -494,7 +502,9 @@ function PublishDialog({
             </label>
             <Field
               label="JSONL 内容"
-              hint="必需 case_id、input 对象；可选 expectations、tags、environment、artifact_requirements。空行、重复标识和非空 steps 会拒绝整个版本。"
+              hint={
+                '每行必需 schema_version: "1.0"、case_id、input 对象；可选 expectations、tags、environment、artifact_requirements。空行、重复标识和非空 steps 会拒绝整个版本。'
+              }
             >
               <textarea
                 required

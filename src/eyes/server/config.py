@@ -1,9 +1,11 @@
 from pathlib import Path
 from uuid import UUID
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AwareDatetime, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
+
+from eyes.contracts.base import LEGACY_SCHEMA_SUNSET
 
 
 class Settings(BaseSettings):
@@ -29,6 +31,14 @@ class Settings(BaseSettings):
     trace_console_export: bool = False
     local_observation: bool = False
     local_observation_project_id: UUID | None = None
+    legacy_schema_until: AwareDatetime | None = None
+
+    @field_validator("legacy_schema_until")
+    @classmethod
+    def bounded_compatibility(cls, value):
+        if value is not None and value > LEGACY_SCHEMA_SUNSET:
+            raise ValueError("legacy schema compatibility must end by 2026-11-01T00:00:00Z")
+        return value
 
     @field_validator("database_url")
     @classmethod

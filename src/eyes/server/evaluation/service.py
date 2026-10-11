@@ -5,7 +5,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from eyes.contracts.scorer import ScoreOutput
+from eyes.contracts.base import explicit_versions
+from eyes.contracts.scorer import ScoreOutput, ScorerPublish
 from eyes.server.domain import DomainError
 from eyes.server.evidence.service import ArtifactStore, view
 from eyes.server.storage.models import (
@@ -77,11 +78,14 @@ def enqueue(
         if skipped:
             score.status = "skipped"
             score.result = ScoreOutput(
-                status="skipped", reason="experiment cancelled while waiting for evidence"
+                schema_version="1.0",
+                status="skipped",
+                reason="experiment cancelled while waiting for evidence",
             ).model_dump(mode="json")
         elif missing:
             score.status = "insufficient_evidence"
             score.result = ScoreOutput(
+                schema_version="1.0",
                 status="insufficient_evidence",
                 reason="missing required evidence: " + ", ".join(sorted(missing)),
             ).model_dump(mode="json")
@@ -119,7 +123,11 @@ def score_input(session: Session, score: ScoreRun):
         "case": session.get(CaseVersion, run.case_version_id).content,
         "result": manifest.content["result"],
         "evidence": view(session, manifest),
-        "scorer": session.get(ScorerVersion, score.scorer_id).content,
+        "scorer": explicit_versions(
+            ScorerPublish,
+            session.get(ScorerVersion, score.scorer_id).content,
+            source="score_snapshot",
+        ),
         "traceparent": f"00-{score.trace_id}-{score.root_span_id}-01",
         "execution_trace_id": attempt.trace_id,
         "execution_root_span_id": attempt.root_span_id,

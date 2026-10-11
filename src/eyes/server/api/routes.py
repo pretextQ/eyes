@@ -8,25 +8,24 @@ from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
 from eyes.contracts.comparison import ComparisonCreate
-from eyes.contracts.dataset import CaseDefinition, DatasetImport
-from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose, ExecutionEvent
-from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput, ScorerPublish
+from eyes.contracts.dataset import DatasetImport
+from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose
+from eyes.contracts.schema import public_models
+from eyes.contracts.scorer import ScorerPublish
 from eyes.contracts.target import (
-    ExecutionInput,
-    ExecutionProgress,
-    ExecutionResult,
     Resolution,
     TargetPublish,
 )
 from eyes.contracts.work import (
-    ClaimedWork,
+    ExecutionSubmission,
     ExperimentBatchCreate,
     ExperimentCreate,
     LeaseRequest,
-    ReconciliationAssignment,
+    ProgressSubmission,
     ReconciliationClaim,
     ReconciliationSubmission,
     RunnerRegister,
+    ScoreSubmission,
     WorkClaim,
 )
 from eyes.server.api.dependencies import ArtifactReader, Database, Manager, Reader, RunnerIdentity
@@ -243,18 +242,6 @@ def reconciliation_result(
     runner: RunnerIdentity,
 ):
     return reconciliation.submit(session, runner, work_id, body)
-
-
-class ProgressSubmission(LeaseRequest):
-    progress: ExecutionProgress
-
-
-class ExecutionSubmission(LeaseRequest):
-    result: ExecutionResult
-
-
-class ScoreSubmission(LeaseRequest):
-    result: ScoreOutput
 
 
 @router.post("/work/{work_id}/score-input")
@@ -488,24 +475,7 @@ def operations(session: Database, user: Reader):
 
 @router.get("/contracts")
 def contract_schemas(user: Reader):
-    models = [
-        ComparisonCreate,
-        EvidenceClose,
-        TargetPublish,
-        ExecutionInput,
-        ExecutionResult,
-        CaseDefinition,
-        ScorerPublish,
-        ScoreInput,
-        ScoreAssignment,
-        ScoreOutput,
-        ExecutionEvent,
-        ArtifactMetadata,
-        ClaimedWork,
-        ReconciliationAssignment,
-        ReconciliationClaim,
-        ReconciliationSubmission,
-    ]
+    models = public_models()
     return {
         "schema_version": "1.0",
         "schemas": {model.__name__: model.model_json_schema() for model in models},

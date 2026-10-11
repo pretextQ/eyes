@@ -103,7 +103,7 @@ uv run eyes-admin revoke-token --credential-id <凭据UUID>
 
 ## 公共契约
 
-模型位于 `src/eyes/contracts/`，不依赖后端 ORM。协议当前为 `1.0`，缺省 `schema_version` 按 `1.0` 解析，其他版本返回校验错误；未知字段被拒绝。`GET /v1/contracts` 返回四类协议的 JSON Schema。
+模型位于 `src/eyes/contracts/`，不依赖后端 ORM。普通公共契约要求显式 `schema_version: "1.0"`（包括已提供的嵌套 Contract）；缺失、不支持版本和未知字段默认拒绝。`GET /v1/contracts` 与 `/openapi.json` 返回严格 JSON Schema；可导出[静态控制契约](control-contracts-v1.schema.json)。短期显式兼容窗口、历史读取与升级顺序见[版本迁移说明](contract-version-migration.md)。统一 Agent 消息仍使用独立必填的 `protocol_version`。
 
 目标版本的 `name` 是项目内稳定的目标名称。发布相同名称会建立新 TargetVersion，并关联同一 Target 容量池。它们共享固定的 `concurrency_limit`；此轮没有容量编辑接口，改变同名目标的容量会返回 409。接入方须用同一名称表示同一目标。并发大于 1 要同时声明会话和环境隔离。
 

@@ -570,6 +570,7 @@ export function CreateExperiment({
     setBusy(true);
     setError(null);
     const body: ExperimentRequest = {
+      schema_version: "1.0",
       target_version_id: target,
       dataset_version_id: dataset,
       scorer_version_ids: selected,

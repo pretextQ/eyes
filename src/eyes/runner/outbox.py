@@ -9,10 +9,36 @@ from uuid import uuid4
 
 import httpx
 
+from eyes.contracts.base import explicit_versions
+from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose
+from eyes.contracts.work import ExecutionSubmission, ReconciliationSubmission, ScoreSubmission
 from eyes.runner.client import ApiError
 from eyes.runner.files import atomic_write, json_bytes, write_json
 
 logger = logging.getLogger(__name__)
+
+
+def job_contract(job):
+    if job["kind"] == "artifact":
+        return ArtifactMetadata, "metadata"
+    if job["kind"] == "events":
+        return EventBatch, "body"
+    if job["kind"] == "evidence_close":
+        return EvidenceClose, "body"
+    if job["kind"] == "completion":
+        model = {
+            "execution-result": ExecutionSubmission,
+            "score-result": ScoreSubmission,
+            "reconciliation-result": ReconciliationSubmission,
+        }.get(job["path"].rsplit("/", 1)[-1])
+        if model is not None:
+            return model, "body"
+    raise ValueError("unknown durable submission contract")
+
+
+def stored_job(job):
+    model, field = job_contract(job)
+    return {**job, field: explicit_versions(model, job[field], source="runner_outbox")}
 
 
 class Outbox:
@@ -65,10 +91,15 @@ class Outbox:
     def size(self):
         return sum(path.stat().st_size for path in self.directory.rglob("*") if path.is_file())
 
-    def enqueue(self, key, job, content=None):
+    def enqueue(self, key, job, content=None, *, persisted=False):
         path = self.pending / f"{key}.json"
         if path.exists() or (self.rejected / path.name).exists():
             return
+        if persisted:
+            job = stored_job(job)
+        else:
+            model, field = job_contract(job)
+            model.model_validate(job[field])
         job = {**job, "key": key}
         data = json_bytes(job)
         content_path = self.pending / f"{key}.content"
@@ -126,19 +157,33 @@ class Outbox:
                     files.append((path, job))
             sent = 0
             for path, job in files[:limit]:
+                # Validate stored bytes before transport; transport/response errors
+                # must not be mistaken for a malformed journal.
+                try:
+                    wire = stored_job(job)
+                except ValueError:
+                    job["rejection"] = {"status": 422, "code": "invalid_stored_contract"}
+                    write_json(self.rejected / path.name, job)
+                    content_path = self.pending / f"{job['key']}.content"
+                    if content_path.exists():
+                        shutil.move(content_path, self.rejected / content_path.name)
+                    path.unlink()
+                    self.retries.pop(job["key"], None)
+                    logger.error("outbox_invalid_stored_contract key=%s", job["key"])
+                    continue
                 try:
                     if job["kind"] == "artifact":
                         response = await client.request(
                             "POST",
                             f"v1/attempts/{job['attempt_id']}/artifacts",
-                            json=job["metadata"],
+                            json=wire["metadata"],
                         )
                         content = (self.pending / f"{job['key']}.content").read_bytes()
                         await client.request(
                             "PUT", f"v1/artifacts/{response['id']}/content", content=content
                         )
                     else:
-                        await client.request("POST", job["path"], json=job["body"])
+                        await client.request("POST", job["path"], json=wire["body"])
                     if job["kind"] == "completion":
                         write_json(Path(job["journal_dir"]) / "ack.json", {"acknowledged": True})
                     if job["kind"] == "evidence_close":

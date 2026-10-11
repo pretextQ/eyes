@@ -26,6 +26,7 @@ def execution_result(value):
     if not isinstance(value, dict):
         raise ValueError("Agent must return a JSON object or ExecutionResult")
     return ExecutionResult(
+        schema_version="1.0",
         status="succeeded",
         output=value,
         cleanup_status="pending",
@@ -40,6 +41,7 @@ class PythonAdapter:
 
     def capabilities(self):
         return TargetCapabilities(
+            schema_version="1.0",
             adapter="python",
             session_isolation=self.binding.session_isolation,
             environment_isolation=self.binding.environment_isolation,

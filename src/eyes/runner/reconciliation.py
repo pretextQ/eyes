@@ -56,7 +56,7 @@ def recover(service):
             continue
         try:
             job = json.loads(path.read_bytes())
-            service.outbox.enqueue(f"query-{path.parent.name}", job)
+            service.outbox.enqueue(f"query-{path.parent.name}", job, persisted=True)
         except ValueError, OSError:
             logger.warning("query_journal_waiting query=%s", path.parent.name)
 

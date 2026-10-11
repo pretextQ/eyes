@@ -110,6 +110,7 @@ class Recorder(SpanProcessor):
             sequence = self.sequence
             self.sequence += 1
         event = ExecutionEvent(
+            schema_version="1.0",
             event_id=uuid4(),
             producer_id=self.producer,
             attempt_id=self.attempt_id,

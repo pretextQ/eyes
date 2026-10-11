@@ -57,6 +57,7 @@ def score(request, context):
         )
         refs = [r for r in request.evidence.references if r.startswith("event:")]
         return ScoreOutput(
+            schema_version="1.0",
             status="completed" if missing and refs else "insufficient_evidence",
             verdict="fail" if missing and refs else None,
             reason=f"Required code artifact missing: {name}",
@@ -88,6 +89,7 @@ def score(request, context):
             outcomes.append({"pass": False, "error": type(error).__name__})
     passed = all(item["pass"] for item in outcomes)
     return ScoreOutput(
+        schema_version="1.0",
         status="completed",
         verdict="pass" if passed else "fail",
         reason=json.dumps(

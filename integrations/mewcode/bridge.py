@@ -96,6 +96,7 @@ async def execute(request, context):
     path.write_text(json.dumps(redact(trajectory, [key]), ensure_ascii=False), encoding="utf-8")
     context.artifact(".mewcode/eyes-trajectory.json", name="mewcode-trajectory.json")
     return ExecutionResult(
+        schema_version="1.0",
         status="succeeded" if completed and not errors else "failed",
         output=output,
         error="; ".join(errors) or (None if completed else "Agent loop did not complete"),

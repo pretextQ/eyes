@@ -17,9 +17,11 @@ def main():
     parameters = json.loads((STATE / "parameters.json").read_text())
     version = versions["mewcode"]
     target = {
+        "schema_version": "1.0",
         "name": "MewCode coding agent",
         "external_version": version["commit"] + ":sha256:" + version["source_sha256"],
         "capabilities": {
+            "schema_version": "1.0",
             "adapter": "python",
             "session_isolation": True,
             "environment_isolation": False,
@@ -33,6 +35,7 @@ def main():
         "concurrency_limit": 1,
     }
     scorer = {
+        "schema_version": "1.0",
         "name": "Existing frozen-code acceptance",
         "plugin": "deta_code",
         "implementation_digest": plugins["scorers"]["deta_code"]["implementation_digest"],
@@ -63,6 +66,7 @@ def main():
                 "dataset": post(
                     "/v1/datasets/import",
                     {
+                        "schema_version": "1.0",
                         "name": "Existing Deta coding smoke (3 tasks)",
                         "jsonl": (ROOT / "integrations/deta/coding-smoke.jsonl").read_text(
                             encoding="utf-8"
@@ -74,6 +78,7 @@ def main():
         experiment = post(
             "/v1/experiments",
             {
+                "schema_version": "1.0",
                 "target_version_id": catalog["target"]["id"],
                 "dataset_version_id": catalog["dataset"]["id"],
                 "scorer_version_ids": [catalog["scorer"]["id"]],

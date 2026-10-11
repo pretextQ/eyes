@@ -12,10 +12,12 @@ export interface Version extends RecordBase {
 }
 export type CatalogKind = "targets" | "datasets" | "scorers";
 export interface TargetContent {
+  schema_version: "1.0";
   name: string;
   external_version: string | null;
   concurrency_limit: number;
   capabilities: {
+    schema_version: "1.0";
     adapter: string;
     observation: string[];
     session_isolation: boolean;
@@ -28,12 +30,14 @@ export interface TargetContent {
   secret_refs: Record<string, string>;
 }
 export interface ScorerContent {
+  schema_version: "1.0";
   name: string;
   plugin: string;
   implementation_digest: string;
   config: Payload;
   required_evidence: string[];
   numeric: {
+    schema_version: "1.0";
     minimum: number;
     maximum: number;
     threshold: number;
@@ -41,6 +45,7 @@ export interface ScorerContent {
   } | null;
 }
 export interface ExperimentRequest {
+  schema_version: "1.0";
   target_version_id: string;
   dataset_version_id: string;
   scorer_version_ids: string[];

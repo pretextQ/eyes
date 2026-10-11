@@ -6,7 +6,14 @@ from pydantic import AwareDatetime, Field, field_validator
 
 from eyes.contracts.agent_protocol import AgentRun
 from eyes.contracts.base import Contract, Payload
-from eyes.contracts.target import TargetCapabilities, TargetPublish, http_origin
+from eyes.contracts.scorer import ScoreOutput
+from eyes.contracts.target import (
+    ExecutionProgress,
+    ExecutionResult,
+    TargetCapabilities,
+    TargetPublish,
+    http_origin,
+)
 
 
 class ExperimentCreate(Contract):
@@ -63,6 +70,18 @@ class WorkClaim(Contract):
 class LeaseRequest(Contract):
     runner_id: UUID
     lease_token: UUID
+
+
+class ProgressSubmission(LeaseRequest):
+    progress: ExecutionProgress
+
+
+class ExecutionSubmission(LeaseRequest):
+    result: ExecutionResult
+
+
+class ScoreSubmission(LeaseRequest):
+    result: ScoreOutput
 
 
 class ReconciliationClaim(Contract):

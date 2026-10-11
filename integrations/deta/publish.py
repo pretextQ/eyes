@@ -73,7 +73,7 @@ def main():
             {
                 "schema_version": "1.0",
                 "name": "Deta coding smoke v1 (3 tasks)",
-                "jsonl": Path(__file__).with_name("coding-smoke.jsonl").read_text(),
+                "jsonl": Path(__file__).with_name("coding-smoke.jsonl").read_text(encoding="utf-8"),
             },
         )
         experiment = post(

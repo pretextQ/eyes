@@ -4,6 +4,8 @@
 
 ## 升级与兼容
 
+2026-10-11 普通公共契约要求显式 schema_version；本仓库客户端已更新，历史记录不改写，旧 outbox 由新 Runner 按原身份做传输投影。公共旧请求只有在明确开启、有固定截止时间的窗口内并带兼容头才支持。先升级生产端再切换严格 API；完整顺序及未验证项见[版本迁移说明](contract-version-migration.md)，本任务不新增数据库迁移。
+
 ```sh
 uv sync --frozen
 uv run alembic upgrade head
@@ -24,14 +26,16 @@ uv run eyes-scheduler
 
 ```json
 {
+  "schema_version": "1.0",
   "baseline_id": "BASELINE_EXPERIMENT_UUID",
   "candidate_id": "CANDIDATE_EXPERIMENT_UUID",
   "scorer_pairs": [
-    {"baseline_id": "BASELINE_SCORER_UUID", "candidate_id": "CANDIDATE_SCORER_UUID"}
+    {"schema_version": "1.0", "baseline_id": "BASELINE_SCORER_UUID", "candidate_id": "CANDIDATE_SCORER_UUID"}
   ],
   "baseline_score_ids": [],
   "candidate_score_ids": [],
   "gate": {
+    "schema_version": "1.0",
     "max_regressions": 0,
     "min_comparable_coverage": 1,
     "min_candidate_pass_rate": 1,

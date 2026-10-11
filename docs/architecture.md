@@ -88,7 +88,7 @@ Experiment、CaseRun、Attempt 和 OTel trace 是不同概念。首版每个 Att
 
 ## 四份核心接入契约
 
-协议以 Pydantic 模型及其 JSON Schema 表达，并带 `schema_version`。当前公共 `Contract` 允许省略该字段并默认解析为 `1.0`，拒绝其他版本、未知字段及缺少的其他必需字段；严格拒绝缺失版本仍是开发规范中的待落实要求。独立的统一 Agent 协议使用必填 `protocol_version`，由新客户端严格校验。Runner 注册时协商协议版本和可执行能力。
+协议以 Pydantic 模型及其 JSON Schema 表达。普通公共 `Contract` 默认要求显式 `schema_version: "1.0"`，拒绝缺失、不支持版本及未知字段；固定截止、显式选择的过渡窗口和带来源的历史读取见[迁移说明](contract-version-migration.md)。独立的统一 Agent 协议使用必填 `protocol_version`，普通兼容窗口不补该字段。Runner 注册时协商协议版本和可执行能力。
 
 ### 目标适配器
 

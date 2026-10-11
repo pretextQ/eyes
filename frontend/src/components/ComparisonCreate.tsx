@@ -21,6 +21,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "./ui/field";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 const defaultGate: GatePolicy = {
+  schema_version: "1.0",
   max_regressions: 0,
   min_comparable_coverage: 1,
   min_candidate_pass_rate: 1,
@@ -28,7 +29,7 @@ const defaultGate: GatePolicy = {
   numeric_tolerance: 0,
 };
 const gateFields: {
-  key: keyof GatePolicy;
+  key: Exclude<keyof GatePolicy, "schema_version">;
   label: string;
   percent?: boolean;
   integer?: boolean;
@@ -267,7 +268,11 @@ function ReportSettings({
   const submitting = useRef(false);
   const selectedPairs = Object.entries(pairs)
     .filter(([, id]) => id)
-    .map(([id, other]) => ({ baseline_id: id, candidate_id: other }));
+    .map(([id, other]) => ({
+      schema_version: "1.0" as const,
+      baseline_id: id,
+      candidate_id: other,
+    }));
   const changed = selectedPairs.some(
     (p) =>
       baseline.snapshot.scorers.find((s) => s.id === p.baseline_id)?.digest !==
@@ -290,7 +295,7 @@ function ReportSettings({
       baseline_id: baseline.id,
       candidate_id: candidate.id,
       scorer_pairs: selectedPairs,
-      gate,
+      gate: { ...gate, schema_version: "1.0" },
       baseline_score_ids: baselineScores,
       candidate_score_ids: candidateScores,
     };
