@@ -180,6 +180,8 @@ uv run alembic current
 
 ### 部署与容量边界
 
+HTML/SPA 和 assets 的缓存 location 显式声明既有安全头，避免 nginx add_header 继承覆盖。2026-10-11 在 nginx 1.30.5 隔离部署通过真实 HTTP 验证，缓存、404 和代理行为保持，见[部署验收](deployment-regression-20261011.md#审查-1nginx-安全头)。
+
 Compose 包含 PostgreSQL、一次性迁移、API、Scheduler、Web 及可选维护进程。API/数据库仅映射本机；可通过 `EYES_API_PORT`、`EYES_POSTGRES_PORT`、`EYES_WEB_PORT` 改变宿主机端口，默认 8000/5432/8080。`EYES_CONTROL_IMAGE` 设置控制端共用镜像名。证据使用单机卷，未引入外部消息中间件。恢复、迁移和清理均有实际命令，不能据此宣称高可用。
 
 当前配置上限仍为 JSON 请求 8 MiB、单产物 32 MiB、评分输入 32 MiB、单实验最多 100000 个 CaseRun。回归报告读取所选两次实验的评分记录，审计/备份遍历完整记录和文件；大型数据集需要预留维护时间和内存。尚无真实 Agent 吞吐、并发故障恢复和容量实测，不提供未经测量的性能承诺。
