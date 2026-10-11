@@ -73,3 +73,11 @@ Runner 在私有 `state_dir/reconciliation/<query-id>/` 原子保存 assignment.
 上述故障项目均为**待验证/当前环境阻塞**，取消/资源正向能力仍需另一个真正支持这些能力的目标；不会因为 MewCode cancellation=false 而伪造停止验收。
 
 2026-10-11 验收审查补充：后续版本迁移任务已在独立 PostgreSQL 实际执行 0001～0005，并在真实历史冷态副本执行 0004→0005；迁移日志和副本前后原执行/清单/评分记录已核对，见[兼容验收](contract-compatibility-validation.md)及[本轮审查](acceptance-review-20261011.md)。因此实际升级不再完全缺证据，但这些操作没有运行活动未知任务的自动核对，不能替代上述故障矩阵。本轮 Docker Linux 引擎管道再次不可达，未启动或中断原服务，任务二结论为部分通过、真实安全恢复仍无法确认。此前环境检查作为历史记录保留。
+
+### 后续真实故障发现与修复（2026-10-11）
+
+独立 PostgreSQL 15.17/API 18056/真实 MewCode HTTP 19047 环境首次强杀整个 Runner 时，远端原运行为 running。租约扫描却连续事务失败：`ck_work_claimed_lease` 检查约束拒绝 claimed 状态提前清空 lease_token。位置为 `server/scheduling/service.py` 的 sweep/expired 分支：清空令牌后读取 CaseRun/其他记录触发 ORM autoflush，尚未同时完成状态转换。影响为活动 Runner 失联后不能进入 unknown、自动核对无法启动，P1。
+
+修复仅移除提前清空，并在无执行意图的安全结束分支将 status/reserved/token/expires 一并设置；有执行意图仍由 mark_unknown 同时转换并保留 reserved。没有修改数据库约束、协议或历史数据。相关文件 Ruff check/format 和字节编译通过；同一真实原 Attempt 随 Scheduler 重启转 unknown/reserved=true，随后真实查询失败仍保留额度，来源/退避持久化。原操作没有重跑。暂停 Agent 导致模型连接超时后，它保守返回 unknown，平台继续保留；可信终态与竞争/迟到的后续验证另行记录，不能从此分支推导终态验收通过。
+
+本轮 Docker Desktop 4.94.0/Engine 29.8.2 通过隐藏启动恢复，原容器保持停止，未重置/删除设置、镜像、卷或记录。私有部署/失败/API/工作记录在 `data/safety-acceptance-20261011/`，不提交。首次部署的安装目录权限失败及采集器早于 API 就绪查询的失败均保留，不计为产品运行成功。
