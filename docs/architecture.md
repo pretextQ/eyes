@@ -60,7 +60,7 @@ Web 与 CLI 使用同一套公开 API。业务规则不放在路由和前端中�
 | 前端 | React、TypeScript、Vite、shadcn/Base UI、Tailwind CSS 4 | 运行列表、执行详情和逐用例对比；组件选择已落地，见前端说明 |
 | 部署 | Docker Compose | 固定版本、数据卷、健康检查和迁移步骤；Runner 也可在宿主机独立运行 |
 
-当前项目保持 Python >=3.14。依赖锁定在 uv.lock；完整 Compose 部署及备份恢复需在当前 Windows 环境验收。当前迁移 head 为 `0005_reconciliation`。Windows/MewCode 记录使用 Linux API/Runner 与独立 PostgreSQL，不能作为原生 Windows API/Runner 或该环境完整 Compose 的验收；见 [MewCode 验证记录](mewcode-validation.md)。完整故障恢复与容量仍待验证。
+当前项目保持 Python >=3.14。依赖锁定在 uv.lock；完整 Compose 干净部署仍需在当前 Windows 环境验收，完整真实材料的隔离备份恢复已通过本轮范围，见[恢复与发布核查](backup-release-review-20261011.md)。当前迁移 head 为 `0005_reconciliation`。Windows/MewCode 记录使用 Linux API/Runner 与独立 PostgreSQL，不能作为原生 Windows API/Runner 或该环境完整 Compose 的验收；见 [MewCode 验证记录](mewcode-validation.md)。完整故障恢复与容量仍待验证。
 
 PostgreSQL 的 `SKIP LOCKED` 可用于多个消费者领取队列表中的工作；它只解决领取时的行锁竞争，并不自动提供租约、并发限额、公平性或外部执行幂等。[PostgreSQL SELECT 文档](https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE)
 
