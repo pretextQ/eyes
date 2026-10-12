@@ -23,8 +23,8 @@ Eyes 把测试集、Agent 执行、评分依据和过程证据关联起来，帮
 | ------------- | -------------------------------------------------------------- |
 | 自定义评测    | JSONL 测试集、版本化用例、规则评分和可信 Python 评分器         |
 | Agent 接入    | 统一协议 HTTP 客户端、通用 HTTP 与本地 Python 适配器，按能力和凭据匹配 Runner  |
-| 执行调度      | 独立执行与评分额度、租约和心跳、超时、取消、未知状态保留       |
-| 多 Agent 批次 | 一次创建多个独立实验，成员分别配置任务集、评分器与并发         |
+| 执行调度      | 独立执行与评分额度、租约和心跳、取消请求；未知状态保留额度，统一协议支持原操作只读核对 |
+| 多 Agent 批次 | 一次创建多个独立实验，成员分别配置任务集、评分器与并发；MewCode/trae 双目标实际并发已验证 |
 | 执行证据      | SDK 事件、trace/span 关联、产物上传与摘要校验、证据完整性标识  |
 | 独立评分      | 评分绑定固定证据清单，支持错误重试和重新评分，保留历史         |
 | 回归对比      | 逐用例可比性检查、改善/退化统计、固定报告及 CLI 质量门槛       |
@@ -72,17 +72,21 @@ flowchart LR
 
 ## 当前验证进度
 
-| 范围          | 已有证据                                                                                                    | 尚未覆盖                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| 统一 HTTP 接入 | 2026-10-10：真实 MewCode 经 agent_http，3/3 执行、3/3 独立评分、12/12 功能检查；60 条事件、8 份产物、认证/去重/终态重启核对 | 可选取消/资源正向路径、活动崩溃、第二个统一协议实现及容量 |
-| MewCode 评测  | 2026-10-09：3/3 执行成功、3/3 独立评分通过，共 12/12 项功能检查；3/3 sealed，53 条事件、6 份产物及 Web 核对 | 完整 MewCode 服务、复杂仓库任务、远端取消、重启恢复与容量 |
-| 多 Agent 执行 | 批次创建、成员实验与调度代码已实现 | 当前 Windows 环境的双 Agent 并发、中断、取消与故障恢复验收 |
-| 回归与部署    | 固定报告、证据跳转、CLI 门槛及备份恢复工具已实现                                        | 真实版本改善/退化、含完整事件和产物的恢复、生产容量       |
-| 本轮 Bug 修复 | 单项上传退避、孤立文件隔离、完整产物存储就绪检查、Web 历史评分选择已实现并通过相关静态检查/构建             | 故障注入及完整浏览器行为验收                              |
+状态更新至 **2026-10-12（Asia/Shanghai）**。实现、静态检查和真实运行验收分别记录；下表的通过均限于对应记录的环境与场景，M0～M4 尚未全部验收通过。
 
-MewCode 目前是 Eyes 的主要被测 Agent，用于验证平台能力。上述三任务结果是基础功能冒烟记录，不代表 MewCode 的完整编码能力或稳定性。
+| 范围 | 已有真实证据 | 剩余边界 |
+| --- | --- | --- |
+| Agent 基础闭环 | MewCode Python/统一 HTTP 与独立 trae HTTP 接入；最新两目标各 3/3 执行、3/3 独立评分通过，修正 trae 另完成 3/3；九项正常闭环共 15 份产物摘要匹配 | 复杂仓库任务、独立宿主机复现及完整能力矩阵 |
+| 双 Agent 并发与恢复 | 实际执行边界重叠约 6.38 秒；目标并发各 1、项目执行额度 2；成员准备失败隔离、批次取消、Runner 整体退出后的原键核对与重复上报已验证 | 故障批次原任务恢复成功后仍为 partial 证据、unknown 清理，未补齐有效评分；两个目标均未支持取消/资源正向能力 |
+| 被动观测 | trae 直接任务不经过实验或 Runner；3 个真实观测任务、100 事件，51 条离线事件持久补传一致；40 个权限请求、Web 展示和重启核对通过 | 强杀 exporter、缓冲满、磁盘故障、其他 exporter 及观测自动保留清理 |
+| 回归比较 | 同一 MewCode 的两个真实版本各 3/3 pass、正反向无变化；历史评分选择、证据引用、分母及 CLI 0/1/2/3 已验证 | 真实改善/退化仍缺合适的可比版本材料，当前阻塞 |
+| 部署与备份恢复 | 干净控制 Compose、迁移 0005、真实 HTTP 接入及 131 个权限请求通过；独立恢复 47 份 ready 产物、341 事件、86 清单、25 评分、17 报告和 2 个 unknown 占额工作 | 其他权限、生命周期及恢复分支；被动观测材料的备份恢复未在该轮覆盖 |
+| 按需运行与容量 | 已就绪组件启动、真实评分/读取、正常停止和重启后数据一致；有限读取并发及评分吞吐测量已有记录 | Runner 启动早期立即停止仍有限制；Agent 执行容量、大报告、慢盘和长期趋势未验证，24h 仅为未来可选验证 |
+| 已修复问题 | Runner 坏恢复载荷隔离、评分基础设施错误分类、BUG-001～004、nginx 安全头与比较缓存已有定向验收；Eyes 观测来源文案已修正 | 指定场景通过不代表完整故障矩阵；新 Agent 的预算预留与模型停止未确认修正在其独立仓库 |
 
-最新证据见 [MewCode 验证记录](docs/mewcode-validation.md)、[HTTP 验证记录](docs/agent-http-validation.md)和 [Bug 修复计划](docs/bug-fix-plan.md)。
+MewCode 和 trae 是用于验证平台接入能力的两个真实 Agent。既有三任务是基础功能冒烟，不代表完整编码能力、任意代码安全隔离或生产容量。
+
+最新范围见[独立复核](docs/acceptance-followup-20261012.md)、[双 Agent 验收](docs/dual-agent-acceptance-20261012.md)、[被动观测验收](docs/observation-trae-acceptance-20261012.md)与[开发计划](docs/PLAN.md)。
 
 ## 启动控制平台
 
@@ -114,7 +118,21 @@ Compose 包含 PostgreSQL、迁移、API、Scheduler 和 Web，**不包含可直
 
 控制镜像以 `eyes`（UID/GID 10001）运行；新建证据卷的根目录为该用户所有、权限 `0700`，产物文件为 `0600`。升级镜像不会修改已有卷权限。部署者应核对实际卷的所有权和权限，以服务用户执行 `eyes-ops audit`，再检查 readiness 和授权下载；已有卷若需交接，按[恢复说明](docs/platform.md#恢复)定向处理，不要放宽为全用户可读写。独立干净 Compose 的实际检查见[部署与权限验收](docs/clean-deployment-permissions-20261011.md)。
 
-此前 Windows/MewCode 实测使用独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。2026-10-11 已在独立项目/新卷按锁文件无缓存构建并启动完整控制 Compose、迁移 0005、首次 bootstrap 和真实 HTTP 三任务闭环；具名权限请求及剩余观测/发布边界见[本轮验收](docs/clean-deployment-permissions-20261011.md)，不代表全部 M4 或容量验收。
+此前 Windows/MewCode 实测使用独立 Windows PostgreSQL、Linux API/Runner 和原生 Scheduler/Web，启动方式见 [MewCode 接入说明](integrations/mewcode/README.md)。2026-10-11 已在独立项目/新卷按锁文件无缓存构建并启动完整控制 Compose、迁移 0005、首次 bootstrap 和真实 HTTP 三任务闭环，详见[部署与权限验收](docs/clean-deployment-permissions-20261011.md)。后续观测与双 Agent 使用各自独立环境，不能将各轮子集通过视为全部 M4 或容量验收。
+
+### 按需停止与再次启动
+
+日常可以按需启动使用，无需为了当前验收连续运行 24 小时。停止前先核对活动及 unknown 工作，按实际目标能力停止或等待任务；正常停止独立 Runner 和 Agent 后，再停止控制平台。在项目根目录的 PowerShell 中：
+
+```powershell
+docker compose --env-file deploy/.env -f deploy/compose.yaml stop
+# 再次使用，保留原数据库与证据卷
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+再次启动后等待 `/health/ready` 就绪，再启动对应 Agent 和 Runner、连接 Web；使用原项目，无需重复 bootstrap。Runner 必须复用原持久状态目录，保留待确认上传和恢复记录。unknown 不能因为停止或重启就释放额度或重新执行；统一 `agent_http` 由匹配 Runner 按原操作只读核对，其他接入按[恢复说明](docs/unknown-recovery.md)处理。不要用 `down -v` 作为日常停止命令，它会删除命名数据卷。
+
+已就绪组件的按需使用周期及限制见[按需验收](docs/ondemand-acceptance-20261012.md)；这不保证任意启动时刻或任意目标的活动任务都能确认停止。
 
 ### 源码开发
 
@@ -192,14 +210,15 @@ uv run eyes-runner --config runner.toml status
 uv run eyes-runner --config runner.toml run
 ```
 
-- HTTP 接入：配置允许的 origin，并按现有任务接口实现请求、结果及实际支持的取消/查询行为。
+- 统一 HTTP 接入（`agent_http`）：实现协议 v1 的能力、幂等运行、查询及结果接口，先发现并冻结能力，再发布目标；配置允许的 origin 和独立 Agent 凭据。
+- 通用 HTTP 接入（`http`）：配置允许的 origin，并按现有任务接口实现请求、结果及实际支持的取消/查询行为；重启后的自动核对能力与统一协议不同。
 - Python 接入：配置可信的执行、准备、清理入口及解释器；评分器可以使用独立解释器。
 - 多个 Runner 使用不同凭据与状态目录。容器内的 `localhost` 指向该容器，应按实际网络配置服务地址。
 - 会话隔离、环境隔离、取消和幂等必须如实声明，Eyes 据此匹配任务和限制并发。
 
 完整步骤见 [Agent 接入文档](docs/agent-integration.md)。MewCode 桥接、运行配置与采集工具位于 [integrations/mewcode](integrations/mewcode/README.md)。
 
-语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)已有 `agent_http` Runner 客户端与持久化参考 HTTP 服务；旧 HTTP/Python 保持兼容。发现、发布及责任边界见[运行时文档](docs/agent-http-runtime.md)。2026-10-10 Docker 恢复后，真实 MewCode 已完成 HTTP 执行、独立评分、证据与基础认证闭环，3/3 通过，实际版本、首次失败及验收边界见[记录](docs/agent-http-validation.md)。
+语言无关的[统一 Agent 协议 v1](docs/agent-protocol.md)已有 `agent_http` Runner 客户端与持久化参考 HTTP 服务；旧 HTTP/Python 保持兼容。发现、发布及责任边界见[运行时文档](docs/agent-http-runtime.md)。MewCode 与 trae 已完成独立 HTTP 闭环及双目标定向验收，见[最新记录](docs/dual-agent-acceptance-20261012.md)。trae 的模型/工具循环及 exporter 位于[独立 Agent 仓库](https://github.com/pretextQ/trae-agent)，不在 Eyes 核心源码中。
 
 ## 回归与运维
 
@@ -219,7 +238,7 @@ uv run eyes-ops maintain
 
 ## 数据与执行边界
 
-- 项目管理/读取令牌、Runner 令牌和模型 API key 分开使用。目标快照保存密钥引用，不保存明文凭据；本机 `.env`、`data/` 和前端本地配置不提交 Git。
+- 项目管理/读取令牌、Runner 令牌、Agent HTTP 凭据、观测来源写入令牌和模型 API key 分开使用。来源令牌只写对应观测来源，项目 read/manage 负责项目范围读取/管理。目标快照保存密钥引用，不保存明文凭据；本机 `.env`、`data/` 和前端本地配置不提交 Git。
 - Python 插件及 shell 按可信代码管理。独立目录、独立进程或本轮容器部署不能自动视为安全沙箱。
 - 未确认停止的外部任务保持未知；本地进程退出或租约失效不证明远端任务已经停止。
 - 观测范围取决于实际接口与埋点。缺失、截断、丢弃和过期证据应明确显示，不能推断隐藏执行过程。
@@ -238,6 +257,8 @@ uv run eyes-ops maintain
 | 被动观测           | [observation.md](docs/observation.md)                                              |
 | Web 与前端质量     | [frontend.md](docs/frontend.md)   |
 | MewCode 接入与实测 | [接入说明](integrations/mewcode/README.md)、[验证记录](docs/mewcode-validation.md) |
+| 双 Agent 与最新独立验收 | [双 Agent 记录](docs/dual-agent-acceptance-20261012.md)、[独立复核](docs/acceptance-followup-20261012.md) |
+| trae 被动观测与按需启停 | [观测验收](docs/observation-trae-acceptance-20261012.md)、[按需验收](docs/ondemand-acceptance-20261012.md) |
 | 故障处理修复进度   | [bug-fix-plan.md](docs/bug-fix-plan.md)                                            |
 | 当前开发与验收计划 | [PLAN.md](docs/PLAN.md)                                                            |
 | 开发约定           | [AGENT.md](AGENT.md)                                                               |
@@ -259,4 +280,4 @@ docs/                设计、使用和验证记录
 
 ## 下一步
 
-当前重点是完成四项修复的行为验收、可靠部署与故障恢复，补齐 HTTP 可选能力/故障、真实版本回归和含产物的备份恢复记录，再开展容量及长期运行验证。功能实现、静态检查和真实运行验收分别记录，以实际证据判断交付阶段。
+当前优先补齐 unknown 核对成功后的原执行证据、清理事实及独立评分；同一 Agent 的真实改善/退化仍等待合适的可比版本材料。随后按实际需要推进支持取消/资源的目标、观测记录生命周期、剩余故障/权限及容量边界。已通过的修复行为、双目标基础闭环、干净部署和完整实验证据备份恢复不重复开发；24 小时及多日运行仅为未来可选目标。任务优先级和完整里程碑条件以[开发计划](docs/PLAN.md)为准。
