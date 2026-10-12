@@ -1,8 +1,14 @@
 # 在 Agent 中工作，在 Eyes 中观测
 
-> 自 2026-10-11 起仅在当前 Windows 宿主机开发，API 在本机 Linux 容器运行，启动方式见 [Windows/MewCode 说明](../integrations/mewcode/README.md)。被动观测在当前 Windows 环境的完整接入与恢复验收仍需重新验证。
+> 自 2026-10-11 起仅在当前 Windows 宿主机开发，API 在本机 Linux 容器运行，启动方式见 [Windows/MewCode 说明](../integrations/mewcode/README.md)。2026-10-12 trae 的直接任务/被动 exporter 在独立环境通过本轮正向、补传、权限、Web 和按需重启范围，见[验收记录](observation-trae-acceptance-20261012.md)；Deta 及其他 exporter 不据此自动升级验收。
 
-被动观测不需要测试集、评分器、实验或 Runner。用户在 Deta 中照常输入任务，Deta 保持执行与工具权限，Eyes 接收实际埋点事件并展示。原有实验评测入口继续用于批量任务和评分。
+被动观测不需要测试集、评分器、实验或 Runner。用户在 Agent 中照常输入任务，Agent 保持执行与工具权限，Eyes 接收实际埋点事件并展示。下面 Deta 配置是该已有接入的专用说明。原有实验评测入口继续用于批量任务和评分。
+
+## trae 直接任务入口
+
+trae 当前已实现 `python -m trae_agent.observe` 直接用户任务及独立 exporter，复用它自己的模型/工具循环，不创建 AgentTask 或 Eyes 实验，不读取主动 HTTP events 来造观测。配置与 Docker Linux 命令见 [trae 接入说明](https://github.com/pretextQ/trae-agent/blob/main/docs/OBSERVATION.md)。当前默认 `mimo-v2.6-flash`；设置真实来源 URL/token、专用状态目录、明确预算，可按用户选择启用正文采集。API 不可达时有界 spool 保留，`--flush-only` 仅重传，不执行任务/模型；来源身份改变不复用旧 spool。
+
+本轮事件显式 schema_version、稳定 run/session/event ID、递增序号和 UTC 时间；读取权限仍为项目级 read/manage，来源凭据只有本来源写入权，不能读取项目。来源内 external run ID 不等于服务端 ObservedRun UUID。完整实现/实测/失败/限制见[验收](observation-trae-acceptance-20261012.md)。
 
 ## 启动与接入
 
