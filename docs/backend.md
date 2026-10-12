@@ -13,11 +13,13 @@
 | 证据 | 事件去重、冲突诊断、固定清单、迟到清单、受控产物上传及查询 |
 | 评分 | 固定清单绑定、前置证据检查、结果校验、重新评分历史及明确分母的结果查询 |
 | 部署 | Alembic 0001～0005 迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移/Web 服务 |
-| 实际执行组件 | HTTP/Python 适配器、独立执行/评分进程、SDK、插件摘要与 Runner CLI 已实现；MewCode Python 与统一 HTTP 基础闭环已有真实记录，完整能力矩阵仍待验收 |
+| 实际执行组件 | HTTP/Python 适配器、独立执行/评分进程、SDK、插件摘要与 Runner CLI 已实现；MewCode Python/HTTP 与 trae HTTP 基础闭环、双目标并发和定向恢复已有真实记录，完整能力矩阵仍待验收 |
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
 
-当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行/评分/证据基础闭环。安全恢复指定必需项及评分读取的 API 中断、数据库 503、鉴权与租约故障已有真实子集证据，见 [Runner 可靠性验收](runner-reliability-20261011.md)。同一 Agent 两版本无变化回归已验证，真实改善/退化仍阻塞。完整真实证据恢复、干净控制 Compose、新环境 HTTP 和本轮具名权限请求已通过相应范围；双 Agent、观测正向、完整故障/权限矩阵和长期运行仍待验证，详见 [独立验收](acceptance-followup-20261011.md) 与 [开发计划](PLAN.md)。
+当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行/评分/证据基础闭环。安全恢复指定必需项及评分读取的 API 中断、数据库 503、鉴权与租约故障已有真实子集证据，见 [Runner 可靠性验收](runner-reliability-20261011.md)。同一 Agent 两版本无变化回归已验证，真实改善/退化仍阻塞。完整真实证据备份恢复、干净控制 Compose、新环境 HTTP 和具名权限请求已通过相应范围。
+
+2026-10-12 已补齐 trae 被动观测的真实正向、离线补传、权限、Web 与按需重启；MewCode/trae 主动 HTTP 正常闭环、真实双目标并发、成员准备失败隔离和原操作定向核对也已通过。故障核对后的原 Attempt 虽恢复 succeeded，证据仍为 partial、清理 unknown，故障批次有效评分尚未补齐。远端取消/资源正向、完整故障/权限矩阵和其他生命周期分支仍待验证。已就绪组件的按需启停周期通过；24 小时及多日运行是未来可选验证，不作为当前用途的发布门槛。详见[最新独立复核](acceptance-followup-20261012.md)、[双 Agent 验收](dual-agent-acceptance-20261012.md)与[开发计划](PLAN.md)，不据此宣布 M0～M4 全部通过。
 
 ## 本机运行
 
