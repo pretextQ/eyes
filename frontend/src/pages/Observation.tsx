@@ -563,7 +563,7 @@ export function ObservationRunPage() {
           {run.prompt ||
             (run.capture_body
               ? "继续既有会话，查看下方输入事件。"
-              : "未启用正文采集。可在 Deta 设置 EYES_CAPTURE_BODY=true 后开始新任务。")}
+              : "未启用正文采集。请在当前 Agent 的观测接入中启用正文采集后开始新任务。")}
         </p>
         <div className="observation-run-meta">
           <span>
@@ -621,7 +621,7 @@ export function ObservationRunPage() {
         </Button>
       )}
       <p className="observation-footnote">
-        完整性仅针对本接入声明的事件。事件来自 Deta
+        完整性仅针对本接入声明的事件。事件来自当前 Agent
         埋点；不代表未埋点的外部服务内部过程。
       </p>
     </>
