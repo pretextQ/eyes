@@ -37,7 +37,9 @@ def summary(run):
     return {
         **public_record(run),
         "status": "disconnected" if stale else run.status,
-        "evidence_status": "complete"
+        "evidence_status": "expired"
+        if run.expired_at
+        else "complete"
         if complete
         else "partial"
         if (
@@ -69,6 +71,7 @@ def add_metrics(run, event):
     elif event.type == "run_end":
         run.status = event.data["status"]
         run.terminal_sequence = event.sequence
+        run.terminal_received_at = datetime.now(UTC)
         metrics["ended_at"] = event.occurred_at.isoformat()
         metrics["dropped"] = event.data["dropped_events"]
     elif event.type == "model_end":
@@ -96,9 +99,9 @@ def ingest(session, source, body, supplied_token):
     if source.revoked:
         raise DomainError(401, "invalid_token", "observation token was revoked")
     run = session.scalar(
-        select(ObservedRun).where(
-            ObservedRun.source_id == source.id, ObservedRun.external_id == body.run_id
-        )
+        select(ObservedRun)
+        .where(ObservedRun.source_id == source.id, ObservedRun.external_id == body.run_id)
+        .with_for_update()
     )
     metadata = {key: getattr(body, key) for key in ("session_id", "agent", "model", "capture_body")}
     if run is None:
@@ -107,6 +110,8 @@ def ingest(session, source, body, supplied_token):
         )
         session.add(run)
         session.flush()
+    elif run.expired_at:
+        raise DomainError(410, "observation_expired", "observation content has expired")
     elif any(getattr(run, key) != value for key, value in metadata.items()):
         raise DomainError(409, "run_identity_conflict", "run metadata is immutable")
     accepted = []

@@ -74,6 +74,8 @@ type ObservedRun = {
   created_at: string;
   last_seen_at: string;
   evidence_status: string;
+  expired_at: string | null;
+  expiration_summary: { events?: number; retention_days?: number };
   sequence_gaps: number;
   metrics: MetricsData;
 };
@@ -91,6 +93,7 @@ function Status({ value }: { value: string }) {
     disconnected: "观测中断",
     complete: "链路已收齐",
     partial: "链路不完整",
+    expired: "内容已过期",
     collecting: "采集中",
   };
   const variant =
@@ -205,8 +208,10 @@ export function ObservationPage() {
                         className="observation-run-title"
                         to={`/observe/${run.id}`}
                       >
-                        {run.prompt ||
-                          (run.capture_body ? "继续会话" : "任务正文未采集")}
+                        {run.expired_at
+                          ? "观测内容已过期"
+                          : run.prompt ||
+                            (run.capture_body ? "继续会话" : "任务正文未采集")}
                         <ChevronRight size={16} />
                       </Link>
                       <div className="observation-run-meta">
@@ -459,6 +464,7 @@ export function ObservationRunPage() {
           `/v1/observation/runs/${id}?limit=200&offset=${offset}`,
           { signal },
         );
+        if (value.expired_at) return value;
         first ??= value;
         events.push(...value.events);
         first.has_more = value.has_more;
@@ -560,10 +566,12 @@ export function ObservationRunPage() {
       <section className="observation-task" aria-label="本次任务">
         <span className="section-label">用户任务</span>
         <p>
-          {run.prompt ||
-            (run.capture_body
-              ? "继续既有会话，查看下方输入事件。"
-              : "未启用正文采集。请在当前 Agent 的观测接入中启用正文采集后开始新任务。")}
+          {run.expired_at
+            ? "任务正文已按保留策略清理。"
+            : run.prompt ||
+              (run.capture_body
+                ? "继续既有会话，查看下方输入事件。"
+                : "未启用正文采集。请在当前 Agent 的观测接入中启用正文采集后开始新任务。")}
         </p>
         <div className="observation-run-meta">
           <span>
@@ -580,10 +588,16 @@ export function ObservationRunPage() {
       <div className="observation-chain-heading">
         <h2>执行链路</h2>
         <span className="muted small-text">
-          按 Agent 事件序号排列 · {run.metrics.events ?? 0} 条事件
+          {run.expired_at ? "原记录统计" : "按 Agent 事件序号排列"} ·{" "}
+          {run.metrics.events ?? 0} 条事件
         </span>
       </div>
-      {!run.events.length ? (
+      {run.expired_at ? (
+        <Empty
+          title="观测内容已过期"
+          description={`清理时间 ${formatDate(run.expired_at)}；保留 ${run.expiration_summary.events ?? run.metrics.events ?? 0} 条原事件的审计摘要。历史统计不代表现有完整证据。`}
+        />
+      ) : !run.events.length ? (
         <Empty
           title="等待执行事件"
           description="Agent 上报后会自动显示在这里。"
@@ -621,8 +635,9 @@ export function ObservationRunPage() {
         </Button>
       )}
       <p className="observation-footnote">
-        完整性仅针对本接入声明的事件。事件来自当前 Agent
-        埋点；不代表未埋点的外部服务内部过程。
+        {run.expired_at
+          ? "仅保留任务身份、历史统计与清理摘要；正文已不可读取，不能作为完整证据。"
+          : "完整性仅针对本接入声明的事件。事件来自当前 Agent 埋点；不代表未埋点的外部服务内部过程。"}
       </p>
     </>
   );

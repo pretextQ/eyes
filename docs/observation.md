@@ -58,4 +58,44 @@ Deta 后台发送器使用 256 条内存队列与工作目录 `.deta/eyes/<配�
 
 当前 exporter 接入 Deta CLI 的 Agent 事件和 OTel 模型边界；直接在 Python 中创建 Agent 不会自动启用 exporter。任务外的手动压缩不归入某个任务。没有采集逐 token 流、屏幕录制、隐藏推理、工具进程的全部系统调用，也不承诺任意 Agent 零改动接入。一个工作目录、同一来源只允许一个 exporter 进程持有发送锁。
 
-观测正文当前保存在 PostgreSQL JSONB；备份应包含数据库。现有实验 Artifact 清理不会删除这些观测表，尚无观测记录自动保留清理策略。不能据此宣称生产容量或长期保留已验收。
+观测正文保存在 PostgreSQL JSONB，备份必须包含数据库。自 0006 起，观测保留策略复用 `eyes-ops maintain` 与 Compose maintenance；它独立于实验 Artifact 保留期。副本清理、权限与页面的实际结果见[生命周期验收](observation-retention-20261013.md)。
+
+## 观测保留与清理
+
+默认 `EYES_OBSERVATION_RETENTION_DAYS=0`，不按年龄标记或清除现有观测。启用时必须给出项目 UUID：`EYES_OBSERVATION_RETENTION_PROJECT_ID`，或命令的 `--project-id`（优先于环境配置）。一个自动维护进程对应一个明确项目；不同项目可按需运行同一命令，不隐式扫描全部项目。
+
+只有来源报告了 `completed/failed/cancelled/limited`、存在 terminal_sequence 的任务可到期。以**服务端终态首次接收时间 terminal_received_at 与最后事件接收时间 last_seen_at 中较晚者**计算保留天数，两者都严格早于本轮 UTC cutoff 才清理；不使用 Agent 的 occurred_at、metrics.ended_at 或创建时间单独判定。迟到补齐或原样重传延后清理。历史终态用 `max(created_at, last_seen_at)` 保守回填 terminal_received_at；缺少明确终态的历史记录继续保护。
+
+running 永不自动清理。disconnected 是 running 的查询展示状态，30 秒失联、撤销来源或 exporter 退出均不证明 Agent 停止，不能使它获得清理资格。当前不提供强制删除未结束任务的命令或停止确认接口；等待可信终态，无法得到时保留并由接入方核对，人工确认/长期失联生命周期仍是后续目标。
+
+在 Windows PowerShell 中配置保留期；API/运维进程按既有 Docker Linux 部署运行。以下以已部署 Compose 为例，替换真实项目 UUID，先预览再执行：
+
+```powershell
+# 写入 deploy/.env：EYES_OBSERVATION_RETENTION_DAYS=30
+$observationProject = 'PROJECT_UUID'
+docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps api eyes-ops maintain --observations-only --project-id $observationProject
+docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps api eyes-ops maintain --observations-only --project-id $observationProject --apply
+```
+
+省略 `--observations-only` 时沿用现有实验证据和文件维护，同时处理配置项目的观测；`--attempt-id` 只处理原实验 Attempt，不清理观测。运维 CLI 使用部署者的数据库权限，无来源令牌或项目令牌删除入口。project read/manage 的项目读取范围、来源令牌仅写入本来源的边界保持。
+
+| 配置 | 默认 | 允许范围 | 含义 |
+| --- | --- | --- | --- |
+| `EYES_OBSERVATION_RETENTION_DAYS` | 0 | 0～36500 | 0 不标记新的过期任务；正数为完整 UTC 天数 |
+| `EYES_OBSERVATION_RETENTION_RUN_BATCH` | 20 | 1～100 | 每批最多标记的任务数 |
+| `EYES_OBSERVATION_RETENTION_EVENT_BATCH` | 500 | 1～2000 | 每批最多清空正文的事件数 |
+| `EYES_OBSERVATION_RETENTION_MAX_BATCHES` | 10 | 1～100 | 每轮最多独立事务批数；预览只查看一批 |
+
+预览的 observations.runs/events 是**一批候选**，不是全项目到期总数。执行每批独立提交，标记任务过期、清空 prompt、保存清理理由/保留天数/cutoff/原完整性及事件数，再有界清空事件 content。事件 ID、sequence、原 digest、接收时间与任务身份/终态/历史数值统计保留。数据库触发器仅允许过期清空转换，不开放任意事件更新。
+
+查询用 `FOR UPDATE SKIP LOCKED` 跳过竞争行，观测清理只取备份共享维护锁，不持有调度锁或全局独占锁。每批 lock_timeout=2 秒、statement_timeout=15 秒，错误使当前批回滚、命令退出 3；此前已提交批次保留，可重复执行。`batch_limit_reached=true` 表示最后一批达到至少一个处理限额，继续执行以排空；即使为 false，竞争锁也可能使本轮跳过候选。禁用年龄策略不会恢复过期正文，指定项目仍可排空此前已标记的正文。
+
+任务标记提交后，API 详情立即返回 `evidence_status=expired`、expired_at、expiration_summary、空 events、has_more=false；项目列表仍保留任务摘要。不存在/跨项目保持 404；原已过期 run 重传返回 410 observation_expired，不重新接收正文。Web 列表标明“观测内容已过期”，详情移除任务正文与流程图，历史统计不能作为当前完整证据。分批未排空的数据库正文暂存不对 API 暴露；已被客户端下载的副本不能远程撤回。
+
+自动执行：在 deploy/.env 同时写保留天数和项目 UUID，显式启用既有 profile：
+
+```powershell
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile maintenance up -d maintenance
+```
+
+既有维护进程每小时执行 `maintain --apply`，每轮仍受批数限制；不新增调度服务。interval 循环响应 SIGTERM/SIGINT，完成当前轮后退出；Compose 给维护进程 3 分钟停止宽限。若显式提高 max_batches 或旧实验证据维护耗时超出宽限，仍可能被强杀；已提交批次可续清，不能把停止进程理解为数据库全部排空。多项目手工维护可以覆盖配置中的 UUID。清理和容量不同：审计行、活动/失联任务、数据库页/WAL、备份与客户端副本仍占空间。VACUUM 可回收供数据库复用，普通清理不保证文件立即缩小或安全擦除磁盘。数据库硬容量限额、超限拒收、空间告警、大规模积压吞吐与长期趋势尚未实现/验收，保留后续计划。备份、升级及不能丢失过期标识的降级规则见[平台说明](platform.md#观测迁移与备份恢复)。

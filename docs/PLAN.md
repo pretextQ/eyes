@@ -71,7 +71,8 @@
 | 实验级取消请求持久审计 | 设计缺口，未实现 | completed 保持调度结束语义，用例取消和 cancelled_runs 正确展示；实验级请求的操作者、时间和理由缺独立持久记录，另行评估追加审计事实，不擅改公共终态，见[核对结果](deployment-regression-20261011.md#审查-2取消语义与审计缺口) | P2 |
 | 统一 Agent 协议客户端与参考服务 | 已实现，真实基本闭环已验收 | 2026-10-10 `adapters/agent_http.py`、`agent_service/http.py`、Runner/领取匹配、发现发布与兼容校验，保留旧 HTTP/Python。真实 MewCode 3/3 执行/评分通过、12/12 功能检查、48 外部事件及 8 产物对应、认证/去重/已完成服务重启核对；可选能力正向及活动故障矩阵未覆盖，见[记录](agent-http-validation.md) | P1 |
 | 执行结束后的独立清理记录 | 部分实现 | Attempt 单独保存清理状态，但当前随执行最终结果上报；后续独立清理记录接口尚未实现，见 [后端说明](backend.md) | P2 |
-| 被动观测自动保留清理 | 未实现 | observation 正文在 PostgreSQL JSONB；现有实验 Artifact 清理不覆盖这些表，需设计观测记录生命周期 | P2 |
+| 被动观测自动保留清理 | 已实现，真实材料副本定向验证通过 | 0006/observation.retention 复用 maintain 与 maintenance profile，默认关闭、显式项目、可信终态/最后接收时间、独立有界批次；3 run/100 事件正文清空、重复执行/归属/API/Web/数据库恢复通过。未结束真实前缀仅作归档回放保护检查，不冒充新活动 Agent，见[验收](observation-retention-20261013.md) | 已交付本轮范围 |
+| 观测容量与失联生命周期扩展 | 未实现，未来目标 | 数据库硬容量上限、超限拒收、空间告警、审计元数据/备份独立保留、可信人工停止确认与长期失联处置、大积压并发/磁盘故障和长期趋势仍保留；期限与批次限额不等于容量配额 | P2 |
 | 多轮 steps 驱动 | 未实现 | `CaseDefinition.single_turn_only` 明确拒绝非空 steps；保留未来有序步骤驱动设计 | P3 |
 | 模型代理、OTLP exporter/查询后端、共享产物存储 | 未实现 | 当前为 SDK/接口采集、可选 ConsoleSpanExporter 与 LocalArtifactStore；保留扩展目标，根据实际需求推进 | P3 |
 | 任意用户代码沙箱、完整原生 Windows API/Runner | 未实现 | 可信 Python/独立进程不是安全沙箱；POSIX 进程组、resource 和目录 fsync 存在平台限制。沙箱是另行设计目标；是否支持原生 Windows 需先明确发布范围 | P3 |

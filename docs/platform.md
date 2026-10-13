@@ -1,10 +1,10 @@
 # 回归、证据与运维
 
-状态同步：2026-10-11。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0005_reconciliation`。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化和完整 Windows 环境运维验收仍待补齐，当前进度见 [开发计划](PLAN.md)。
+状态同步：2026-10-13。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0006_observation_retention`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化和完整 Windows 环境运维验收仍待补齐，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 
-2026-10-11 普通公共契约要求显式 schema_version；本仓库客户端已更新，历史记录不改写，旧 outbox 由新 Runner 按原身份做传输投影。公共旧请求只有在明确开启、有固定截止时间的窗口内并带兼容头才支持。先升级生产端再切换严格 API；完整顺序及未验证项见[版本迁移说明](contract-version-migration.md)，本任务不新增数据库迁移。
+2026-10-11 普通公共契约要求显式 schema_version；本仓库客户端已更新，历史记录不改写，旧 outbox 由新 Runner 按原身份做传输投影。公共旧请求只有在明确开启、有固定截止时间的窗口内并带兼容头才支持。先升级生产端再切换严格 API；完整顺序及未验证项见[版本迁移说明](contract-version-migration.md)，该轮未新增数据库迁移。
 
 ```sh
 uv sync --frozen
@@ -14,7 +14,15 @@ uv run eyes-server
 uv run eyes-scheduler
 ```
 
-升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空）。当前 API 就绪检查要求 0005，并通过实际产物发布与读取路径检查证据卷，不能仅升级到 0002 后运行当前服务。
+升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。当前 API 就绪检查要求 0006，并通过实际产物发布与读取路径检查证据卷，不能仅升级到旧 head 后运行当前服务。
+
+### 观测迁移与备份恢复
+
+0006 迁移保留历史事件正文、digest 和 run 终态，历史明确终态按最后服务端接收时间保守回填；默认保留期 0 不清理。列变更及历史回填需要维护窗口，停止 API/exporter 写入和维护进程后先备份；两个索引使用 concurrent build，此迁移包含 autocommit 边界，失败不能假定所有 DDL 已回滚。失败时保持停写，检查已建列/索引和数据库日志，优先用升级前备份恢复独立空目标，再重跑完整迁移，不能盲目 stamp head。升级后运行 `alembic current`、`alembic check`、服务用户 audit 和 readiness。
+
+观测正文在 PostgreSQL，无额外观测文件卷，现有一致性数据库 dump 已覆盖 run/event、过期标识及摘要；数据库和实验证据卷仍按既有整体备份操作一起保留。恢复 0005 备份后先迁移到 0006，再启动新版 API；恢复含过期记录的 0006 备份只能得到过期摘要，不能靠重传或降级恢复正文。恢复可能重新引入旧备份中的正文与来源凭据：恢复后核对来源撤销状态和每项目保留配置，在开放 exporter/API 前明确是否继续清理；备份有独立保留期限，不因在线清理自动删除。
+
+0006 在没有观测过期记录时允许降到 0005，清理发生后**拒绝降级**，防止旧 API 将已清空的事件误显示为完整证据。需要旧版本完整内容时使用清理前备份恢复新的空目标；禁止通过删除过期标识、直接 stamp 或关闭触发器绕过。2026-10-13 在真实观测材料独立副本完成升/降/再升级与清理后拒绝降级，清理后 PostgreSQL dump 在独立空库恢复、观测全行摘要一致；这不是完整平台备份所有分支的新增验收，见[记录](observation-retention-20261013.md)。
 
 协议仍为 `1.0`。新增 `ExperimentCreate.evidence_wait_seconds`，新实验默认 60 秒，可设 0；历史实验快照缺少该字段时沿用即时评分。旧实验创建请求重试时，未显式传入新字段仍按原摘要判断幂等。旧 Runner 可继续上报，升级 Runner 后支持迟到上传完成后的 `evidence-close`。新版 Runner 对旧 API 的封存请求会失败，因此先升级服务端。
 

@@ -120,7 +120,14 @@ def runs(
 def run_detail(
     run_id: UUID, session: Database, user: Reader, limit: Limit = 200, offset: Offset = 0
 ):
-    run = scoped(session, ObservedRun, run_id, user.project_id)
+    run = scoped(session, ObservedRun, run_id, user.project_id, lock=True)
+    if run.expired_at:
+        return {
+            "schema_version": "1.0",
+            **service.summary(run),
+            "events": [],
+            "has_more": False,
+        }
     events = session.scalars(
         select(ObservedEvent)
         .where(ObservedEvent.run_id == run.id)

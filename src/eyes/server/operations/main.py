@@ -1,14 +1,16 @@
 import argparse
 import json
+import signal
 import sys
-import time
 from pathlib import Path
+from threading import Event
 from uuid import UUID
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from eyes.server.config import Settings
 from eyes.server.domain import DomainError
+from eyes.server.observation.retention import maintain_observations
 from eyes.server.operations import service
 from eyes.server.storage.database import database, maintenance_lock
 
@@ -23,6 +25,10 @@ def main():
         "maintain", help="preview by default; --apply commits retention and reclaims files"
     )
     maintain.add_argument("--apply", action="store_true")
+    maintain.add_argument("--project-id", type=UUID, help="observation retention project scope")
+    maintain.add_argument(
+        "--observations-only", action="store_true", help="skip experimental artifact maintenance"
+    )
     maintain.add_argument(
         "--interval", type=float, default=0, help="repeat maintenance every N seconds; 0 runs once"
     )
@@ -64,12 +70,33 @@ def main():
         else:
             if args.interval < 0 or (args.interval and args.attempt_id):
                 raise ValueError("interval must be nonnegative; explicit expiration runs once")
+            stopping = Event()
+            if args.interval:
+                # Complete the current bounded round, then stop without waiting
+                # through the interval or requiring Docker to kill PID 1.
+                def stop(_signum, _frame):
+                    stopping.set()
+
+                signal.signal(signal.SIGTERM, stop)
+                signal.signal(signal.SIGINT, stop)
             while True:
-                with sessions() as session, session.begin():
-                    result, _ = service.maintain(
-                        session, settings, apply=args.apply, attempt_id=args.attempt_id
+                if args.observations_only and args.attempt_id:
+                    raise ValueError("--observations-only cannot be combined with --attempt-id")
+                observations = (
+                    maintain_observations(
+                        sessions, settings, apply=args.apply, project_id=args.project_id
                     )
-                if args.apply:
+                    if not args.attempt_id
+                    else None
+                )
+                result = {"schema_version": "1.0", "mode": "apply" if args.apply else "preview"}
+                if not args.observations_only:
+                    with sessions() as session, session.begin():
+                        result, _ = service.maintain(
+                            session, settings, apply=args.apply, attempt_id=args.attempt_id
+                        )
+                result["observations"] = observations
+                if args.apply and not args.observations_only:
                     with sessions() as session, session.begin():
                         _, paths = service.maintain(session, settings)
                         result["delete_failures"] = service.reclaim(paths)
@@ -77,7 +104,8 @@ def main():
                 if not args.interval:
                     break
                 print(json.dumps(result, ensure_ascii=False), flush=True)
-                time.sleep(args.interval)
+                if stopping.wait(args.interval):
+                    break
         print(json.dumps(result, ensure_ascii=False))
         if result.get("status") == "error" or result.get("delete_failures"):
             raise SystemExit(1)

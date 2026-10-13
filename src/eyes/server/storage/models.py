@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -62,7 +63,17 @@ class ObservationSource(Record):
 
 class ObservedRun(Record):
     __tablename__ = "observed_runs"
-    __table_args__ = (UniqueConstraint("source_id", "external_id"),)
+    __table_args__ = (
+        UniqueConstraint("source_id", "external_id"),
+        Index(
+            "ix_observed_runs_retention",
+            "project_id",
+            "terminal_received_at",
+            "last_seen_at",
+            "id",
+            postgresql_where=text("expired_at IS NULL AND terminal_received_at IS NOT NULL"),
+        ),
+    )
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
     source_id: Mapped[UUID] = mapped_column(ForeignKey("observation_sources.id"), index=True)
     external_id: Mapped[str] = mapped_column(String(200))
@@ -75,6 +86,9 @@ class ObservedRun(Record):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     terminal_sequence: Mapped[int | None]
     metrics: Mapped[dict] = mapped_column(JSONB, default=dict)
+    terminal_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expiration_summary: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
 class ObservedEvent(Record):
@@ -82,6 +96,13 @@ class ObservedEvent(Record):
     __table_args__ = (
         UniqueConstraint("run_id", "sequence"),
         UniqueConstraint("source_id", "event_id"),
+        Index(
+            "ix_observed_events_retention",
+            "project_id",
+            "run_id",
+            "id",
+            postgresql_where=text("expired_at IS NULL"),
+        ),
     )
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)
     source_id: Mapped[UUID] = mapped_column(ForeignKey("observation_sources.id"))
@@ -90,6 +111,7 @@ class ObservedEvent(Record):
     sequence: Mapped[int]
     content: Mapped[dict] = mapped_column(JSONB)
     digest: Mapped[str] = mapped_column(String(64))
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Version(Record):

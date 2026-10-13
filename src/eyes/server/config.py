@@ -26,12 +26,22 @@ class Settings(BaseSettings):
     score_submission_grace_seconds: int = Field(default=60, ge=1, le=3600)
     scheduler_interval_seconds: float = Field(default=5, ge=0.1)
     evidence_retention_days: int = Field(default=0, ge=0)
+    observation_retention_days: int = Field(default=0, ge=0, le=36500)
+    observation_retention_project_id: UUID | None = None
+    observation_retention_run_batch: int = Field(default=20, ge=1, le=100)
+    observation_retention_event_batch: int = Field(default=500, ge=1, le=2000)
+    observation_retention_max_batches: int = Field(default=10, ge=1, le=100)
     pending_artifact_ttl_hours: int = Field(default=24, ge=1)
     orphan_artifact_grace_hours: int = Field(default=24, ge=1)
     trace_console_export: bool = False
     local_observation: bool = False
     local_observation_project_id: UUID | None = None
     legacy_schema_until: AwareDatetime | None = None
+
+    @field_validator("observation_retention_project_id", mode="before")
+    @classmethod
+    def optional_retention_project(cls, value):
+        return None if value == "" else value
 
     @field_validator("legacy_schema_until")
     @classmethod
