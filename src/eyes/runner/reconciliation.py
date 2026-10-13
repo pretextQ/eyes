@@ -97,6 +97,9 @@ async def run_one(service):
         )
         query = response["query"]
         if query is None:
+            from eyes.runner import recovery
+
+            await recovery.run_one(service)
             return
         if response.get("schema_version") != "1.0":
             raise ValueError("unsupported reconciliation protocol")

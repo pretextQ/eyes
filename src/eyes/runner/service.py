@@ -751,6 +751,8 @@ class RunnerService:
         self.runner_id = registration["runner_id"]
         logger.info("runner_registered runner=%s", self.runner_id)
         counts = {"execute": self.config.execution_slots, "score": self.config.score_slots}
+        if self.config.recovery_only:
+            counts = {"execute": 0, "score": 0}
         query_task = None
         try:
             while not self.stopping.is_set():

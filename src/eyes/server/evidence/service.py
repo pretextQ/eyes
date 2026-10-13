@@ -8,6 +8,7 @@ from uuid import UUID, uuid4, uuid5
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from eyes.contracts.agent_protocol import AgentEvent
 from eyes.contracts.base import SENSITIVE_KEYS
 from eyes.contracts.evidence import ArtifactMetadata, EventBatch
 from eyes.server.domain import DomainError, digest, public_record, scoped
@@ -37,8 +38,18 @@ def redact(value):
     return value
 
 
-def authorize_attempt(session: Session, credential: Credential, attempt_id: UUID, *, lock=False):
+def authorize_attempt(
+    session: Session, credential: Credential, attempt_id: UUID, *, lock=False, recovery_token=None
+):
     attempt = scoped(session, Attempt, attempt_id, credential.project_id, lock=lock)
+    if recovery_token is not None:
+        from eyes.server.scheduling.recovery import authorize
+
+        work = session.scalar(
+            select(WorkItem).where(WorkItem.attempt_id == attempt_id, WorkItem.kind == "execute")
+        )
+        authorize(session, credential, work.id, recovery_token)
+        return attempt
     if credential.role == "runner":
         runner = session.get(Runner, attempt.runner_id)
         run = session.get(CaseRun, attempt.case_run_id)
@@ -129,6 +140,49 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
                 Event.event_id == event.event_id,
             )
         )
+        if previous is None and event.type == "agent.event" and event.source == "target_trace":
+            try:
+                native = AgentEvent.model_validate(event.data)
+            except ValueError:
+                raise DomainError(
+                    422, "invalid_agent_event", "invalid native Agent event"
+                ) from None
+            if attempt.remote_operation_id and str(native.run_id) != attempt.remote_operation_id:
+                raise DomainError(409, "identity_mismatch", "event belongs to another Agent run")
+            # Native IDs survive a different Runner/envelope after process loss.
+            # Reuse the original record, including its original trace and timestamp.
+            candidates = session.scalars(
+                select(Event).where(
+                    Event.attempt_id == attempt.id,
+                    Event.content["type"].as_string() == "agent.event",
+                    Event.content["data"]["run_id"].as_string() == str(native.run_id),
+                    Event.content["data"]["event_id"].as_string() == str(native.event_id),
+                )
+            ).all()
+            if candidates:
+                if any(digest(r.content["data"]) != digest(content["data"]) for r in candidates):
+                    raise DomainError(409, "event_conflict", "native event has different content")
+                record = candidates[0]
+                receipts.append(
+                    {
+                        "event_id": event.event_id,
+                        "record_id": record.id,
+                        "received_at": record.created_at,
+                        "duplicate": True,
+                    }
+                )
+                continue
+            if session.scalar(
+                select(Event.id)
+                .where(
+                    Event.attempt_id == attempt.id,
+                    Event.content["type"].as_string() == "agent.event",
+                    Event.content["data"]["run_id"].as_string() == str(native.run_id),
+                    Event.content["data"]["sequence"].as_integer() == native.sequence,
+                )
+                .limit(1)
+            ):
+                raise DomainError(409, "sequence_conflict", "native sequence has another event")
         if previous:
             if previous.digest != content_digest:
                 logging.getLogger(__name__).warning(
@@ -233,9 +287,13 @@ def publish_artifact(
     artifact_id: UUID,
     content: bytes,
     store: ArtifactStore,
+    *,
+    recovery_token=None,
 ):
     artifact = scoped(session, Artifact, artifact_id, credential.project_id)
-    attempt = authorize_attempt(session, credential, artifact.attempt_id, lock=True)
+    attempt = authorize_attempt(
+        session, credential, artifact.attempt_id, lock=True, recovery_token=recovery_token
+    )
     session.refresh(artifact, with_for_update=True)
     if attempt.evidence_expired_at or artifact.status == "expired":
         raise DomainError(410, "evidence_expired", "expired artifact cannot be republished")
@@ -261,8 +319,12 @@ def initiate_artifact(
     attempt_id: UUID,
     metadata: ArtifactMetadata,
     max_bytes: int,
+    *,
+    recovery_token=None,
 ):
-    attempt = authorize_attempt(session, credential, attempt_id, lock=True)
+    attempt = authorize_attempt(
+        session, credential, attempt_id, lock=True, recovery_token=recovery_token
+    )
     if attempt.evidence_expired_at:
         raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
     if metadata.size > max_bytes:

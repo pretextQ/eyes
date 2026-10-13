@@ -21,7 +21,9 @@ class RequestBoundary:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        artifact = scope["method"] == "PUT" and scope["path"].startswith("/v1/artifacts/")
+        artifact = scope["method"] == "PUT" and (
+            scope["path"].startswith("/v1/artifacts/") or "/recovery-artifacts/" in scope["path"]
+        )
         limit = self.settings.max_artifact_bytes if artifact else self.settings.max_request_bytes
         headers = {
             key.decode("latin-1"): value.decode("latin-1") for key, value in scope["headers"]

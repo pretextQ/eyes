@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, Field, field_validator
 
-from eyes.contracts.agent_protocol import AgentRun
+from eyes.contracts.agent_protocol import AgentEventPage, AgentRun
 from eyes.contracts.base import Contract, Payload
 from eyes.contracts.scorer import ScoreOutput
 from eyes.contracts.target import (
@@ -86,6 +86,7 @@ class ScoreSubmission(LeaseRequest):
 
 class ReconciliationClaim(Contract):
     runner_id: UUID
+    evidence_recovery: bool = False
 
 
 class ReconciliationAssignment(Contract):
@@ -97,11 +98,19 @@ class ReconciliationAssignment(Contract):
     idempotency_key: str
     remote_operation_id: str | None
     target: TargetPublish
+    phase: Literal["outcome", "evidence"] = "outcome"
+    recovery_cursor: str | None = None
+    recovery_events_done: bool = False
 
 
 class ReconciliationSubmission(LeaseRequest):
     snapshot: AgentRun | None = None
     diagnostic: Literal["query_failed", "capability_mismatch", "snapshot_received"]
+
+
+class RecoveryEventSubmission(LeaseRequest):
+    cursor: str | None = Field(default=None, max_length=512)
+    page: AgentEventPage
 
 
 class ClaimedWork(Contract):

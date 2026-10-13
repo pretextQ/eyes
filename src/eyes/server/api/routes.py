@@ -24,6 +24,7 @@ from eyes.contracts.work import (
     ProgressSubmission,
     ReconciliationClaim,
     ReconciliationSubmission,
+    RecoveryEventSubmission,
     RunnerRegister,
     ScoreSubmission,
     WorkClaim,
@@ -34,7 +35,7 @@ from eyes.server.domain import DomainError, public_record, scoped
 from eyes.server.evaluation import service as evaluation
 from eyes.server.evidence import service as evidence
 from eyes.server.experiments import batches
-from eyes.server.scheduling import reconciliation
+from eyes.server.scheduling import reconciliation, recovery
 from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.database import scheduling_lock
 from eyes.server.storage.models import (
@@ -231,7 +232,54 @@ def heartbeat(
 
 @router.post("/reconciliation/claim")
 def claim_reconciliation(body: ReconciliationClaim, session: Database, runner: RunnerIdentity):
-    return {"schema_version": "1.0", "query": reconciliation.claim(session, runner, body)}
+    handler = recovery.claim if body.evidence_recovery else reconciliation.claim
+    return {"schema_version": "1.0", "query": handler(session, runner, body)}
+
+
+@router.post("/work/{work_id}/recovery-observation")
+def recovery_observation(
+    work_id: UUID, body: ReconciliationSubmission, session: Database, runner: RunnerIdentity
+):
+    return recovery.observe(session, runner, work_id, body)
+
+
+@router.post("/work/{work_id}/recovery-events")
+def recovery_events(
+    work_id: UUID, body: RecoveryEventSubmission, session: Database, runner: RunnerIdentity
+):
+    return recovery.events(session, runner, work_id, body)
+
+
+@router.put("/work/{work_id}/recovery-artifacts/{artifact_id}")
+async def recovery_artifact(
+    work_id: UUID,
+    artifact_id: UUID,
+    lease_token: UUID,
+    session: Database,
+    runner: RunnerIdentity,
+    request: Request,
+):
+    from starlette.concurrency import run_in_threadpool
+
+    content = await request.body()
+    if len(content) > request.app.state.settings.max_artifact_bytes:
+        raise DomainError(413, "artifact_too_large", "artifact exceeds configured size limit")
+    return await run_in_threadpool(
+        recovery.artifact,
+        session,
+        runner,
+        work_id,
+        lease_token,
+        artifact_id,
+        content,
+        request.app.state.artifacts,
+        request.app.state.settings.max_artifact_bytes,
+    )
+
+
+@router.post("/work/{work_id}/recovery-close")
+def recovery_close(work_id: UUID, body: LeaseRequest, session: Database, runner: RunnerIdentity):
+    return recovery.close(session, runner, work_id, body)
 
 
 @router.post("/work/{work_id}/reconciliation-result")

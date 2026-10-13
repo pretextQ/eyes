@@ -37,6 +37,7 @@ class RunnerConfig(BaseModel):
     state_dir: Path = Path("data/runner")
     execution_slots: int = Field(default=1, ge=0, le=100)
     score_slots: int = Field(default=1, ge=0, le=100)
+    recovery_only: bool = False
     poll_seconds: float = Field(default=2, ge=0.1)
     api_timeout_seconds: float = Field(default=5, ge=0.1, le=60)
     stop_grace_seconds: float = Field(default=5, ge=0.1, le=60)
@@ -59,7 +60,7 @@ class RunnerConfig(BaseModel):
     def check_config(self):
         origin(self.server_url)
         self.allowed_http_origins = [origin(item) for item in self.allowed_http_origins]
-        if not self.execution_slots and not self.score_slots:
+        if not self.execution_slots and not self.score_slots and not self.recovery_only:
             raise ValueError("at least one execution or score slot is required")
         if self.token_env in self.secret_env_allowlist:
             raise ValueError("platform Runner token must not be exposed to plugins")
