@@ -1,6 +1,6 @@
 # 回归、证据与运维
 
-状态同步：2026-10-13。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0006_observation_retention`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化和完整 Windows 环境运维验收仍待补齐，当前进度见 [开发计划](PLAN.md)。
+状态同步：2026-10-13。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0006_observation_retention`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化按用户决定不纳入当前验收，未来有真实可比材料时再验证；原始完整 Windows 运维验收仍有未覆盖项，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 

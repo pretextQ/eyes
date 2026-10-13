@@ -1,5 +1,7 @@
 # 被动观测生命周期交付（2026-10-13）
 
+后续独立复核：源码提交 `b34cd6f`，本页原始清理/API/Web 材料已核对，清理后 dump 又在独立空库恢复并检查权限与重复清理，通过当前约定范围，见[独立验收](acceptance-review-20261013.md)。归档前缀保护与真实活动 Agent 的证据边界不变。
+
 基线 `9755432`，Windows PowerShell、本机 Docker Linux，PostgreSQL 18.6；使用既有锁定 `eyes-clean-control:20261011` 依赖镜像、只读挂载本轮源码/迁移，Web 挂载本轮生产构建。不宣称无缓存镜像重建或原生 Windows API 支持。没有新模型调用、Agent 任务、实验、Runner、评分或 24h 运行；没有新增/修改测试、fixtures、mocks 或 snapshots。
 
 ## 源码与操作
