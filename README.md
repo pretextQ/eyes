@@ -1,5 +1,7 @@
 # Eyes
 
+容量保护已提供可选的项目事件正文额度与产物卷可用空间检查，默认关闭；管理员通过 `GET /v1/operations/capacity` 或 `eyes-ops capacity --project-id UUID` 查询当前用量和去重告警。逻辑正文额度不等于 PostgreSQL 磁盘上限。配置、覆盖入口和升级操作见[容量保护](docs/platform.md#容量保护与当前告警)，独立真实材料验证见[容量验收](docs/capacity-protection-20261013.md)。
+
 [![CI](https://github.com/pretextQ/eyes/actions/workflows/ci.yml/badge.svg)](https://github.com/pretextQ/eyes/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
@@ -282,4 +284,4 @@ docs/                设计、使用和验证记录
 
 ## 下一步
 
-原操作证据/清理事实/独立评分恢复与观测保留生命周期已开发，并通过[本轮独立验收](docs/acceptance-review-20261013.md)的约定范围；目前没有据此发现必须追加的开发任务。用户决定不纳入当前验收范围的同一 Agent 真实改善/退化，未来有真实可比材料时再验证；24 小时及多日运行同为未来可选验证。取消/资源正向、其他故障/权限组合和硬容量/拒收/告警属于保留的平台扩展目标，按实际需要另定，不作为继续开发的默认理由。版本比较功能、历史失败和原始 M0～M4 未覆盖条件均保留，见[开发计划](docs/PLAN.md)。
+原操作证据/清理事实/独立评分恢复与观测保留生命周期已开发，并通过[本轮独立验收](docs/acceptance-review-20261013.md)的约定范围；目前没有据此发现必须追加的开发任务。用户决定不纳入当前验收范围的同一 Agent 真实改善/退化，未来有真实可比材料时再验证；24 小时及多日运行同为未来可选验证。本轮新授权的事件逻辑额度、产物卷拒收及当前告警见容量验收；数据库物理硬容量、取消/资源正向与其他故障/权限组合属于保留的平台扩展目标，按实际需要另定，不作为继续开发的默认理由。版本比较功能、历史失败和原始 M0～M4 未覆盖条件均保留，见[开发计划](docs/PLAN.md)。

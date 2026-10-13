@@ -21,6 +21,8 @@ def main():
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("audit")
+    capacity_command = commands.add_parser("capacity", help="current capacity and keyed alerts")
+    capacity_command.add_argument("--project-id", required=True, type=UUID)
     maintain = commands.add_parser(
         "maintain", help="preview by default; --apply commits retention and reclaims files"
     )
@@ -63,6 +65,15 @@ def main():
                 container=args.pg_container,
                 bin_dir=args.pg_bin_dir,
             )
+        elif args.command == "capacity":
+            from eyes.server.operations.capacity import status
+            from eyes.server.storage.models import Project
+
+            with sessions() as session, session.begin():
+                maintenance_lock(session)
+                if session.get(Project, args.project_id) is None:
+                    raise ValueError("project does not exist")
+                result = status(session, settings, args.project_id)
         elif args.command == "audit":
             with sessions() as session, session.begin():
                 maintenance_lock(session, exclusive=True)

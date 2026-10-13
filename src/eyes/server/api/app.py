@@ -36,7 +36,9 @@ def create_app(settings: Settings | None = None):
     app = FastAPI(title="Eyes Control API", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.sessions = sessions
-    app.state.artifacts = LocalArtifactStore(settings.artifact_root)
+    app.state.artifacts = LocalArtifactStore(
+        settings.artifact_root, minimum_free_bytes=settings.artifact_min_free_bytes
+    )
     app.add_middleware(RequestBoundary, settings=settings, tracer=tracer)
     app.include_router(router)
     app.include_router(observation_router)

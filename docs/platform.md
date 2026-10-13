@@ -1,5 +1,39 @@
 # 回归、证据与运维
 
+## 容量保护与当前告警
+
+2026-10-13 新增 `server/operations/capacity.py`、API 事务检查和 LocalArtifactStore 发布检查，复用原载荷限制、去重、维护及认证。无新增依赖、数据库表或迁移，head 仍为 0006，协议仍为 1.0。默认两项保护为 0，沿用接收行为；空间写入错误增加稳定诊断。
+
+| 配置 | 默认 | 计量范围 |
+| --- | --- | --- |
+| `EYES_MAX_REQUEST_BYTES` | 8388608 | 原有单 HTTP 请求体上限；产物 PUT 使用 MAX_ARTIFACT_BYTES |
+| `EYES_MAX_ARTIFACT_BYTES` | 33554432 | 原有单产物声明与实际上传体上限，仍校验大小/SHA-256 |
+| `EYES_PROJECT_EVENT_CONTENT_BYTES` | 0 | 每项目 Event.content + ObservedEvent.content 的 `sum(octet_length(content::text))`；正数启用，所有项目各自使用相同额度 |
+| `EYES_ARTIFACT_MIN_FREE_BYTES` | 0 | ARTIFACT_ROOT 所在文件系统实际 available bytes 的最低余量；正数启用，与项目逻辑额度独立 |
+| `EYES_CAPACITY_WARNING_PERCENT` | 90 | 1～100，事件用量达到额度的此百分比时 warning；达到额度时 blocked |
+
+逻辑额度统计实际持久化的 PostgreSQL JSONB 文本表示，包括脱敏事件封装、过期事件残留 `{}` 或审计封装，清理后仍有非零用量。它不计 ObservedRun.prompt/metrics、Attempt.result、Manifest、评分、报告、版本目录、索引/TOAST/页/WAL、日志、备份或客户端缓冲，不是 PostgreSQL 实际磁盘字节数。产物卷 used/free/total 是整个所在文件系统的值，可包含其他目录/项目/进程，不是仅产物文件总量。原请求大小限制独立生效。
+
+覆盖入口：`POST /v1/events`、`POST /v1/observation/events`、`POST /v1/observation/local/events`、`POST /v1/work/{id}/recovery-events` 共用函数作用域的 API 数据库事务提交前检查。授权、去重、身份/内容冲突校验先执行；flush 后测量新增量，超额整笔回滚并返回 507 `project_event_capacity_exceeded`，不返回成功后丢弃。历史已高于新额度时，零增长同内容重传、读取、心跳及完成回执仍可进行；原冲突、过期、撤销与领取令牌语义保持。剩余额度不够某批次时可整批拒绝，即使用量尚未达到告警线；拒绝响应含 used/requested_growth/limit/measured_at/retryable，状态 API 反映实际保留用量。
+
+启用逻辑保护后，API 首个数据库事务按维护共享锁 → 独立容量 advisory lock 74003 → 原领域锁执行；容量锁持有到提交/回滚，READ COMMITTED 下测量前一事务提交后的总量。此单团队实现串行化所有 API 数据库事务（含读请求），每事务两次全量正文聚合，未承诺大积压吞吐。清理只减少正文，不需占额台账。失败、取消或进程崩溃由 PostgreSQL 回滚/释放锁，重试重新测量，没有持久预留需要过期释放或核对。启用或修改配置前停止全部写入 API，用同一版本/配置重启所有 API worker；未升级 API、不同配置 API 或直接写库不参与保护，不能在混合版本滚动窗口承诺额度。
+
+产物保护位于 `LocalArtifactStore.publish`，覆盖普通 PUT、恢复上传和恢复缺失/损坏文件的再次发布，也包括 readiness 探测。声明 metadata 不占物理字节、不预留；pending 真正写入时再检查。同内容 ready 重传先校验完整性并返回既有登记，不因空间变小重复写入；恢复接口确实重建文件时仍检查。发布持有卷内永久 `.capacity.lock` 的 POSIX flock，测量空间，按文件系统块向上取整并加一个块的目录余量，检查后写临时文件/fsync/原子发布。同卷参与保护的发布者不能同时使用同一份空间；现有维护不删锁文件。仍使用既有 Linux Docker 部署。
+
+空间不足返回 507 `artifact_capacity_exceeded`（free/minimum/requested/allocation_allowance/measured_at），实际 ENOSPC/EDQUOT 返回 507 `artifact_storage_full`；测量失败为 503 `artifact_capacity_unknown`，其他写入错误为 503 `artifact_store_unavailable`。失败不把 pending 改为 ready。锁在失败/进程退出时释放；崩溃残留的临时文件、数据库失败后的未登记发布文件仍占真实空间，按既有 orphan grace 维护回收，不能当作已接受。无空间预留台账；文件释放空间在下一次测量生效。
+
+管理员查询：`GET /v1/operations/capacity` 仅 manage，事件用量仅本项目，共享卷空间仅管理员可见；read/Runner/来源令牌无此权限，来源写入边界不变。部署运维者用数据库权限运行：
+
+```powershell
+docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps api eyes-ops capacity --project-id PROJECT_UUID
+```
+
+返回 measurements（用量/阈值/UTC 测量时间/状态/原因）与 alerts。告警是按 `capacity:scope:project_id` 稳定 ID 去重的当前状态集合；轮询替换同一项，恢复后下次查询移除，不每次追加记录。没有持久告警历史、后台通知或 Web 新面板，通过公开运维 API/CLI 查看，不发送邮件/Webhook。未知卷数据为 null 并产生 unknown 告警；数据库不可用返回既有 503，不能当作零用量。未配置额度仍测量用量，阈值 0 表示关闭。
+
+恢复：提高逻辑额度、降低空间最低余量或按既有安全规则清理/回收后，新请求重新判断；客户端须保留待确认批次并重传，服务不自动恢复客户端已放弃数据。未知/活动任务、历史引用和未确认工作继续受原维护规则保护，不新增删除未知任务的腾空间入口。保留与 quota 独立，正文清理不保证数据库文件缩小。
+
+边界：存储锁不约束数据库、日志或外部进程写同一文件系统，块/元数据估算不是文件系统硬配额。不保护宿主机 Docker 磁盘镜像增长、数据库全部对象、WAL/日志/备份、Runner/exporter 缓冲、其他存储实现或直接写库；仍需部署层磁盘管理。不宣称防止所有磁盘耗尽。真实结果与未验收分支见[容量验收](capacity-protection-20261013.md)。
+
 状态同步：2026-10-13。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0006_observation_retention`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化按用户决定不纳入当前验收，未来有真实可比材料时再验证；原始完整 Windows 运维验收仍有未覆盖项，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容

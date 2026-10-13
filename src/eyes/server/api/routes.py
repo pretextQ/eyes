@@ -35,6 +35,7 @@ from eyes.server.domain import DomainError, public_record, scoped
 from eyes.server.evaluation import service as evaluation
 from eyes.server.evidence import service as evidence
 from eyes.server.experiments import batches
+from eyes.server.operations import capacity
 from eyes.server.scheduling import reconciliation, recovery
 from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.database import scheduling_lock
@@ -59,6 +60,13 @@ from eyes.server.storage.models import (
 )
 
 router = APIRouter(prefix="/v1")
+
+
+@router.get("/operations/capacity", tags=["operations"])
+def capacity_status(request: Request, session: Database, user: Manager):
+    return capacity.status(session, request.app.state.settings, user.project_id)
+
+
 Limit = Annotated[int, Query(ge=1, le=200)]
 Offset = Annotated[int, Query(ge=0)]
 

@@ -1,5 +1,7 @@
 # 在 Agent 中工作，在 Eyes 中观测
 
+2026-10-13 可选容量保护已实现：`EYES_PROJECT_EVENT_CONTENT_BYTES=0` 默认关闭，正数限制每项目已保留实验事件与观测事件的 JSON 文本字节总量；公共与 local 观测入口均检查，超额整批 507/回滚，原已接受内容重传保持幂等，冲突/410 语义不变。失败不更新任务终态或把缺失事件显示成完整证据。容量释放后发送端须重传原待确认批次，服务端不恢复客户端已丢弃的数据。管理员在 `GET /v1/operations/capacity` 或 `eyes-ops capacity --project-id UUID` 查看用量、阈值、时间及按稳定 ID 去重的当前告警。额度不是 PostgreSQL 磁盘上限，正文清理后审计封装仍占额度；配置/锁与未覆盖对象见[运维说明](platform.md#容量保护与当前告警)，真实材料副本结果见[容量验收](capacity-protection-20261013.md)。
+
 > 自 2026-10-11 起仅在当前 Windows 宿主机开发，API 在本机 Linux 容器运行，启动方式见 [Windows/MewCode 说明](../integrations/mewcode/README.md)。2026-10-12 trae 的直接任务/被动 exporter 在独立环境通过本轮正向、补传、权限、Web 和按需重启范围，见[验收记录](observation-trae-acceptance-20261012.md)；Deta 及其他 exporter 不据此自动升级验收。
 
 被动观测不需要测试集、评分器、实验或 Runner。用户在 Agent 中照常输入任务，Agent 保持执行与工具权限，Eyes 接收实际埋点事件并展示。下面 Deta 配置是该已有接入的专用说明。原有实验评测入口继续用于批量任务和评分。
@@ -98,4 +100,4 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps 
 docker compose --env-file deploy/.env -f deploy/compose.yaml --profile maintenance up -d maintenance
 ```
 
-既有维护进程每小时执行 `maintain --apply`，每轮仍受批数限制；不新增调度服务。interval 循环响应 SIGTERM/SIGINT，完成当前轮后退出；Compose 给维护进程 3 分钟停止宽限。若显式提高 max_batches 或旧实验证据维护耗时超出宽限，仍可能被强杀；已提交批次可续清，不能把停止进程理解为数据库全部排空。多项目手工维护可以覆盖配置中的 UUID。清理和容量不同：审计行、活动/失联任务、数据库页/WAL、备份与客户端副本仍占空间。VACUUM 可回收供数据库复用，普通清理不保证文件立即缩小或安全擦除磁盘。数据库硬容量限额、超限拒收、空间告警、大规模积压吞吐与长期趋势尚未实现/验收，保留后续计划。备份、升级及不能丢失过期标识的降级规则见[平台说明](platform.md#观测迁移与备份恢复)。
+既有维护进程每小时执行 `maintain --apply`，每轮仍受批数限制；不新增调度服务。interval 循环响应 SIGTERM/SIGINT，完成当前轮后退出；Compose 给维护进程 3 分钟停止宽限。若显式提高 max_batches 或旧实验证据维护耗时超出宽限，仍可能被强杀；已提交批次可续清，不能把停止进程理解为数据库全部排空。多项目手工维护可以覆盖配置中的 UUID。清理和容量不同：审计行、活动/失联任务、数据库页/WAL、备份与客户端副本仍占空间。VACUUM 可回收供数据库复用，普通清理不保证文件立即缩小或安全擦除磁盘。项目事件正文额度与产物卷空间拒收、当前告警已新增，见本文开头；数据库物理硬容量限额、大规模积压吞吐与长期趋势仍未实现/验收。备份、升级及不能丢失过期标识的降级规则见[平台说明](platform.md#观测迁移与备份恢复)。

@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import logging
 import os
@@ -245,8 +246,9 @@ class ArtifactStore:
 
 
 class LocalArtifactStore(ArtifactStore):
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, minimum_free_bytes: int = 0):
         self.root = root.resolve()
+        self.minimum_free_bytes = minimum_free_bytes
 
     def path(self, key: str) -> Path:
         # Keys are server-generated UUIDs; user-visible names never become paths.
@@ -254,7 +256,60 @@ class LocalArtifactStore(ArtifactStore):
         return self.root / str(identifier)
 
     def publish(self, key: str, content: bytes) -> None:
+        try:
+            self._admit_and_publish(key, content)
+        except OSError as error:
+            if error.errno in {errno.ENOSPC, errno.EDQUOT}:
+                raise DomainError(
+                    507, "artifact_storage_full", "artifact filesystem has no available capacity"
+                ) from error
+            raise DomainError(
+                503,
+                "artifact_store_unavailable",
+                "artifact filesystem cannot publish content",
+                {"scope": "artifact_volume", "reason": f"filesystem_error:{error.errno}"},
+            ) from error
+
+    def _admit_and_publish(self, key: str, content: bytes) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
+        if self.minimum_free_bytes:
+            # Persistent lock inode: never unlink it during cleanup. File locks
+            # release on process exit; pending bytes remain counted by statvfs.
+            import fcntl
+
+            from eyes.server.operations.capacity import volume_status
+
+            with (self.root / ".capacity.lock").open("a+b") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                measurement = volume_status(self.root, self.minimum_free_bytes)
+                if measurement["free_bytes"] is None:
+                    raise DomainError(
+                        503,
+                        "artifact_capacity_unknown",
+                        "cannot measure artifact volume",
+                        measurement,
+                    )
+                block = os.statvfs(self.root).f_frsize or 4096
+                # Round up the file allocation and leave one extra block for
+                # directory metadata. External writers remain outside this lock.
+                allocation = ((len(content) + block - 1) // block + 1) * block
+                if measurement["free_bytes"] - allocation < self.minimum_free_bytes:
+                    raise DomainError(
+                        507,
+                        "artifact_capacity_exceeded",
+                        "artifact upload would cross minimum free space",
+                        {
+                            **measurement,
+                            "requested_bytes": len(content),
+                            "allocation_allowance_bytes": allocation,
+                            "retryable": True,
+                        },
+                    )
+                self._publish(key, content)
+        else:
+            self._publish(key, content)
+
+    def _publish(self, key: str, content: bytes) -> None:
         fd, filename = tempfile.mkstemp(prefix=".pending-", dir=self.root)
         try:
             with os.fdopen(fd, "wb") as stream:

@@ -31,6 +31,7 @@
 | 接入目标、SDK、评分器与 Runner | [通用接入](agent-integration.md)、[统一协议](agent-protocol.md)、[HTTP 运行时](agent-http-runtime.md) |
 | 查询未知任务与恢复原操作 | [恢复操作](unknown-recovery.md)、[Runner 可靠性](runner-reliability-20261011.md) |
 | 备份恢复与发布性能风险 | [平台操作](platform.md)、[完整恢复及 #7/#8/#10/#11 核查](backup-release-review-20261011.md) |
+| 配置容量保护、查询当前告警 | [容量操作](platform.md#容量保护与当前告警)、[真实材料副本验收](capacity-protection-20261013.md) |
 | 升级普通契约、旧载荷与客户端 | [版本迁移](contract-version-migration.md)、[兼容验收](contract-compatibility-validation.md) |
 | 使用 Web、历史评分与固定报告 | [前端](frontend.md)、[平台与 CLI](platform.md) |
 | 创建批次与被动观测 | [多 Agent 批次](multi-agent-batches.md)、[观测](observation.md) |
