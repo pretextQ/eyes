@@ -1,5 +1,9 @@
 # 取消持久审计开发与独立验收（2026-10-14）
 
+后续再次独立读取原始材料、比较完整快照摘要，并在新卷复核重启同键读取/read权限/追加保护，结论为**通过本轮范围**，不升级活动远端停止或基础设施故障矩阵，见[独立复核](capacity-cancellation-review-20261014.md)。本记录历史操作与失败保持。
+
+计数更正：原记录将0007备份审计总数写为十条；完整SQL JSON及备份前后列表实际均为十一条，完整文件SHA-256一致。恢复API的十条是分页响应，不能作总数。本轮据原材料更正下表，未发现记录丢失，不改写历史操作失败。
+
 日期为 Asia/Shanghai；起点 `f4f97ba`（容量保护已独立提交、工作区干净）。Windows PowerShell / 本机 Docker Linux；宿主 Python 3.14.4，缓存控制镜像 Python 3.14.7，PostgreSQL 18.6。此次交付实际源码、0007 迁移、契约/schema、CLI 与 Web，不修改评测用例、评分器、Runner/外部 Agent 或容量保护实现。
 
 ## 实现范围
@@ -33,10 +37,10 @@
 | Web 实际提交 | `e68a3a92-b245-4163-ba23-da5602d53e68` 经浏览器弹窗输入理由并提交；页面立即 completed、3 cancelled、Attempt=0，审计显示经认证的凭据 UUID、服务端时间、理由及平台处理结果 |
 | Web 关联与布局 | 实验事实可展开，批次父记录按需展开真实两个成员及 parent_id；390/1280 宽度检查，修正初版 notice 横向布局，长 ID/理由换行，事实使用既有可滚动 JsonBlock |
 | 重启 | 两副本 API 实际 restart 后持久审计可读取；原 unknown/预留没有被审计替代为停止确认 |
-| 0007 备份往返 | Linux `eyes-ops backup /deliver/verified-0007` 27 ready 产物，空目标 restore/audit 为 ok：49 清单、16 评分；备份时十条审计的完整整行 JSON（含键摘要、理由、身份、时间、结果、父关联）完全相同，恢复 API 200读取十条。此后 CLI/理由/Web 操作只在源副本追加，未混称为备份时内容 |
+| 0007 备份往返 | Linux `eyes-ops backup /deliver/verified-0007` 27 ready 产物，空目标 restore/audit 为 ok：49 清单、16 评分；备份时十一条审计的完整整行 JSON（含键摘要、理由、身份、时间、结果、父关联）完全相同，恢复 API 200读取前十条（该分页响应不等于备份总数）。此后 CLI/理由/Web 操作只在源副本追加，未混称为备份时内容 |
 | 旧备份兼容 | 0005 原备份恢复 audit=ok，47 ready/86 清单/25 评分，两项 unknown 保持；0006 实际备份也由当前 restore 完整恢复同份材料，再升级 0007、alembic check 无差异。未补造旧取消身份/时间/理由 |
 | 追加与迁移保护 | 实际 UPDATE/DELETE 事务均被 PostgreSQL immutable trigger 拒绝；非空审计 downgrade 拒绝，head/历史保持；空新库 0007→0006→0007 成功 |
-| 原历史保持 | 控制副本原17 Attempt 整行 JSON 前后完全相同，仍16 ScoreRun；新排队操作没有执行或评分。原审计备份十行全字段一致，后续合法请求只追加 |
+| 原历史保持 | 控制副本原17 Attempt 整行 JSON 前后完全相同，仍16 ScoreRun；新排队操作没有执行或评分。原审计备份十一行全字段一致，后续合法请求只追加 |
 
 结束前控制库共14条审计（含两个批次子行及其他项目失败行）：processed=6、already_finished=6、failed=2。旧故障备份副本另有原 unknown 操作和其重复/权限失败记录，不能与主项目数量混算。
 

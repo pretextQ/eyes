@@ -1,5 +1,7 @@
 # 容量保护开发与真实材料副本检查（2026-10-13）
 
+后续 2026-10-14 独立复核判定**部分通过**：原始材料与隔离小额度复验支持 API/CLI 已覆盖行为，容量 Web 未实现及部分故障分支证据不足；原失败及边界保留，见[本轮复核](capacity-cancellation-review-20261014.md)。
+
 Windows PowerShell、本机 Docker Linux、PostgreSQL 18.6，起点 Eyes `83e9c63`。本轮实现源码，不只更新文档；未修改外部 Agent、仓库测试、fixtures 或 mocks，未安装依赖、执行 Agent/评分器、调用付费模型、做 24h 实验或填满宿主机磁盘。
 
 ## 实现与计量
