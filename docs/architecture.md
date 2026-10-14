@@ -60,7 +60,7 @@ Web 与 CLI 使用同一套公开 API。业务规则不放在路由和前端中�
 | 前端 | React、TypeScript、Vite、shadcn/Base UI、Tailwind CSS 4 | 运行列表、执行详情和逐用例对比；组件选择已落地，见前端说明 |
 | 部署 | Docker Compose | 固定版本、数据卷、健康检查和迁移步骤；Runner 也可在宿主机独立运行 |
 
-当前项目保持 Python >=3.14。依赖锁定在 uv.lock；当前 Windows 宿主机/Linux 容器的干净完整控制 Compose 与新环境 HTTP 接入已通过本轮范围，见[部署与权限](clean-deployment-permissions-20261011.md)。完整真实材料的隔离备份恢复见[恢复与发布核查](backup-release-review-20261011.md)。当前迁移 head 为 `0006_observation_retention`（项目范围的观测保留及副本验收见 [观测说明](observation.md)）；这些容器记录不证明原生 Windows API/Runner 已兼容。有界读取/评分容量已有实测，Agent 执行容量、完整故障矩阵及长期运行仍待验证，见[容量边界](capacity-validation-20261011.md)。
+当前项目保持 Python >=3.14。依赖锁定在 uv.lock；当前 Windows 宿主机/Linux 容器的干净完整控制 Compose 与新环境 HTTP 接入已通过本轮范围，见[部署与权限](clean-deployment-permissions-20261011.md)。完整真实材料的隔离备份恢复见[恢复与发布核查](backup-release-review-20261011.md)。当前迁移 head 为 `0007_cancellation_audit`（项目范围的观测保留及副本验收见 [观测说明](observation.md)）；这些容器记录不证明原生 Windows API/Runner 已兼容。有界读取/评分容量已有实测，Agent 执行容量、完整故障矩阵及长期运行仍待验证，见[容量边界](capacity-validation-20261011.md)。
 
 PostgreSQL 的 `SKIP LOCKED` 可用于多个消费者领取队列表中的工作；它只解决领取时的行锁竞争，并不自动提供租约、并发限额、公平性或外部执行幂等。[PostgreSQL SELECT 文档](https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE)
 
@@ -182,7 +182,7 @@ Attempt 的正常流程为 `claimed → preparing → running → succeeded / fa
 
 CI 门槛返回 `pass`、`fail` 或 `inconclusive`，同时列出未达标与证据缺口。CLI 为配置或服务错误保留独立退出码；默认只有 pass 返回成功，人工放行属于外部流程。
 
-当前验收已用同一真实 MewCode 的两个原样 Git 版本固定既有测试集/评分器，验证三项无变化、历史选择、旧报告、引用/分母及 CLI 0/1/2/3；真实改善/退化仍未产生，M3 不视为完整通过。实验 completed 仍表示调度结束，实验级取消请求持久审计另列设计缺口，见[部署与回归验收](deployment-regression-20261011.md)。
+当前验收已用同一真实 MewCode 的两个原样 Git 版本固定既有测试集/评分器，验证三项无变化、历史选择、旧报告、引用/分母及 CLI 0/1/2/3；真实改善/退化仍未产生，M3 不视为完整通过。实验 completed 仍表示调度结束，实验/批次取消请求现已追加持久审计，保持既有终态与停止确认边界，见[取消审计](cancellation-audit.md)。
 
 ## 存储与访问边界
 

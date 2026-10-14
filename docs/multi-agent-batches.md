@@ -36,7 +36,7 @@
 - 批次顶层和 experiments 中的每个 ExperimentCreate 都要求显式 `schema_version: "1.0"`；旧请求的有限窗口及文件迁移见[版本迁移](contract-version-migration.md)。
 - `GET /v1/experiment-batches?limit=50&offset=0`：分页读取批次摘要。
 - `GET /v1/experiment-batches/{id}`：批次快照、各成员实验与任务进度。
-- `POST /v1/experiment-batches/{id}/cancel`：请求取消全部成员。
+- `POST /v1/experiment-batches/{id}/cancel`：请求取消全部成员；可选理由和请求键，响应追加父级审计及 duplicate，成员逐一记录真实处理结果，见[取消审计契约](cancellation-audit.md)。
 
 创建 body 的 `name` 为批次名称，`experiments` 为现有 `ExperimentCreate` 请求组成的数组；每个对象提供自己的 `target_version_id`、`dataset_version_id`、`scorer_version_ids`、`concurrency` 等配置。每个成员默认超时 300 秒、重复 1 次、证据等待 60 秒，选择首个执行成功的 Attempt。
 
@@ -57,7 +57,7 @@ eyes cancel-batch <batch-id>
 
 新迁移为 `0004_experiment_batches`，在 `0003_observation` 后增加批次表与可空的 `experiments.batch_id`。旧实验保持独立且可读取，不回填为批次，不覆盖历史快照。
 
-0004 是引入批次时的历史迁移编号；当前部署必须升级到 head `0005_reconciliation`，不能停在 0004 运行当前服务。后续普通 schema_version 严格要求与旧请求窗口见[版本迁移](contract-version-migration.md)，升级需核对控制端、Scheduler、Runner 的实际安装版本。
+0004 是引入批次时的历史迁移编号；当前部署必须升级到 head `0007_cancellation_audit`，不能停在 0004 运行当前服务。后续普通 schema_version 严格要求与旧请求窗口见[版本迁移](contract-version-migration.md)，升级需核对控制端、Scheduler、Runner 的实际安装版本。
 
 先按现有运维流程备份并停止控制端/调度器，再执行 `uv run alembic upgrade head`，随后以当前代码重启控制端和调度器。Runner 协议未变化，可以继续使用已有配置。API 就绪检查要求迁移达到当前 head。
 

@@ -1,5 +1,7 @@
 # Eyes
 
+实验与批次取消现已提供认证凭据身份、服务端时间、可选理由与实际平台处理结果的追加审计。详情/运行状态页与项目分页 API 可读取；completed 和未确认停止的占额语义保持。升级需迁移到 0007，见[取消审计](docs/cancellation-audit.md)与[独立验收](docs/cancellation-audit-20261014.md)。
+
 容量保护已提供可选的项目事件正文额度与产物卷可用空间检查，默认关闭；管理员通过 `GET /v1/operations/capacity` 或 `eyes-ops capacity --project-id UUID` 查询当前用量和去重告警。逻辑正文额度不等于 PostgreSQL 磁盘上限。配置、覆盖入口和升级操作见[容量保护](docs/platform.md#容量保护与当前告警)，独立真实材料验证见[容量验收](docs/capacity-protection-20261013.md)。
 
 [![CI](https://github.com/pretextQ/eyes/actions/workflows/ci.yml/badge.svg)](https://github.com/pretextQ/eyes/actions/workflows/ci.yml)
@@ -76,7 +78,7 @@ flowchart LR
 
 ## 当前验证进度
 
-状态更新至 **2026-10-13（Asia/Shanghai）**。实现、静态检查和真实运行验收分别记录；下表的通过均限于对应记录的环境与场景，M0～M4 尚未全部验收通过。
+状态更新至 **2026-10-14（Asia/Shanghai）**。实现、静态检查和真实运行验收分别记录；下表的通过均限于对应记录的环境与场景，M0～M4 尚未全部验收通过。
 
 | 范围 | 已有真实证据 | 剩余边界 |
 | --- | --- | --- |

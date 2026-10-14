@@ -35,6 +35,8 @@
 
 **独立设计缺口**：Experiment 没有取消请求的独立时间、操作者、理由或持久化审计记录。活动 Attempt/ScoreRun 的取消时间及排队用例 cancelled 能保留部分事实，但无法完整重建实验级取消意图（尤其调度终态后）。将来应单独评估追加审计事实及权限/历史读取，不能据此未经评估改变 completed 的公共含义。本轮仅覆盖排队执行取消；没有宣称 MewCode 不支持的远端取消正向路径已通过。
 
+2026-10-14 后续状态：上述历史缺口现由[实验/批次取消审计](cancellation-audit.md)补齐，见[独立验收](cancellation-audit-20261014.md)。本页 2026-10-11 的历史结果不改写，也未追加远端取消通过声明。
+
 ## 安全恢复前置条件复核
 
 新版本执行前，只读复核上一轮的原始响应、PostgreSQL 当前状态与 Agent protocol.sqlite3，没有重跑原操作。记录为 `safety-prerequisites.json` / `safety-raw-verification.json`：

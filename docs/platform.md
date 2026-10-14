@@ -2,7 +2,7 @@
 
 ## 容量保护与当前告警
 
-2026-10-13 新增 `server/operations/capacity.py`、API 事务检查和 LocalArtifactStore 发布检查，复用原载荷限制、去重、维护及认证。无新增依赖、数据库表或迁移，head 仍为 0006，协议仍为 1.0。默认两项保护为 0，沿用接收行为；空间写入错误增加稳定诊断。
+2026-10-13 新增 `server/operations/capacity.py`、API 事务检查和 LocalArtifactStore 发布检查，复用原载荷限制、去重、维护及认证。该容量任务无新增依赖、数据库表或迁移，当时 head 为 0006，协议仍为 1.0；当前 head 见下方升级说明。默认两项保护为 0，沿用接收行为；空间写入错误增加稳定诊断。
 
 | 配置 | 默认 | 计量范围 |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps 
 
 边界：存储锁不约束数据库、日志或外部进程写同一文件系统，块/元数据估算不是文件系统硬配额。不保护宿主机 Docker 磁盘镜像增长、数据库全部对象、WAL/日志/备份、Runner/exporter 缓冲、其他存储实现或直接写库；仍需部署层磁盘管理。不宣称防止所有磁盘耗尽。真实结果与未验收分支见[容量验收](capacity-protection-20261013.md)。
 
-状态同步：2026-10-13。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0006_observation_retention`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化按用户决定不纳入当前验收，未来有真实可比材料时再验证；原始完整 Windows 运维验收仍有未覆盖项，当前进度见 [开发计划](PLAN.md)。
+状态同步：2026-10-14。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0007_cancellation_audit`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化按用户决定不纳入当前验收，未来有真实可比材料时再验证；原始完整 Windows 运维验收仍有未覆盖项，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 
@@ -48,7 +48,7 @@ uv run eyes-server
 uv run eyes-scheduler
 ```
 
-升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。当前 API 就绪检查要求 0006，并通过实际产物发布与读取路径检查证据卷，不能仅升级到旧 head 后运行当前服务。
+升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。0007 增加实验/批次追加取消审计；当前 API 就绪检查要求 0007，并通过实际产物发布与读取路径检查证据卷，不能仅升级到旧 head 后运行当前服务。
 
 ### 观测迁移与备份恢复
 
@@ -154,7 +154,7 @@ CI 应以 `eyes gate` 的退出码决定结果：
 
 取消实验现在同时处理执行任务、等待证据、排队评分和活动评分。等待/排队评分记录 skipped；活动评分收到心跳停止请求，其后提交的结果不再计为有效分数。未按时结束或失去租约保留 error 诊断。对外部执行仍保留原规则：取消未确认保持未知状态和配额，不因租约过期自动重新执行。
 
-实验 completed 只表示调度结束，取消用例仍计入计划分母并由 cancelled_runs 及逐用例 cancelled 展示；比较报告保留 execution_not_successful 等原因，不把取消算为质量退化。排队取消已经通过实际 API/Web 核对，实验级请求审计不足另列设计缺口，见[取消验收](deployment-regression-20261011.md#审查-2取消语义与审计缺口)。
+实验 completed 只表示调度结束，取消用例仍计入计划分母并由 cancelled_runs 及逐用例 cancelled 展示；比较报告保留 execution_not_successful 等原因，不把取消算为质量退化。排队取消已经通过实际 API/Web 核对，实验/批次请求审计已实现，字段、事务、父/成员关联、失败与重试规则见[取消审计](cancellation-audit.md)，真实材料检查见[验收](cancellation-audit-20261014.md)。
 
 评分失败可以调用 `POST /v1/score-runs/{id}/retry`：新建 ScoreRun，保留原评分器和原清单，不执行目标。`rescore` 则使用最新清单；初始证据等待尚未结束时拒绝提前重新评分。汇总仍选择最早评分，使用新评分做回归时要在报告请求中明确指定对应 ScoreRun。
 
@@ -292,3 +292,7 @@ docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml up -d
 
 
 统一 agent_http 未知任务自动核对、人工 resolve 边界及 0005 升降级要求见[恢复操作](unknown-recovery.md)。初始实现轮次的 Docker/API/Agent 阻塞已保留为历史；之后独立 PostgreSQL 实际迁移和指定安全恢复必需项分别完成验证，见[兼容验收](contract-compatibility-validation.md)及[Runner 可靠性](runner-reliability-20261011.md)。它们不代替本节完整证据备份恢复或完整故障矩阵。
+
+## 取消审计保留与恢复
+
+取消审计采用 PostgreSQL 追加表，UPDATE/DELETE 被 trigger 拒绝，普通证据/观测维护不清除。对象/凭据删除不级联，默认长期随部署保留；不同独立操作的历史总量仍需监测。数据库备份包含所有父/子审计；当前 restore 兼容 0005/0006 旧备份，恢复到空目的地后必须先迁移到 0007，再启动 API；历史身份/时间不能回填猜测。完整规则见[取消审计](cancellation-audit.md#保留备份与删除)。

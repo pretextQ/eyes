@@ -140,7 +140,11 @@ def backup(sessions, settings, destination, *, container=None, bin_dir=None):
 def restore(sessions, settings, source, *, container=None, bin_dir=None):
     source = source.resolve()
     manifest = json.loads((source / "manifest.json").read_text())
-    if manifest.get("schema_version") != "1.0" or manifest["database_revision"] != SCHEMA_REVISION:
+    if manifest.get("schema_version") != "1.0" or manifest["database_revision"] not in {
+        SCHEMA_REVISION,
+        "0005_reconciliation",
+        "0006_observation_retention",
+    }:
         raise ValueError("backup protocol or database revision does not match this service")
     dump = source / "database.dump"
     if dump.is_symlink() or sha256(dump) != manifest["database_sha256"]:

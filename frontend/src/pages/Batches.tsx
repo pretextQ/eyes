@@ -1,3 +1,4 @@
+import { CancellationHistory } from "../components/CancellationHistory";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -163,6 +164,8 @@ function BatchView({ id }: { id: string }) {
   const { api } = useConnection();
   const client = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [cancelKey, setCancelKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const query = useQuery({
@@ -180,8 +183,13 @@ function BatchView({ id }: { id: string }) {
     try {
       const result = await api.post<Batch>(
         `/v1/experiment-batches/${id}/cancel`,
+        { schema_version: "1.0", reason },
+        { "Idempotency-Key": cancelKey },
       );
       client.setQueryData(["batch", id], result);
+      setCancelKey(crypto.randomUUID());
+      setReason("");
+      await client.invalidateQueries({ queryKey: ["cancellation-audits"] });
       await Promise.all([
         client.invalidateQueries({ queryKey: ["batches"] }),
         client.invalidateQueries({ queryKey: ["experiments"] }),
@@ -342,6 +350,7 @@ function BatchView({ id }: { id: string }) {
           </>
         )
       )}
+      <CancellationHistory kind="batch" id={id} />
       {cancelOpen && (
         <Dialog
           title="取消整个批次"
@@ -351,6 +360,18 @@ function BatchView({ id }: { id: string }) {
           }}
         >
           <div className="form">
+            <label>
+              取消理由（可选，最多 1000 字符；请勿填写密钥）
+              <textarea
+                maxLength={1000}
+                value={reason}
+                disabled={busy}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  setCancelKey(crypto.randomUUID());
+                }}
+              />
+            </label>
             {error != null && <ErrorNotice error={error} />}
             <div className="form-actions">
               <Button

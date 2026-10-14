@@ -62,6 +62,11 @@ def main():
     ):
         command = commands.add_parser(name)
         command.add_argument("id", type=UUID)
+        if name in {"cancel", "cancel-batch"}:
+            command.add_argument(
+                "--reason", help="optional plain-text reason (max 1000 characters)"
+            )
+            command.add_argument("--key", help="opaque request key; reuse only on transport retry")
         if name in {"wait", "wait-batch"}:
             command.add_argument("--deadline", type=float, default=600)
             command.add_argument("--interval", type=float, default=2)
@@ -134,6 +139,14 @@ def main():
                 path += f"?limit={args.limit}&offset={args.offset}"
             else:
                 path = f"v1/experiments/{args.id}"
+                if args.command in {"cancel", "cancel-batch"}:
+                    from eyes.contracts.cancellation import CancellationRequest
+
+                    payload = CancellationRequest(
+                        schema_version="1.0", reason=args.reason
+                    ).model_dump(mode="json")
+                    if args.key:
+                        headers = {"Idempotency-Key": args.key}
                 if args.command in {"results", "cancel"}:
                     path += f"/{args.command}"
                 if args.command == "cancel":

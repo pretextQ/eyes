@@ -4,6 +4,7 @@ import json
 
 from pydantic.json_schema import models_json_schema
 
+from eyes.contracts.cancellation import CancellationRequest
 from eyes.contracts.comparison import ComparisonCreate
 from eyes.contracts.dataset import CaseDefinition, DatasetImport
 from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose, ExecutionEvent
@@ -35,6 +36,7 @@ from eyes.contracts.work import (
 
 def public_models():
     return (
+        CancellationRequest,
         ComparisonCreate,
         CaseDefinition,
         DatasetImport,

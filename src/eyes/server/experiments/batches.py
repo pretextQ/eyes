@@ -8,9 +8,8 @@ from sqlalchemy.orm import Session
 
 from eyes.contracts.work import ExperimentBatchCreate
 from eyes.server.config import Settings
-from eyes.server.domain import DomainError, digest, public_record, scoped
+from eyes.server.domain import DomainError, digest, public_record
 from eyes.server.experiments import service as experiments
-from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.models import (
     CaseRun,
     CaseVersion,
@@ -164,13 +163,3 @@ def detail(session: Session, batch: ExperimentBatch):
         "status": status(members),
         "members": result,
     }
-
-
-def cancel(session: Session, project_id: UUID, batch_id: UUID):
-    batch = scoped(session, ExperimentBatch, batch_id, project_id)
-    ids = session.scalars(
-        select(Experiment.id).where(Experiment.batch_id == batch.id).order_by(Experiment.id)
-    ).all()
-    for experiment_id in ids:
-        scheduling.cancel(session, project_id, experiment_id)
-    return batch

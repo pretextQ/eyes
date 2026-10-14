@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
+from eyes.contracts.cancellation import CancellationRequest
 from eyes.contracts.comparison import ComparisonCreate
 from eyes.contracts.dataset import DatasetImport
 from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose
@@ -34,7 +35,7 @@ from eyes.server.catalog import service as catalog
 from eyes.server.domain import DomainError, public_record, scoped
 from eyes.server.evaluation import service as evaluation
 from eyes.server.evidence import service as evidence
-from eyes.server.experiments import batches
+from eyes.server.experiments import batches, cancellation
 from eyes.server.operations import capacity
 from eyes.server.scheduling import reconciliation, recovery
 from eyes.server.scheduling import service as scheduling
@@ -171,8 +172,71 @@ def get_batch(batch_id: UUID, session: Database, user: Reader):
 
 
 @router.post("/experiment-batches/{batch_id}/cancel")
-def cancel_batch(batch_id: UUID, session: Database, user: Manager):
-    return batches.detail(session, batches.cancel(session, user.project_id, batch_id))
+def cancel_batch(
+    batch_id: UUID,
+    session: Database,
+    user: Manager,
+    body: CancellationRequest | None = None,
+    key: Annotated[
+        str | None, Header(alias="Idempotency-Key", min_length=1, max_length=200)
+    ] = None,
+):
+    audit, duplicate = cancellation.request(
+        session, user, "batch", batch_id, body.reason if body else None, key
+    )
+    return cancellation_response(session, user, audit, duplicate)
+
+
+def cancellation_response(session, user, audit, duplicate):
+    metadata = {"cancellation_audit": cancellation.view(audit), "duplicate": duplicate}
+    if audit.http_status != 200:
+        # Returning a response commits the failed handling fact; raising rolls it back.
+        return JSONResponse(
+            status_code=audit.http_status,
+            content=jsonable_encoder(
+                {
+                    "schema_version": "1.0",
+                    "error": {
+                        "code": audit.result["error_code"],
+                        "message": "cancellation object not available in this project",
+                    },
+                    **metadata,
+                }
+            ),
+        )
+    model = Experiment if audit.object_kind == "experiment" else ExperimentBatch
+    obj = session.scalar(
+        select(model).where(model.id == audit.object_id, model.project_id == user.project_id)
+    )
+    # Replay after deletion can still return the immutable original handling result.
+    payload = (
+        (record(obj) if model is Experiment else batches.detail(session, obj))
+        if obj
+        else {
+            "schema_version": "1.0",
+            "id": audit.object_id,
+            "object_deleted": True,
+        }
+    )
+    return {**payload, **metadata}
+
+
+@router.get("/cancellation-audits")
+def cancellation_history(
+    session: Database,
+    user: Reader,
+    limit: Limit = 50,
+    offset: Offset = 0,
+    object_kind: Literal["experiment", "batch"] | None = None,
+    object_id: UUID | None = None,
+    parent_id: UUID | None = None,
+):
+    return {
+        "schema_version": "1.0",
+        "items": cancellation.listing(
+            session, user.project_id, limit, offset, object_kind, object_id, parent_id
+        ),
+    }
 
 
 @router.get("/experiments/{experiment_id}")
@@ -214,8 +278,19 @@ def get_case_run(experiment_id: UUID, case_run_id: UUID, session: Database, user
 
 
 @router.post("/experiments/{experiment_id}/cancel")
-def cancel_experiment(experiment_id: UUID, session: Database, user: Manager):
-    return record(scheduling.cancel(session, user.project_id, experiment_id))
+def cancel_experiment(
+    experiment_id: UUID,
+    session: Database,
+    user: Manager,
+    body: CancellationRequest | None = None,
+    key: Annotated[
+        str | None, Header(alias="Idempotency-Key", min_length=1, max_length=200)
+    ] = None,
+):
+    audit, duplicate = cancellation.request(
+        session, user, "experiment", experiment_id, body.reason if body else None, key
+    )
+    return cancellation_response(session, user, audit, duplicate)
 
 
 @router.post("/runners/register")

@@ -52,6 +52,29 @@ class Credential(Record):
     revoked: Mapped[bool] = mapped_column(default=False)
 
 
+class CancellationAudit(Record):
+    __tablename__ = "cancellation_audits"
+    __table_args__ = (
+        UniqueConstraint("project_id", "actor_id", "key_digest"),
+        Index("ix_cancellation_project_time", "project_id", "created_at", "id"),
+        Index("ix_cancellation_object", "project_id", "object_kind", "object_id"),
+        CheckConstraint("object_kind IN ('experiment', 'batch')", name="ck_cancellation_kind"),
+    )
+    # Deliberately retain identifiers independently of object/credential deletion.
+    project_id: Mapped[UUID]
+    actor_id: Mapped[UUID]
+    actor_role: Mapped[str] = mapped_column(String(20))
+    object_kind: Mapped[str] = mapped_column(String(20))
+    object_id: Mapped[UUID]
+    parent_id: Mapped[UUID | None] = mapped_column(index=True)
+    reason: Mapped[str | None] = mapped_column(String(1000))
+    key_digest: Mapped[str | None] = mapped_column(String(64))
+    request_digest: Mapped[str | None] = mapped_column(String(64))
+    outcome: Mapped[str] = mapped_column(String(30))
+    http_status: Mapped[int]
+    result: Mapped[dict] = mapped_column(JSONB)
+
+
 class ObservationSource(Record):
     __tablename__ = "observation_sources"
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), index=True)

@@ -12,7 +12,7 @@
 | 调度 | 主动领取、插件匹配、执行/评分容量、租约、心跳、令牌校验、取消及到期扫描 |
 | 证据 | 事件去重、冲突诊断、固定清单、迟到清单、受控产物上传及查询 |
 | 评分 | 固定清单绑定、前置证据检查、结果校验、重新评分历史及明确分母的结果查询 |
-| 部署 | Alembic 0001～0005 迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移/Web 服务 |
+| 部署 | Alembic 0001～0007 迁移、配置样例、Compose 的 PostgreSQL/API/调度进程/迁移/Web 服务 |
 | 实际执行组件 | HTTP/Python 适配器、独立执行/评分进程、SDK、插件摘要与 Runner CLI 已实现；MewCode Python/HTTP 与 trae HTTP 基础闭环、双目标并发和定向恢复已有真实记录，完整能力矩阵仍待验收 |
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
@@ -143,6 +143,7 @@ ScorerVersion 冻结插件标识、实现摘要、配置、证据要求、超时
 | 实验列表/详情 | `GET /v1/experiments[/{id}]` | read/manage |
 | 汇总及用例详情 | `GET /v1/experiments/{id}/results`、`/case-runs` | read/manage |
 | 取消实验 | `POST /v1/experiments/{id}/cancel` | manage |
+| 取消审计 | `GET /v1/cancellation-audits`，项目分页与对象/父请求过滤 | read/manage |
 | 注册与领取 | `POST /v1/runners/register`、`POST /v1/work/claim` | runner |
 | 固定评分输入 | `POST /v1/work/{id}/score-input`（身份与有效 lease token） | runner |
 | 心跳与进度 | `POST /v1/work/{id}/heartbeat`、`/progress` | runner |
@@ -193,7 +194,7 @@ ScorerVersion 冻结插件标识、实现摘要、配置、证据要求、超时
 
 实验 `completed` 表示调度工作已结束；可能仍有执行失败、评分错误或证据不足。存在未知工作时为 `completed_with_unresolved`。结果查询同时展示计划运行数、成功数、评分数、通过数及未解决数，比例返回明确的 numerator/denominator。初版汇总选首个成功 Attempt 和其最早的 ScoreRun；重新评分的完整历史在用例详情中读取，汇总不会自动换成新分数。comparison 模块可选择固定 ScoreRun 并生成不可变回归报告。
 
-取消后的用例/尝试状态与 cancelled_runs 独立于实验调度状态；排队取消不创建虚构 Attempt，也不从计划分母移除。当前没有实验级取消请求的独立持久审计记录，这是需另行评估的设计缺口，不能据此新增公共 cancelled 终态。实际取消页面/报告核对见[验收记录](deployment-regression-20261011.md#审查-2取消语义与审计缺口)。
+取消后的用例/尝试状态与 cancelled_runs 独立于实验调度状态；排队取消不创建虚构 Attempt，也不从计划分母移除。实验与批次取消请求现有独立追加审计、认证身份、可选理由及父/成员处理结果；completed 公共终态不变。契约、分页查询、失败与重试规则见[取消审计](cancellation-audit.md)。实际取消页面/报告核对见[验收记录](deployment-regression-20261011.md#审查-2取消语义与审计缺口)。
 
 ## 证据、产物与敏感内容
 

@@ -1,3 +1,4 @@
+import { CancellationHistory } from "../components/CancellationHistory";
 import { formatDate, formatRatio, shortId } from "../format";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -74,6 +75,8 @@ function ExperimentView({ id }: { id: string }) {
   };
   const [createOpen, setCreateOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [cancelKey, setCancelKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const experiment = useQuery({
@@ -116,7 +119,13 @@ function ExperimentView({ id }: { id: string }) {
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/v1/experiments/${id}/cancel`);
+      await api.post(
+        `/v1/experiments/${id}/cancel`,
+        { schema_version: "1.0", reason },
+        { "Idempotency-Key": cancelKey },
+      );
+      setCancelKey(crypto.randomUUID());
+      setReason("");
       setCancelOpen(false);
       await client.invalidateQueries();
     } catch (e) {
@@ -450,6 +459,7 @@ function ExperimentView({ id }: { id: string }) {
       {createOpen && data && (
         <CreateExperiment source={data} onClose={() => setCreateOpen(false)} />
       )}
+      <CancellationHistory kind="experiment" id={id} />
       {cancelOpen && (
         <Dialog
           title="请求取消实验"
@@ -457,6 +467,18 @@ function ExperimentView({ id }: { id: string }) {
           onClose={() => setCancelOpen(false)}
         >
           <div className="form">
+            <label>
+              取消理由（可选，最多 1000 字符；请勿填写密钥）
+              <textarea
+                maxLength={1000}
+                value={reason}
+                disabled={busy}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  setCancelKey(crypto.randomUUID());
+                }}
+              />
+            </label>
             <div className="notice">
               <p>
                 未确认停止的执行保留“等待停止确认”或“结果未知”，历史尝试与证据仍可查看。

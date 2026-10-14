@@ -502,7 +502,7 @@ def finish(
     }
 
 
-def cancel(session: Session, project_id: UUID, experiment_id: UUID):
+def _cancel(session: Session, project_id: UUID, experiment_id: UUID):
     scheduling_lock(session)
     experiment = scoped(session, Experiment, experiment_id, project_id, lock=True)
     if experiment.status in {"completed", "completed_with_unresolved"}:
