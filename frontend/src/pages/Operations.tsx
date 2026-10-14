@@ -1,4 +1,5 @@
 import { CancellationHistory } from "../components/CancellationHistory";
+import { CapacityStatus } from "../components/CapacityStatus";
 import { formatDate } from "../format";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, RefreshCw, Server } from "lucide-react";
@@ -228,6 +229,7 @@ export function OperationsPage() {
           此刻在线。租约失效也不证明外部目标已停止；未知工作需核对实际状态。
         </p>
       </div>
+      <CapacityStatus />
       <CancellationHistory />
     </>
   );
