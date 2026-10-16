@@ -5,6 +5,8 @@
 本轮用户授权优先于草案中的旧授权描述。其余六题继续为候选。
 
 最新交付复核及待授权的最小真实评测方案见[评测准备](../../docs/coding-regression-preflight-20261016.md)。
+后续用户授权后的[trae单次真实评测](../../docs/coding-regression-real-acceptance-20261016.md)：
+chunk/int执行与独立评分通过；订单因4096 token输出截断执行失败，无有效质量评分；未重跑。
 以下各任务段落按实施时序保留当时状态，最新运行范围以任务4及其实施记录为准。
 
 当前包含 `py-chunk-sequence`（13组/18条件）、`py-int-cli-errors`（5组/17条件）及 `py-order-pricing-project`（16组/78条件）。JSONL 的
