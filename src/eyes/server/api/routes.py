@@ -11,6 +11,7 @@ from eyes.contracts.cancellation import CancellationRequest
 from eyes.contracts.comparison import ComparisonCreate
 from eyes.contracts.dataset import DatasetImport
 from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose
+from eyes.contracts.reconciliation import ReconciliationEvidence
 from eyes.contracts.schema import public_models
 from eyes.contracts.scorer import ScorerPublish
 from eyes.contracts.target import (
@@ -37,7 +38,7 @@ from eyes.server.evaluation import service as evaluation
 from eyes.server.evidence import service as evidence
 from eyes.server.experiments import batches, cancellation
 from eyes.server.operations import capacity
-from eyes.server.scheduling import reconciliation, recovery
+from eyes.server.scheduling import manual_evidence, reconciliation, recovery
 from eyes.server.scheduling import service as scheduling
 from eyes.server.storage.database import scheduling_lock
 from eyes.server.storage.models import (
@@ -432,6 +433,13 @@ def score_result(
 @router.post("/attempts/{attempt_id}/resolve")
 def resolve_attempt(attempt_id: UUID, body: Resolution, session: Database, user: Manager):
     return record(scheduling.resolve(session, user, attempt_id, body))
+
+
+@router.post("/attempts/{attempt_id}/reconciliation-evidence")
+def reconciliation_evidence(
+    attempt_id: UUID, body: ReconciliationEvidence, session: Database, user: Manager
+):
+    return manual_evidence.submit(session, user, attempt_id, body)
 
 
 @router.post("/attempts/{attempt_id}/rescore", status_code=201)

@@ -1,5 +1,12 @@
 # 未知远端任务的安全自动核对
 
+2026-10-17：新增manage人工证据入口 `POST /v1/attempts/{id}/reconciliation-evidence`。
+ReconciliationEvidence绑定原attempt/task/run/幂等键摘要，记录来源、证据摘要、事实时间和
+独立的停止/业务/计费声明；默认仅追加审计，不释放占额。只有明确停止与已知业务终态
+同时齐备且apply=true才复用resolve。费用声明不结算外部账本，清理状态独立保留。
+同证据ID重传幂等、冲突拒绝；旧resolve和外部Agent协议不变，无数据库迁移。
+权限与证据真实性责任、具体字段、兼容性及隔离验证见[专项记录](order-unknown-investigation-20261016.md)。
+
 2026-10-13 更新：原终态核对后已增加独立的原事件/产物补齐、清理事实及显式重评分路径。两原故障任务、补传 Runner 整体退出、同租约和过期租约续传、重复核对已实际复验，见[源码修复及边界](evidence-recovery-20261013.md)。下文 2026-10-11 的“不下载远端证据”是当时的实现边界；M2 仍未整体通过。
 
 现在匹配 Runner 先核对 unknown，再以 ReconciliationClaim.evidence_recovery=true 领取已由自动原操作核对完成的工作；证据租约不占业务执行额度。重新认证原键/原结果后，只 GET 原 events/artifacts，通过 recovery-observation/events/artifacts/close 接口保存回执、游标和新清单；不调用 Agent 执行或清理。`recovery_only = true` 可禁用普通执行/评分领取。项目、目标、凭据和原 task/attempt/run 范围必须匹配；大小/摘要、原生事件去重及冲突有校验。证据补齐不会自动重评分，需沿用显式 rescore；retry 仍使用原清单。旧结果、清单、评分和报告保留，未确认停止的 unknown 原规则不变。

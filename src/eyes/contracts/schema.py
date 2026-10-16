@@ -9,6 +9,7 @@ from eyes.contracts.comparison import ComparisonCreate
 from eyes.contracts.dataset import CaseDefinition, DatasetImport
 from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose, ExecutionEvent
 from eyes.contracts.observation import ObservationBatch, ObservationSourceCreate
+from eyes.contracts.reconciliation import ReconciliationEvidence
 from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput, ScorerPublish
 from eyes.contracts.target import (
     ExecutionInput,
@@ -46,6 +47,7 @@ def public_models():
         ExecutionEvent,
         ObservationBatch,
         ObservationSourceCreate,
+        ReconciliationEvidence,
         ScoreAssignment,
         ScoreInput,
         ScoreOutput,
