@@ -277,3 +277,5 @@ Runner 使用服务端 deadline 控制墙钟超时；心跳只续租，不延长
 平台迁移升级到 `0002_platform`。新实验的 `evidence_wait_seconds` 默认为 60，历史实验缺省按 0 处理；该等待发生在服务端，独立于 Runner 本地上传等待配置。Runner 将执行完成上报与证据上传分别确认，迟到证据清空后持久化提交 evidence-close，收到确认再清理正常工作目录。真实采集缺口不会因上传成功被改成 sealed。
 
 `POST /v1/attempts/{id}/evidence-close` 使用执行 Runner 令牌及原 Attempt 授权，提交 status、dropped_events、details；不会改变已发布评分。服务端等待截止之后的证据需显式 rescore。评分 retry 保留原清单，rescore 选择最新清单。升级顺序、取消行为及接口说明见 [平台说明](platform.md)。真实 Agent 联调仍按要求放在最后。
+
+编码回归扩展的独立数据集、可信 Python 评分插件与离线校验入口见[编码回归说明](../integrations/coding/README.md)。实施和静态检查不代表真实 Agent 验收；导入、发布及实验需要单独授权。

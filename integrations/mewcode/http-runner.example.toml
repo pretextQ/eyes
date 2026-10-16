@@ -11,3 +11,12 @@ entry_point = "integrations.deta.scorer:score"
 import_paths = ["/app"]
 cpu_seconds = 30
 memory_bytes = 536870912
+
+# New coding regression; configure frozen numeric/config before separate publication.
+[python_scorers.coding_regression]
+entry_point = "integrations.coding.scorer:score"
+python = "/app/.venv/bin/python"
+import_paths = ["/app"]
+cpu_seconds = 45
+memory_bytes = 536870912
+file_bytes = 1048576
