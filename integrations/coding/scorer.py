@@ -194,7 +194,8 @@ def candidate(spec):
             passed = check_call(condition)
     except BaseException:
         passed = False
-    print(json.dumps({"passed": passed}))
+    prefix = "\nEYES_CALL_RESULT " if condition["kind"] == "call" else ""
+    print(prefix + json.dumps({"passed": passed}))
 
 
 def limits():
@@ -278,20 +279,29 @@ def supervise(spec):
     if outcome == "exited":
         try:
             condition = spec["condition"]
-            stdout = output["stdout"].decode("utf-8")
-            stderr = output["stderr"].decode("utf-8")
             if condition["kind"] == "cli":
+                stdout = output["stdout"].decode("utf-8")
+                stderr = output["stderr"].decode("utf-8")
                 passed = process.returncode == condition["exit"] and stderr == condition["stderr"]
                 passed = passed and (
                     equal(strict_json(stdout), condition["json"])
                     if "json" in condition
                     else stdout == condition["stdout"]
                 )
-            else:
+            elif condition["kind"] == "import":
                 passed = (
                     process.returncode == 0
-                    and not stderr
-                    and equal(strict_json(stdout), {"passed": True})
+                    and not output["stderr"]
+                    and bytes(output["stdout"]) == b'{"passed": true}\n'
+                )
+            else:
+                # Function call output is not forbidden by the public task specification.
+                # Keep it byte-bounded, but parse only the checker's terminal result frame.
+                _, marker, frame = bytes(output["stdout"]).rpartition(b"\nEYES_CALL_RESULT ")
+                passed = (
+                    process.returncode == 0
+                    and bool(marker)
+                    and equal(strict_json(frame), {"passed": True})
                 )
         except ValueError, UnicodeError:
             pass
