@@ -4,9 +4,12 @@
 `deta_code` 或历史评分。来源为[修订草案](../../docs/coding-regression-review-proposal.md)，
 本轮用户授权优先于草案中的旧授权描述。其余六题继续为候选。
 
-最新交付复核及待授权的最小真实评测方案见[评测准备](../../docs/coding-regression-preflight-20261016.md)。
-后续用户授权后的[trae单次真实评测](../../docs/coding-regression-real-acceptance-20261016.md)：
+交付复核及首轮授权前方案见[评测准备](../../docs/coding-regression-preflight-20261016.md)。
+首轮用户授权后的[trae单次真实评测](../../docs/coding-regression-real-acceptance-20261016.md)：
 chunk/int执行与独立评分通过；订单因4096 token输出截断执行失败，无有效质量评分；未重跑。
+最新[订单第二次真实评测](../../docs/coding-regression-order-real-r2-20261016.md)：另获授权后仅订单一次，
+输出8192、请求240秒；第8次模型请求HTTP错误，原键核对仍unknown，无质量评分及追加执行。
+已结算0.03102228元，未确认预留0.184524元；原失败保留，3个必要核对组件继续运行。
 以下各任务段落按实施时序保留当时状态，最新运行范围以任务4及其实施记录为准。
 
 当前包含 `py-chunk-sequence`（13组/18条件）、`py-int-cli-errors`（5组/17条件）及 `py-order-pricing-project`（16组/78条件）。JSONL 的
