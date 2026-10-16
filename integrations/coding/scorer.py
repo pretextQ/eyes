@@ -7,6 +7,7 @@ import importlib
 import json
 import math
 import os
+import runpy
 import selectors
 import signal
 import subprocess
@@ -66,6 +67,7 @@ def validate_case(case):
     """Validate frozen product acceptance data, without loading candidate code."""
     allowed = {
         "py-chunk-sequence": ["chunks.py"],
+        "py-int-cli-errors": ["intsum.py"],
     }
     names = allowed[case["case_id"]]
     if case["artifact_requirements"] != names or sorted(case["input"]["files"]) != sorted(names):
@@ -88,7 +90,7 @@ def validate_case(case):
             raise ValueError("empty group")
         for condition in group["conditions"]:
             ids.append(condition["id"])
-            if condition["kind"] not in {"call", "import"}:
+            if condition["kind"] not in {"call", "import", "cli"}:
                 raise ValueError("unknown condition kind")
             if condition["module"] + ".py" not in names:
                 raise ValueError("unknown module")
@@ -99,6 +101,13 @@ def validate_case(case):
                     raise ValueError("invalid function check")
                 if condition.get("raises") not in {None, "TypeError", "ValueError"}:
                     raise ValueError("invalid expected exception")
+            if condition["kind"] == "cli":
+                if not all(isinstance(arg, str) for arg in condition["argv"]):
+                    raise ValueError("invalid argv")
+                if condition["exit"] not in {0, 2} or not isinstance(condition["stderr"], str):
+                    raise ValueError("invalid CLI protocol")
+                if ("json" in condition) == ("stdout" in condition):
+                    raise ValueError("ambiguous CLI output")
         units += len(group["conditions"])
     if len(ids) != len(set(ids)) or units > MAX_UNITS:
         raise ValueError("duplicate IDs or process budget exceeded")
@@ -143,6 +152,10 @@ def candidate(spec):
     sys.dont_write_bytecode = True
     condition = spec["condition"]
     sys.argv = [condition["module"] + ".py", "invalid argument"]
+    if condition["kind"] == "cli":
+        sys.argv = [condition["module"] + ".py", *condition["argv"]]
+        runpy.run_module(condition["module"], run_name="__main__", alter_sys=True)
+        return
     try:
         if condition["kind"] == "import":
             importlib.import_module(condition["module"])
@@ -234,11 +247,22 @@ def supervise(spec):
         raise RuntimeError("trusted launcher did not become ready")
     if outcome == "exited":
         try:
-            passed = (
-                process.returncode == 0
-                and not output["stderr"]
-                and strict_json(bytes(output["stdout"])) == {"passed": True}
-            )
+            condition = spec["condition"]
+            stdout = output["stdout"].decode("utf-8")
+            stderr = output["stderr"].decode("utf-8")
+            if condition["kind"] == "cli":
+                passed = process.returncode == condition["exit"] and stderr == condition["stderr"]
+                passed = passed and (
+                    equal(strict_json(stdout), condition["json"])
+                    if "json" in condition
+                    else stdout == condition["stdout"]
+                )
+            else:
+                passed = (
+                    process.returncode == 0
+                    and not stderr
+                    and equal(strict_json(stdout), {"passed": True})
+                )
         except ValueError, UnicodeError:
             pass
     print(json.dumps({"outcome": outcome, "passed": passed}))

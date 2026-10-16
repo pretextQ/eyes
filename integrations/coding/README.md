@@ -4,7 +4,7 @@
 `deta_code` 或历史评分。来源为[修订草案](../../docs/coding-regression-review-proposal.md)，
 本轮用户授权优先于草案中的旧授权描述。其余六题继续为候选。
 
-当前包含 `py-chunk-sequence`（13 个评分组，18 个独立条件进程）。JSONL 的
+当前包含 `py-chunk-sequence`（13组/18条件）及 `py-int-cli-errors`（5组/17条件）。JSONL 的
 prompt 是公开业务规范，expectations 冻结检查 ID、具体输入、预期、权重及分组。
 每个条件在新目录、新进程运行；复合组全部条件通过才获得该组整数分数。
 条件失败不阻断其他条件；未执行明确记为 not_run。100 分才 pass。
@@ -56,3 +56,7 @@ worker 被强杀、进程回收和资源参数均需要运行验证，静态实�
 snapshots 或内联自测。真实 Agent 评测另行明确目标版本、范围、次数、并发、超时及费用。
 
 任务1静态检查（2026-10-16，Windows/PowerShell）：`uv run --no-sync python -m integrations.coding.validate`、`uv run --no-sync ruff check src migrations integrations/coding`、`uv run --no-sync ruff format --check src migrations integrations/coding` 和 `git diff --check` 通过。18个条件，保守预算20秒。尚未执行候选代码或评分器运行验证。
+
+任务2：整数 CLI 冻结 int-valid/empty/large/invalid/import 五组，分值30/10/10/40/10。合法条件含正负混合、显式加号、前导零；大整数含20位及100位边界；非法条件分别运行空串、正负符号、前后空白、下划线、小数、全角及阿拉伯数字、合法/非法混合。每个条件独立新进程，保守预算20秒。CLI实际以 `runpy` 设置脚本身份/argv运行，比较退出码、原始错误通道和严格JSON（拒绝重复键、NaN/Infinity、额外字段、布尔冒充整数及额外日志）。导入使用非法CLI参数检查无副作用。
+
+任务2静态检查（2026-10-16，Windows/PowerShell）：同任务1的离线校验、Ruff检查/格式检查、`git diff --check` 通过。尚未执行评分器或真实 Agent。数据集内容变化后必须使用新的config摘要及评分器版本。
