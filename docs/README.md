@@ -33,7 +33,7 @@
 | 理解模块边界与交付目标 | [架构](architecture.md)、[计划](PLAN.md) |
 | 启动控制端、认证与公开 API | [后端](backend.md) |
 | 接入目标、SDK、评分器与 Runner | [通用接入](agent-integration.md)、[统一协议](agent-protocol.md)、[HTTP 运行时](agent-http-runtime.md) |
-| 首批编码回归与订单第二次评测 | [准备](coding-regression-preflight-20261016.md)、[首轮](coding-regression-real-acceptance-20261016.md)、[订单第二次](coding-regression-order-real-r2-20261016.md)；第二次unknown，无质量评分，保留恢复组件 |
+| 首批编码回归与订单第二次评测 | [准备](coding-regression-preflight-20261016.md)、[首轮](coding-regression-real-acceptance-20261016.md)、[订单第二次及后续收尾](coding-regression-order-real-r2-20261016.md)；unknown及费用预留保留，无质量评分；专用组件已停机，待供应商事实 |
 | 查询未知任务与恢复原操作 | [恢复操作](unknown-recovery.md)、[Runner 可靠性](runner-reliability-20261011.md) |
 | 备份恢复与发布性能风险 | [平台操作](platform.md)、[完整恢复及 #7/#8/#10/#11 核查](backup-release-review-20261011.md) |
 | 配置容量保护、查询当前告警 | [容量操作](platform.md#容量保护与当前告警)、[真实材料副本验收](capacity-protection-20261013.md) |
