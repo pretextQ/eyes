@@ -49,11 +49,10 @@ CPU软限制45秒、地址空间512 MiB、单文件1 MiB，均为每进程限制
 独立监督进程脱离 worker 进程组，持有父控制管道，EOF时杀死候选进程组。
 Linux subreaper 回收候选后代；正常、异常、超时和输出超限路径均 killpg/wait，
 无法确认回收返回 error。恶意候选新建会话、更强沙箱和树总额度不在本轮范围。
-worker 被强杀、进程回收和资源参数均需要运行验证，静态实现不代表验收通过。
+worker强杀、进程回收和资源参数已有本轮定向运行验证，实际范围见实施记录；静态实现和局部验证不代表完整验收。
 
 本轮不导入数据、不发布评分器、不运行真实 Agent、不创建实验或比较报告。
-评分器运行验证须使用已有获授权材料；不能自行新增仓库测试、fixtures、mocks、
-snapshots 或内联自测。真实 Agent 评测另行明确目标版本、范围、次数、并发、超时及费用。
+用户已专项授权本轮离线验证驱动与候选材料，见verification目录；授权不扩展至其他仓库测试或历史运行材料。真实Agent评测另行明确目标版本、范围、次数、并发、超时及费用。
 
 任务1静态检查（2026-10-16，Windows/PowerShell）：`uv run --no-sync python -m integrations.coding.validate`、`uv run --no-sync ruff check src migrations integrations/coding`、`uv run --no-sync ruff format --check src migrations integrations/coding` 和 `git diff --check` 通过。18个条件，保守预算20秒。尚未执行候选代码或评分器运行验证。
 
@@ -70,3 +69,7 @@ reason.conditions 以 `[检查ID, 状态, 原因码]` 紧凑行保存；groups�
 任务3静态检查（2026-10-16，Windows/PowerShell）：离线契约/矩阵/预算校验、Ruff检查/格式检查及 `git diff --check` 通过。多文件加载、监督进程及资源参数尚无运行验收；不修改核心Runner、公共契约、数据库结构或外部Agent。
 
 任务4静态收尾修正：公开规范只要求导入静默；函数调用过程中的输出在限额内不额外扣分，结果使用末尾可信检查帧读取。CLI和独立导入检查仍严格验证通道。该修正没有运行验证；环境、实际命令及材料限制见[本轮实施记录](../../docs/coding-regression-implementation-20261016.md)。
+
+任务4运行验证：在Python3.14.7的本机Linux容器内，三题正确实现均100分；典型错误、证据缺失/损坏、预算不足、超时、输出超限及正常/异常/强杀后的回收均经独立驱动验证。真实ProcessWorker评分阶段（45秒CPU/512 MiB AS/1 MiB FSIZE）三题均100分；强杀后观测到的监督/候选/后代均已回收。运行发现并修复了后代持管道误判超时，以及限内存worker下额外线程池导致基础设施错误的问题。最终实现按波次并行启动最多8个监督进程，不增加插件线程。完整命令、失败历史及未覆盖边界见本轮实施记录；不代表真实Agent验收。
+
+授权材料的复用入口为 `python -m integrations.coding.verification.run` 和 `python -m integrations.coding.verification.worker`，只在上述隔离Linux容器运行。worker驱动须同时将当前src只读挂载到镜像的/app/src，确保worker使用当前源码。需要Docker init回收孤立监督进程；候选后代由监督进程subreaper回收。

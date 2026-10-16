@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -237,6 +237,13 @@ def supervise(spec):
             selector.register(getattr(process, name), selectors.EVENT_READ, name)
         end = time.monotonic() + PROCESS_SECONDS
         while len(selector.get_map()) > 1:
+            if process.poll() is not None:
+                # A descendant may keep the inherited pipes open after the leader exits.
+                # Stop the group now, then drain the bounded pipes before judging output.
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             if time.monotonic() >= end:
                 outcome = "timeout"
                 break
@@ -308,9 +315,8 @@ def supervise(spec):
     print(json.dumps({"outcome": outcome, "passed": passed}))
 
 
-def run_condition(condition, sources, workspace, end):
-    if time.monotonic() + 4 > end:
-        return {"id": condition["id"], "state": "not_run"}
+@contextmanager
+def pending_condition(condition, sources, workspace):
     with tempfile.TemporaryDirectory(prefix="coding-", dir=workspace) as directory:
         root = Path(directory)
         project = root / "project"
@@ -346,27 +352,38 @@ def run_condition(condition, sources, workspace, end):
             start_new_session=True,
         )
         try:
-            # Keep stdin open until the supervisor has killed/reaped every candidate child.
-            process.wait(timeout=min(4.5, max(0.1, end - time.monotonic())))
-            stdout = process.stdout.read(OUTPUT_LIMIT * 16)
-            if process.returncode:
-                raise RuntimeError("supervisor failed")
-            actual = strict_json(stdout)
-        except BaseException:
+            yield process
+        finally:
+            # EOF asks the independent supervisor to finish cleanup even on parent errors.
             process.stdin.close()
             try:
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired as error:
                 raise RuntimeError("supervisor cleanup unconfirmed") from error
-            raise
-        finally:
-            for stream in (process.stdin, process.stdout, process.stderr):
-                stream.close()
-        passed = actual["passed"]
-        diagnostic = actual["outcome"]
-        if actual["outcome"] == "exited":
-            diagnostic = "ok" if passed else "behavior"
-        return {"id": condition["id"], "state": "pass" if passed else "fail", "detail": diagnostic}
+            finally:
+                for stream in (process.stdout, process.stderr):
+                    stream.close()
+
+
+def collect_condition(process, condition, end):
+    # Supervisors emit only small trusted summaries; candidate output never reaches this pipe.
+    process.wait(timeout=min(4.5, max(0.1, end - time.monotonic())))
+    stdout = process.stdout.read(4096)
+    if process.returncode:
+        raise RuntimeError("supervisor failed")
+    actual = strict_json(stdout)
+    passed = actual["passed"]
+    diagnostic = actual["outcome"]
+    if diagnostic == "exited":
+        diagnostic = "ok" if passed else "behavior"
+    return {"id": condition["id"], "state": "pass" if passed else "fail", "detail": diagnostic}
+
+
+def run_condition(condition, sources, workspace, end):
+    if time.monotonic() + 4 > end:
+        return {"id": condition["id"], "state": "not_run"}
+    with pending_condition(condition, sources, workspace) as process:
+        return collect_condition(process, condition, end)
 
 
 def score(request, context):
@@ -454,22 +471,41 @@ def score(request, context):
                 remaining, (request.deadline - datetime.now(UTC)).total_seconds() - RESERVE_SECONDS
             )
         end = time.monotonic() + remaining
-        with ThreadPoolExecutor(max_workers=PARALLEL) as executor:
-            futures = [
-                executor.submit(run_condition, c, sources, context.workspace, end)
-                for c in conditions
-            ]
-            broken = False
-            for index, future in enumerate(futures):
-                try:
-                    outcomes[index] = future.result()
-                except Exception as error:
-                    broken = True
-                    outcomes[index] = {
-                        "id": conditions[index]["id"],
-                        "state": "error",
-                        "detail": type(error).__name__,
-                    }
+        # Wave scheduling keeps concurrency without reserving additional Python thread stacks
+        # or libc thread arenas inside the memory-limited Runner worker.
+        broken = False
+        for offset in range(0, len(conditions), PARALLEL):
+            with ExitStack() as stack:
+                active = []
+                for index in range(offset, min(offset + PARALLEL, len(conditions))):
+                    if time.monotonic() + 4 > end:
+                        continue
+                    try:
+                        process = stack.enter_context(
+                            pending_condition(
+                                conditions[index],
+                                sources,
+                                context.workspace,
+                            )
+                        )
+                        active.append((index, process))
+                    except Exception as error:
+                        broken = True
+                        outcomes[index] = {
+                            "id": conditions[index]["id"],
+                            "state": "error",
+                            "detail": type(error).__name__,
+                        }
+                for index, process in active:
+                    try:
+                        outcomes[index] = collect_condition(process, conditions[index], end)
+                    except Exception as error:
+                        broken = True
+                        outcomes[index] = {
+                            "id": conditions[index]["id"],
+                            "state": "error",
+                            "detail": type(error).__name__,
+                        }
         if broken:
             return result("error", "infrastructure check failure")
         if any(o["state"] == "not_run" for o in outcomes) or time.monotonic() > end:
