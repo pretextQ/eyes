@@ -4,6 +4,9 @@
 `deta_code` 或历史评分。来源为[修订草案](../../docs/coding-regression-review-proposal.md)，
 本轮用户授权优先于草案中的旧授权描述。其余六题继续为候选。
 
+最新交付复核及待授权的最小真实评测方案见[评测准备](../../docs/coding-regression-preflight-20261016.md)。
+以下各任务段落按实施时序保留当时状态，最新运行范围以任务4及其实施记录为准。
+
 当前包含 `py-chunk-sequence`（13组/18条件）、`py-int-cli-errors`（5组/17条件）及 `py-order-pricing-project`（16组/78条件）。JSONL 的
 prompt 是公开业务规范，expectations 冻结检查 ID、具体输入、预期、权重及分组。
 每个条件在新目录、新进程运行；复合组全部条件通过才获得该组整数分数。
