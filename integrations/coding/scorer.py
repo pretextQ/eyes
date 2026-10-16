@@ -60,6 +60,14 @@ def equal(actual, expected):
     return actual == expected
 
 
+def candidate_json(text):
+    try:
+        return strict_json(text)
+    except RecursionError as error:
+        # Only candidate JSON decoding depth is a quality failure, not checker recursion.
+        raise ValueError("candidate JSON nesting too deep") from error
+
+
 def catalog():
     return [strict_json(line) for line in DATASET.read_text(encoding="utf-8").splitlines() if line]
 
@@ -223,6 +231,7 @@ def supervise(spec):
     process = None
     output = {"stdout": bytearray(), "stderr": bytearray()}
     outcome = "exited"
+    returncode = None
     try:
         process = subprocess.Popen(
             command,
@@ -236,14 +245,17 @@ def supervise(spec):
         for name in output:
             selector.register(getattr(process, name), selectors.EVENT_READ, name)
         end = time.monotonic() + PROCESS_SECONDS
-        while len(selector.get_map()) > 1:
-            if process.poll() is not None:
+        while True:
+            returncode = process.poll()
+            if returncode is not None:
                 # A descendant may keep the inherited pipes open after the leader exits.
                 # Stop the group now, then drain the bounded pipes before judging output.
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+                if len(selector.get_map()) == 1:
+                    break
             if time.monotonic() >= end:
                 outcome = "timeout"
                 break
@@ -289,15 +301,15 @@ def supervise(spec):
             if condition["kind"] == "cli":
                 stdout = output["stdout"].decode("utf-8")
                 stderr = output["stderr"].decode("utf-8")
-                passed = process.returncode == condition["exit"] and stderr == condition["stderr"]
+                passed = returncode == condition["exit"] and stderr == condition["stderr"]
                 passed = passed and (
-                    equal(strict_json(stdout), condition["json"])
+                    equal(candidate_json(stdout), condition["json"])
                     if "json" in condition
                     else stdout == condition["stdout"]
                 )
             elif condition["kind"] == "import":
                 passed = (
-                    process.returncode == 0
+                    returncode == 0
                     and not output["stderr"]
                     and bytes(output["stdout"]) == b'{"passed": true}\n'
                 )
@@ -306,12 +318,12 @@ def supervise(spec):
                 # Keep it byte-bounded, but parse only the checker's terminal result frame.
                 _, marker, frame = bytes(output["stdout"]).rpartition(b"\nEYES_CALL_RESULT ")
                 passed = (
-                    process.returncode == 0
+                    returncode == 0
                     and bool(marker)
-                    and equal(strict_json(frame), {"passed": True})
+                    and equal(candidate_json(frame), {"passed": True})
                 )
         except ValueError, UnicodeError:
-            pass
+            passed = False
     print(json.dumps({"outcome": outcome, "passed": passed}))
 
 

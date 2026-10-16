@@ -83,3 +83,11 @@ reason.conditions 以 `[检查ID, 状态, 原因码]` 紧凑行保存；groups�
 任务4运行验证：在Python3.14.7的本机Linux容器内，三题正确实现均100分；典型错误、证据缺失/损坏、预算不足、超时、输出超限及正常/异常/强杀后的回收均经独立驱动验证。真实ProcessWorker评分阶段（45秒CPU/512 MiB AS/1 MiB FSIZE）三题均100分；强杀后观测到的监督/候选/后代均已回收。运行发现并修复了后代持管道误判超时，以及限内存worker下额外线程池导致基础设施错误的问题。最终实现按波次并行启动最多8个监督进程，不增加插件线程。完整命令、失败历史及未覆盖边界见本轮实施记录；不代表真实Agent验收。
 
 授权材料的复用入口为 `python -m integrations.coding.verification.run` 和 `python -m integrations.coding.verification.worker`，只在上述隔离Linux容器运行。worker驱动须同时将当前src只读挂载到镜像的/app/src，确保worker使用当前源码。需要Docker init回收孤立监督进程；候选后代由监督进程subreaper回收。
+
+2026-10-16 独立审查修复：输出管道EOF与候选主进程退出分别跟踪，双通道关闭后仍按原3秒
+截止时间等待真实退出，先保存退出码再清理后代；超时为条件fail，回收无法确认仍为error。
+候选CLI JSON及函数结果帧的解析深度错误归条件fail，其他检查继续；只在候选JSON解析
+边界处理RecursionError。新增复用入口 `python -m integrations.coding.verification.regressions`，
+本机隔离Linux容器内新增场景、既有run和真实worker验证均通过。
+评分器源码摘要已变化，未来使用须另获授权发布新版本；旧评分与验收结论保留。
+实际命令、摘要、结果及限制见[修复记录](../../docs/coding-scorer-fixes-20261016.md)。
