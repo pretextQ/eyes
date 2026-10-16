@@ -19,14 +19,18 @@ model_client.py字节与冻结副本一致。冻结Eyes 78文件摘要也吻合�
 - 原生事件：8 request、7 response、1 model_http_error，11 tool.call / 11 tool.result。
 - 7响应输入50305、输出9206 token；账本缓存38464，spent_rmb=0.03102228，
   pending_rmb=0.184524，unconfirmed_usage_calls=0。
-- 停机后账本与停机前归档摘要一致。计数字段0不证明费用确认，HTTP错误在record之前返回。
+- 停机后账本与停机前归档摘要一致。另用无网络、只读挂载容器读取原Agent卷，当前账本和
+  协议SQLite与停机归档逐字节一致，integrity_check=ok、唯一run。没有启动原服务或写入原卷。
+  计数字段0不证明费用确认，HTTP错误在record之前返回。
 - 平台归档显示unknown且reserved=true，两次查询均snapshot_received/applied=false。
   本轮没有重启原PostgreSQL或发起新原键查询；平台状态依据最新持久归档，非本轮实时SQL。
 - 原9个具名容器当前全部exited；没有启动历史Runner、Scheduler或maintenance。
 
 第8次错误结果保留HTTP500及正文503/ServiceUnavailableError，但客户端只提取有限正文，
 没有保存响应headers；ModelError没有request-id字段，model.error事件也只有call_index/code。
-协议结果与49原生事件中未找到供应商request-id。不能由“未保存”断言“供应商未返回”；
+协议结果与45条协议原生事件（平台归档共49事件）中未找到供应商request-id。
+原错误正文顶层只有error，内部字段为code/message/param/type，正文同样没有request-id。
+不能由“未保存”断言“供应商未返回”；
 也不能把本地Attempt/run或LLM tool_call_id当作供应商请求ID。
 
 | 独立事实 | 已知 | 缺失/限制 |
@@ -124,8 +128,9 @@ _post仅白名单提取响应ID、request-id类响应头及HTTP/error code，限
 4. 证据导出文件保存在私有目录，保留来源、获取时间和字节SHA-256；不在仓库公开Key、
    敏感请求/响应或原始账单。身份相符后分别送入批准后的Eyes事实入口和trae结算入口。
 
-目前旧resolve只能在已知业务终态且确认停止时使用，并由manage人工核对身份及reason；
-没有符合本轮要求的预算导入入口，不能手改pending。仅提供停止或费用中的一项不会
+定位时旧resolve只能在已知业务终态且确认停止时使用，并由manage人工核对身份及reason；
+当时没有符合本轮要求的预算导入入口。批准后新增入口见下节，仍不能手改pending。
+仅提供停止或费用中的一项不会
 自动解决其他维度；即使代码修复完成也不能称原个案已解决。
 
 ## 本轮独立验证与交付
@@ -155,3 +160,40 @@ cleanup仍unknown、ScoreRun为0；数据库及API进程重启后同回执重复
 
 `ruff check src migrations integrations/coding`、`ruff format --check src migrations integrations/coding`、
 普通控制Schema导出和`git diff --check`通过。未运行前端、迁移或真实供应商验证。
+
+提交`28124c0`已推送origin/main。
+
+### trae任务B与最终收尾（2026-10-17）
+
+外部仓库已完成请求身份/安全诊断、v2账本、分开的停止与费用事实，以及有权限、服务互斥、
+身份/来源/重复/冲突校验和前后审计的离线入口。原价率/usage/实际金额不一致拒绝结算；
+旧聚合pending必须先核对协议、账本摘要及唯一原请求，显式绑定后才能登记供应商证明。
+绑定不改既有金额，不覆盖协议。已知供应商ID必须匹配；供应商明确确认无ID但能唯一
+关联原请求时可显式登记该证明，不能由“本地没采到ID”推断。没有凭据/任意响应头/正文落盘。
+
+trae提交`d58a814ffa5ee16342ebdf3ae392b9743a75b56a`已推送origin/main，
+详细契约、命令、兼容及结果见[固定版本协调说明](https://github.com/pretextQ/trae-agent/blob/d58a814ffa5ee16342ebdf3ae392b9743a75b56a/docs/RECOVERY.md)。
+BudgetLedger等旧导入路径保留，v1读取不迁移；首次新写入才写v2，未知未来版本拒绝。
+v2不能直接降级旧二进制；服务/CLI需一起升级，未来冻结新提交/配置并发布新Agent目标版本。
+本轮没有部署、发布或修改原冻结源码。
+
+实际验证在本机无网络短命Linux容器，当前外部src及verification只读挂载，/tmp合成材料。
+Python3.14.7/httpx0.28.1/Pydantic2.13.5，以MockTransport运行真实客户端解析和账本代码，
+无供应商请求；六组场景均passed=true、驱动退出0。覆盖HTTP500/正文503诊断及敏感值
+不落盘、身份/金额/来源冲突拒绝、证据不足、停止与费用分离、跨CLI进程重复幂等、
+活动服务锁及文件权限、正常usage、缺usage、未知版本、旧pending显式绑定保留原金额、
+协议字节不变，以及供应商明确无ID证明。其余环境/边界见外部记录，不冒称真实Agent复验。
+
+trae `ruff check src scripts verification`通过，修改范围`ruff format --check src verification`
+通过，`git diff --check`通过。扩大format到scripts时，未修改的submit_task.py两处既有格式
+不通过，已如实记录，未为本轮改动该无关文件。初次身份反例使用非法哈希导致驱动未按
+预期路径结束，修正合成材料后重验通过；没有掩去此失败。
+
+本轮独立验证PostgreSQL已正常停止，新的验证卷保留；未启动任何历史普通Runner、
+Scheduler或maintenance，原9个专用容器仍全部exited。原数据、五个卷、恢复材料、
+原协议SQLite与预算文件均未修改；没有第三次订单执行、质量评分或模型调用。
+
+**代码入口已完成，原个案仍未解决**：原unknown/执行占额保留；未确认预留¥0.184524保留，
+前7次本地已结算¥0.03102228仍未供应商对账。平台状态依据最新停机归档，未重启原数据库
+发起实时SQL。后续必须先取得上面的供应商证据，以新版入口在私有副本校验，再另获授权
+应用到原环境；本轮批准不包含原历史应用。远端停止、业务结果、费用与清理仍分别协调。
