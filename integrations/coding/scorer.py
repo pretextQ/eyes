@@ -1,5 +1,6 @@
 """Trusted, Linux-only coding scorer; subprocess modes do not import Eyes."""
 
+import builtins
 import copy
 import ctypes
 import hashlib
@@ -23,10 +24,10 @@ OUTPUT_LIMIT = 65536
 SOURCE_LIMIT = 262144
 PROCESS_SECONDS = 3
 RECYCLE_SECONDS = 0.5
-PARALLEL = 4
+PARALLEL = 8
 PHASE_SECONDS = 60
 RESERVE_SECONDS = 10
-MAX_UNITS = 52
+MAX_UNITS = 104
 SEMANTICS = dict(minimum=0, maximum=100, direction="higher", threshold=100, aggregation="mean")
 
 
@@ -68,6 +69,7 @@ def validate_case(case):
     allowed = {
         "py-chunk-sequence": ["chunks.py"],
         "py-int-cli-errors": ["intsum.py"],
+        "py-order-pricing-project": ["money.py", "order.py", "main.py"],
     }
     names = allowed[case["case_id"]]
     if case["artifact_requirements"] != names or sorted(case["input"]["files"]) != sorted(names):
@@ -78,6 +80,13 @@ def validate_case(case):
     if expected["artifacts"] != names:
         raise ValueError("artifact matrix mismatch")
     groups = expected["checks"]
+    weights = {
+        "py-chunk-sequence": [15, 10, 10, 10, 5, 5, 5, 5, 5, 5, 5, 10, 10],
+        "py-int-cli-errors": [30, 10, 10, 40, 10],
+        "py-order-pricing-project": [5, 5, 5, 10, 10, 5, 5, 5, 5, 5, 15, 10, 4, 4, 4, 3],
+    }
+    if [group["points"] for group in groups] != weights[case["case_id"]]:
+        raise ValueError("published group weight matrix differs")
     if sum(g["points"] for g in groups) != 100:
         raise ValueError("points must total 100")
     ids = []
@@ -95,6 +104,9 @@ def validate_case(case):
             if condition["module"] + ".py" not in names:
                 raise ValueError("unknown module")
             if condition["kind"] == "call":
+                functions = {"chunks": "chunk", "money": "discounted_cents", "order": "total_cents"}
+                if condition["function"] != functions.get(condition["module"]):
+                    raise ValueError("unexpected function")
                 if not isinstance(condition["args"], list) or (
                     ("returns" in condition) == ("raises" in condition)
                 ):
@@ -108,12 +120,28 @@ def validate_case(case):
                     raise ValueError("invalid CLI protocol")
                 if ("json" in condition) == ("stdout" in condition):
                     raise ValueError("ambiguous CLI output")
+                for name, content in condition.get("files", {}).items():
+                    if name != "order input.json" or not isinstance(content, str):
+                        raise ValueError("unexpected generated input path")
+                if condition.get("invalid_utf8") not in {None, True}:
+                    raise ValueError("invalid generated encoding")
         units += len(group["conditions"])
     if len(ids) != len(set(ids)) or units > MAX_UNITS:
         raise ValueError("duplicate IDs or process budget exceeded")
-    # Four concurrent lanes, 3s runtime + .5s cleanup + .5s startup allowance.
+    # Eight concurrent lanes, 3s runtime + .5s cleanup + .5s startup allowance.
     if math.ceil(units / PARALLEL) * 4 > PHASE_SECONDS - 5:
         raise ValueError("worst-case process budget exceeds phase budget")
+    diagnostic = {
+        "detail": "infrastructure check failure",
+        "groups": [{"id": g["id"], "earned": g["points"], "points": g["points"]} for g in groups],
+        "conditions": [
+            [c["id"], "not_run", "supervisor_cleanup_unconfirmed"]
+            for g in groups
+            for c in g["conditions"]
+        ],
+    }
+    if len(json.dumps(diagnostic, separators=(",", ":"))) > 5000:
+        raise ValueError("diagnostic matrix exceeds reason budget")
     return units
 
 
@@ -127,7 +155,9 @@ def check_call(condition):
     try:
         result = function(*args)
     except Exception as error:
-        return type(error).__name__ == condition.get("raises") and equal(args, before)
+        return type(error) is getattr(builtins, condition.get("raises", ""), None) and equal(
+            args, before
+        )
     if "raises" in condition:
         return False
     passed = equal(result, condition["returns"]) and equal(args, before)
@@ -277,6 +307,10 @@ def run_condition(condition, sources, workspace, end):
         project.mkdir()
         for name, content in sources.items():
             (project / name).write_bytes(content)
+        for name, content in condition.get("files", {}).items():
+            (project / name).write_bytes(
+                b"\xff" if condition.get("invalid_utf8") else content.encode("utf-8")
+            )
         spec = {
             "project": str(project),
             "condition": condition,
@@ -334,7 +368,12 @@ def score(request, context):
 
     def result(status, detail, value=None):
         reason = json.dumps(
-            {"detail": detail, "groups": groups, "conditions": outcomes}, separators=(",", ":")
+            {
+                "detail": detail,
+                "groups": groups,
+                "conditions": [[o["id"], o["state"], o.get("detail", "")] for o in outcomes],
+            },
+            separators=(",", ":"),
         )
         if len(reason) > 5000:
             return ScoreOutput(
@@ -354,7 +393,7 @@ def score(request, context):
             raise ValueError("Linux scorer required")
         canonical = next(c for c in catalog() if c["case_id"] == request.case["case_id"])
         validate_case(canonical)
-        if any(request.case.get(key) != value for key, value in canonical.items()):
+        if any(not equal(request.case.get(key), value) for key, value in canonical.items()):
             raise ValueError("case differs from installed dataset")
         if (
             request.scorer.numeric is None
