@@ -30,7 +30,7 @@
 
 | 任务 | 文档 |
 | --- | --- |
-| 缺陷修复（2026-10-17） | [修复计划](fix-plan-20261017.md) |
+| 缺陷修复（2026-10-17） | [修复计划](fix-plan-20261017.md)、[验证记录](fix-verification-20261017.md) |
 | 理解模块边界与交付目标 | [架构](architecture.md)、[计划](PLAN.md) |
 | 启动控制端、认证与公开 API | [后端](backend.md) |
 | 接入目标、SDK、评分器与 Runner | [通用接入](agent-integration.md)、[统一协议](agent-protocol.md)、[HTTP 运行时](agent-http-runtime.md) |
