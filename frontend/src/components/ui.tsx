@@ -65,7 +65,6 @@ export function PageHeading({
   description,
   action,
 }: {
-  eyebrow: string;
   title: string;
   description: string;
   action?: ReactNode;

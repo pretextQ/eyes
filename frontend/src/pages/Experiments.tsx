@@ -127,7 +127,6 @@ export function ExperimentsPage() {
   return (
     <>
       <PageHeading
-        eyebrow=""
         title="实验"
         description="查看固定配置、执行状态和用例结果。"
         action={

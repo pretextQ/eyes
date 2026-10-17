@@ -149,7 +149,6 @@ function ExperimentView({ id }: { id: string }) {
         </Link>
       )}
       <PageHeading
-        eyebrow={`EXPERIMENT / ${shortId(id).toUpperCase()}`}
         title={data?.snapshot.target.content.name || "实验详情"}
         description={
           data

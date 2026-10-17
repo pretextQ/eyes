@@ -26,7 +26,6 @@ import type { CatalogKind, Payload, TargetContent, Version } from "../types";
 
 const info = {
   targets: {
-    eyebrow: "03 / TARGETS",
     title: "目标 Agent",
     description: "发布接入配置与能力声明，为每次实验固定目标版本。",
     action: "接入 Agent",
@@ -34,7 +33,6 @@ const info = {
     text: "支持 HTTP 和 Python 接入。目标在独立 Runner 环境执行。",
   },
   datasets: {
-    eyebrow: "04 / DATASETS",
     title: "测试集",
     description: "用稳定的用例标识，把测试输入、预期和环境要求一起固定。",
     action: "导入测试集",
@@ -42,7 +40,6 @@ const info = {
     text: "导入 JSONL，整体校验后发布；无效记录会报告具体行号。",
   },
   scorers: {
-    eyebrow: "05 / SCORERS",
     title: "评分口径",
     description: "让每一个质量结论，都能追溯到固定口径和执行证据。",
     action: "发布评分器",
@@ -76,7 +73,6 @@ function CatalogView({ kind }: { kind: CatalogKind }) {
   return (
     <>
       <PageHeading
-        eyebrow={config.eyebrow}
         title={config.title}
         description={config.description}
         action={

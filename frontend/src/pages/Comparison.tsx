@@ -57,7 +57,6 @@ export function ComparisonPage() {
   return (
     <>
       <PageHeading
-        eyebrow="COMPARISON"
         title="回归报告"
         description="固定比较口径与执行证据，查看改善、退化和发布门槛。"
         action={

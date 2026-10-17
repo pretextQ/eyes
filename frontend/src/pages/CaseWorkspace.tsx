@@ -97,7 +97,6 @@ function CaseWorkspace({ id, runId }: { id: string; runId: string }) {
         返回实验 · {shortId(id)}
       </Link>
       <PageHeading
-        eyebrow="EVIDENCE / REVIEW"
         title="执行审阅"
         description={
           experiment.data

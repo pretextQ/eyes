@@ -139,7 +139,6 @@ export function ObservationPage() {
   return (
     <>
       <PageHeading
-        eyebrow="OBSERVATION"
         title="Agent 观测"
         description="在 Agent 中照常对话，在这里查看每一次模型与工具调用。"
         action={
@@ -502,7 +501,6 @@ export function ObservationRunPage() {
         全部观测任务
       </Link>
       <PageHeading
-        eyebrow="RUN"
         title={run.agent}
         description={`${run.model} · 会话 ${shortId(run.session_id)} · 每 2 秒更新`}
         action={

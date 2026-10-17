@@ -43,7 +43,6 @@ export function OperationsPage() {
   return (
     <>
       <PageHeading
-        eyebrow="06 / OPERATIONS"
         title="运行状态"
         description="查看工作队列、后端就绪状态与 Runner 最近一次心跳。"
         action={

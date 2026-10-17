@@ -14,7 +14,6 @@ export function GuidePage() {
   return (
     <>
       <PageHeading
-        eyebrow="GETTING STARTED / 接入指南"
         title="从目标到证据"
         description="准备控制后端与 Runner，用一场真实实验建立完整记录。"
         action={
