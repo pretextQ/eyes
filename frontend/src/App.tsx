@@ -115,6 +115,15 @@ export default function App() {
   }, [pageName]);
   function connect(client: Api | null) {
     queryClient.clear();
+    if (client) {
+      // A revoked or expired token drops the session instead of leaving every
+      // polling query to fail independently while the header still says "已认证".
+      client.onUnauthorized = () => {
+        queryClient.clear();
+        setApi(null);
+        setConnectionOpen(true);
+      };
+    }
     setApi(client);
     setConnectionOpen(false);
   }

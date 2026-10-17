@@ -10,7 +10,16 @@ export class ApiError extends Error {
   }
 }
 export class Api {
+  onUnauthorized?: () => void;
+  private unauthorizedNotified = false;
   constructor(readonly token: string) {}
+
+  private notifyUnauthorized(status: number) {
+    if (status !== 401 || this.unauthorizedNotified) return;
+    this.unauthorizedNotified = true;
+    this.onUnauthorized?.();
+  }
+
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let response: Response;
     try {
@@ -37,6 +46,7 @@ export class Api {
       throw new ApiError(0, "无法连接控制 API，请检查后端服务和代理配置。");
     }
     if (!response.ok) {
+      this.notifyUnauthorized(response.status);
       const body = await response.json().catch(() => null);
       const messages: Record<number, string> = {
         401: "令牌无效或已撤销，请重新连接。",
@@ -92,11 +102,13 @@ export class Api {
       headers: { Authorization: `Bearer ${this.token}` },
       signal: AbortSignal.timeout(60000),
     });
-    if (!response.ok)
+    if (!response.ok) {
+      this.notifyUnauthorized(response.status);
       throw new ApiError(
         response.status,
         `产物下载失败（${response.status}），可能尚未发布或已过期。`,
       );
+    }
     const url = URL.createObjectURL(await response.blob());
     const anchor = document.createElement("a");
     anchor.href = url;
