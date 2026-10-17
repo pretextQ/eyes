@@ -57,7 +57,7 @@ Runner 在私有 `state_dir/reconciliation/<query-id>/` 原子保存 assignment.
 
 ## 升级与历史数据
 
-升级前暂停领取并结束/核对活动工作，停止服务写入端，备份 PostgreSQL 与证据卷。按原环境运行 `uv run alembic upgrade head`，确认 head 为 `0005_reconciliation`，再启动同源码版本的 API、Scheduler 和 Runner。Runner 的安装包也必须更新，不能仅替换 Supervisor 的 PYTHONPATH。迁移增加一个非空 JSONB 字段，历史工作缺省为 `{}`；不重写 Attempt、结果、评分、证据或核对历史。历史符合能力条件的 unknown 在新 Runner 可用后自动领取；其他历史未知仍保留原额度。
+升级前暂停领取并结束/核对活动工作，停止服务写入端，备份 PostgreSQL 与证据卷。按原环境运行 `uv run alembic upgrade head`，确认 head 至少为 `0005_reconciliation`（当前为 `0007_cancellation_audit`），再启动同源码版本的 API、Scheduler 和 Runner。Runner 的安装包也必须更新，不能仅替换 Supervisor 的 PYTHONPATH。迁移增加一个非空 JSONB 字段，历史工作缺省为 `{}`；不重写 Attempt、结果、评分、证据或核对历史。历史符合能力条件的 unknown 在新 Runner 可用后自动领取；其他历史未知仍保留原额度。
 
 控制协议 1.0 增加新契约/端点，旧业务领取、心跳、结果、人工 resolve 请求形状不变；外部 Agent 协议和 Schema 不变。旧 Runner 不会主动调用新接口，未知工作等待新 Runner 或人工核对。新 Runner 配旧 API 的核对端点不可用，无法自动恢复，部署应先升级控制端。本任务不推进普通契约显式版本迁移。
 
