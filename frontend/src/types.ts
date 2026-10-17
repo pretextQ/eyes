@@ -36,12 +36,14 @@ export interface ScorerContent {
   implementation_digest: string;
   config: Payload;
   required_evidence: string[];
+  timeout_seconds: number;
   numeric: {
     schema_version: "1.0";
     minimum: number;
     maximum: number;
     threshold: number;
     direction: string;
+    aggregation: "mean";
   } | null;
 }
 export interface ExperimentRequest {
@@ -52,6 +54,8 @@ export interface ExperimentRequest {
   concurrency: number;
   timeout_seconds: number;
   repetitions: number;
+  // Older snapshots may omit it; the backend defaults to 60 seconds on replay.
+  evidence_wait_seconds?: number;
   attempt_selection: "first_success";
   parent_experiment_id?: string | null;
 }
@@ -164,4 +168,8 @@ export interface Operations {
     last_seen_at: string;
     capabilities: { adapters?: string[]; scorers?: string[] };
   })[];
+  event_drops: { reported_total: number | null; unknown_attempts: number };
+  waiting_evidence: number;
+  oldest_queued_at: string | null;
+  score_errors: number;
 }
