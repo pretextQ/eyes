@@ -43,6 +43,97 @@
       "title": "AgentArtifact",
       "type": "object"
     },
+    "AgentEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Payload"
+        }
+      },
+      "required": [
+        "event_id",
+        "run_id",
+        "sequence",
+        "occurred_at",
+        "type",
+        "data"
+      ],
+      "title": "AgentEvent",
+      "type": "object"
+    },
+    "AgentEventPage": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": "1.0",
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/AgentEvent"
+          },
+          "maxItems": 200,
+          "title": "Items",
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Cursor"
+        },
+        "evidence": {
+          "$ref": "#/$defs/AgentEvidence"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "run_id",
+        "items",
+        "next_cursor",
+        "evidence"
+      ],
+      "title": "AgentEventPage",
+      "type": "object"
+    },
     "AgentEvidence": {
       "additionalProperties": false,
       "properties": {
@@ -294,6 +385,34 @@
         "sha256"
       ],
       "title": "ArtifactMetadata",
+      "type": "object"
+    },
+    "CancellationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "schema_version"
+      ],
+      "title": "CancellationRequest",
       "type": "object"
     },
     "CaseDefinition": {
@@ -1471,6 +1590,32 @@
         },
         "target": {
           "$ref": "#/$defs/TargetPublish"
+        },
+        "phase": {
+          "default": "outcome",
+          "enum": [
+            "outcome",
+            "evidence"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "recovery_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Cursor"
+        },
+        "recovery_events_done": {
+          "default": false,
+          "title": "Recovery Events Done",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1499,6 +1644,11 @@
           "format": "uuid",
           "title": "Runner Id",
           "type": "string"
+        },
+        "evidence_recovery": {
+          "default": false,
+          "title": "Evidence Recovery",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1506,6 +1656,136 @@
         "runner_id"
       ],
       "title": "ReconciliationClaim",
+      "type": "object"
+    },
+    "ReconciliationEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "evidence_id": {
+          "format": "uuid",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "expected_attempt_id": {
+          "format": "uuid",
+          "title": "Expected Attempt Id",
+          "type": "string"
+        },
+        "expected_task_id": {
+          "format": "uuid",
+          "title": "Expected Task Id",
+          "type": "string"
+        },
+        "expected_run_id": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Expected Run Id",
+          "type": "string"
+        },
+        "idempotency_key_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Idempotency Key Sha256",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "supplier_record",
+            "operator_review"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "source_reference": {
+          "format": "uuid",
+          "title": "Source Reference",
+          "type": "string"
+        },
+        "evidence_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Evidence Sha256",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "stopped_confirmed": {
+          "default": false,
+          "title": "Stopped Confirmed",
+          "type": "boolean"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "succeeded",
+                "failed",
+                "cancelled",
+                "timed_out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "billing": {
+          "default": "unconfirmed",
+          "enum": [
+            "unconfirmed",
+            "not_charged",
+            "charged",
+            "refunded"
+          ],
+          "title": "Billing",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "apply": {
+          "default": false,
+          "title": "Apply",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "evidence_id",
+        "expected_attempt_id",
+        "expected_task_id",
+        "expected_run_id",
+        "idempotency_key_sha256",
+        "source",
+        "source_reference",
+        "evidence_sha256",
+        "observed_at",
+        "reason"
+      ],
+      "title": "ReconciliationEvidence",
       "type": "object"
     },
     "ReconciliationSubmission": {
@@ -1554,6 +1834,50 @@
         "diagnostic"
       ],
       "title": "ReconciliationSubmission",
+      "type": "object"
+    },
+    "RecoveryEventSubmission": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "runner_id": {
+          "format": "uuid",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "lease_token": {
+          "format": "uuid",
+          "title": "Lease Token",
+          "type": "string"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "page": {
+          "$ref": "#/$defs/AgentEventPage"
+        }
+      },
+      "required": [
+        "schema_version",
+        "runner_id",
+        "lease_token",
+        "page"
+      ],
+      "title": "RecoveryEventSubmission",
       "type": "object"
     },
     "Resolution": {
