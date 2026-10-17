@@ -54,6 +54,19 @@ Web 通过 `POST /v1/comparisons` 创建固定报告，使用幂等键重试同�
 
 详情按评分口径展示用例等权汇总、重复执行记录、门槛失败与证据缺口，并可导出完整 JSON。报告链接固定到其选中的 Attempt 和 ScoreRun；用例通过新增 `GET /v1/experiments/{experiment_id}/case-runs/{case_run_id}` 直接读取，不依赖列表分页位置。接口校验项目与实验归属。评分页可查看原评分的证据引用及清单，历史报告不承诺证据永不过期。
 
+## 2026-10-17 修复
+
+本轮修复了控制台已知的几处运行时与契约问题，不改变页面信息架构：
+
+- `formatDate` 对非法日期不再抛 `RangeError`，统一显示 `—`；
+- 产物下载先把链接挂载到 DOM，点击后移除，并延迟回收 blob URL；
+- 令牌被撤销或过期时，任一请求的 401 会清空查询缓存、断开连接并打开连接框；
+- 补全 `ScorerContent.timeout_seconds`、`ExperimentRequest.evidence_wait_seconds` 与 `Operations` 的运行指标字段；
+- `catalog()`/`caseRuns()` 增加 500 页上限，避免服务端异常时无限请求；
+- 删除从未渲染的 `PageHeading.eyebrow` 属性。
+
+验证为 `npm run lint`、`npm run format:check`、`npm run build`（含 `tsc -b`）通过；本机没有浏览器自动化，未做真实浏览器回归。详见[验证记录](fix-verification-20261017.md)。
+
 ## 构建与部署
 
 ```sh

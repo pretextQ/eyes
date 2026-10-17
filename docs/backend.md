@@ -2,6 +2,8 @@
 
 当前实现 Eyes 的控制后端基础及配套 Runner。Agent 端入口、HTTP 协议、SDK 与评分器说明见 [接入文档](agent-integration.md)。源码按 AGENT.md 的模块边界组织；HTTP 路由负责认证和协议转换，领域模块负责校验、状态及事务。当前 Windows/MewCode 基础闭环证据见 [验证记录](mewcode-validation.md)，M1 尚未完整验收。
 
+2026-10-17 完成一轮不改变运行语义的修复：重新导出控制契约（补齐 `CancellationRequest`、`ReconciliationEvidence`、`RecoveryEventSubmission` 等）、对齐迁移 head 文档，并在 Docker/Linux + PostgreSQL 18.6 上复验迁移与 API 冒烟，见[验证记录](fix-verification-20261017.md)。
+
 当前约定范围已于 2026-10-14 交付完成，进入按需使用与维护；源码基线 `6929b6d`、迁移至 `0007_cancellation_audit`。取消审计与容量保护/API/CLI/Web 已完成对应范围实现和验收，见[当前计划](PLAN.md#当前交付状态与维护安排)与[容量 Web 验收](capacity-web-20261014.md)。本节原始 M1/M2/M4 等完整条件仍保留，当前范围完成不等于全部矩阵通过。
 
 ## 当前实现与后续工作

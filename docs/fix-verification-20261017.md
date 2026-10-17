@@ -1,6 +1,6 @@
 # Eyes 缺陷修复验证记录（2026-10-17）
 
-范围：`docs/fix-plan-20261017.md` 中 FIX-01～FIX-08 的整体验证。基线 `7f998a6`，修复与验证提交从 `286d4f6` 起（未推送）。本记录只证明本轮修复与既有静态/冒烟检查，不新增产品验收结论，也不改变 M0～M4 的历史状态。
+范围：`docs/fix-plan-20261017.md` 中 FIX-01～FIX-08 的整体验证。基线 `7f998a6`，修复与验证提交从 `286d4f6` 起，已推送至 `origin/main`（`35e3566`）。本记录只证明本轮修复与既有静态/冒烟检查，不新增产品验收结论，也不改变 M0～M4 的历史状态。
 
 ## 环境
 
@@ -115,4 +115,4 @@ npm run lint; npm run format:check; npm run build
 
 ## 结论
 
-FIX-01～FIX-08 全部完成并分别提交；静态检查、契约导出、迁移升降级、前端 lint/format/build 与 43 项 API 冒烟全部通过。Docker/Linux 第二轮进一步用当前源码镜像、PostgreSQL 18.6、真实 POSIX 证据存储和真实 HTTP 复验通过。本记录提交后 `main` 领先 `origin/main` 11 个提交，**未推送**，等待用户审阅。
+FIX-01～FIX-08 全部完成并分别提交；静态检查、契约导出、迁移升降级、前端 lint/format/build 与 43 项 API 冒烟全部通过。Docker/Linux 第二轮进一步用当前源码镜像、PostgreSQL 18.6、真实 POSIX 证据存储和真实 HTTP 复验通过。本记录提交后已推送至 `origin/main`（`35e3566`），本地与远端一致。

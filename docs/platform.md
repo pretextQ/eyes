@@ -50,7 +50,7 @@ uv run eyes-server
 uv run eyes-scheduler
 ```
 
-升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。0007 增加实验/批次追加取消审计；当前 API 就绪检查要求 0007，并通过实际产物发布与读取路径检查证据卷，不能仅升级到旧 head 后运行当前服务。
+升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。0007 增加实验/批次追加取消审计；当前 API 就绪检查要求 0007，并通过实际产物发布与读取路径检查证据卷，不能仅升级到旧 head 后运行当前服务。2026-10-17 在当前源码镜像与 PostgreSQL 18.6 隔离环境中重新执行 0001→0007 升级、降级、重放和 `alembic check`，并通过容器内 API 冒烟；使用新建隔离卷，未修改既有数据，见[验证记录](fix-verification-20261017.md)。
 
 ### 观测迁移与备份恢复
 
