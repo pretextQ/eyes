@@ -75,27 +75,28 @@ export class Api {
       headers,
     });
   }
-  async catalog(kind: CatalogKind, signal?: AbortSignal): Promise<Version[]> {
-    const all: Version[] = [];
-    for (let offset = 0; ; offset += 200) {
-      const result = await this.request<{ items: Version[] }>(
-        `/v1/catalog/${kind}?limit=200&offset=${offset}`,
+  private async paginate<T>(path: string, signal?: AbortSignal): Promise<T[]> {
+    const all: T[] = [];
+    // Bound list loading so a server that never returns a short page cannot make
+    // the console request forever. 500 pages x 200 matches max_experiment_runs.
+    for (let page = 0; page < 500; page += 1) {
+      const result = await this.request<{ items: T[] }>(
+        `${path}?limit=200&offset=${page * 200}`,
         { signal },
       );
       all.push(...result.items);
       if (result.items.length < 200) return all;
     }
+    throw new ApiError(0, "结果超过 100000 条，已停止加载；请缩小查询范围。");
+  }
+  async catalog(kind: CatalogKind, signal?: AbortSignal): Promise<Version[]> {
+    return this.paginate<Version>(`/v1/catalog/${kind}`, signal);
   }
   async caseRuns(id: string, signal?: AbortSignal) {
-    const all: import("./types").CaseRun[] = [];
-    for (let offset = 0; ; offset += 200) {
-      const result = await this.request<{ items: import("./types").CaseRun[] }>(
-        `/v1/experiments/${id}/case-runs?limit=200&offset=${offset}`,
-        { signal },
-      );
-      all.push(...result.items);
-      if (result.items.length < 200) return all;
-    }
+    return this.paginate<import("./types").CaseRun>(
+      `/v1/experiments/${id}/case-runs`,
+      signal,
+    );
   }
   async download(id: string) {
     const response = await fetch(`/api/v1/artifacts/${id}/content`, {
