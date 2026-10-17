@@ -100,8 +100,16 @@ export class Api {
     const url = URL.createObjectURL(await response.blob());
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `eyes-artifact-${id}`;
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    anchor.download = `eyes-artifact-${id}.bin`;
+    anchor.rel = "noopener";
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    try {
+      anchor.click();
+    } finally {
+      anchor.remove();
+      // Keep the blob URL alive long enough for slower devices to start reading.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }
   }
 }
