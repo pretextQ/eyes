@@ -2,7 +2,7 @@
 
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./vendor/shadcn-tailwind.css";
 @import "@xyflow/react/dist/style.css" layer(components);
 
 @custom-variant dark (&:is(.dark *));

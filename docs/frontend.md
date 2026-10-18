@@ -2,6 +2,8 @@
 
 控制台位于 `frontend/`，使用 React、TypeScript、Vite、React Router、TanStack Query 和 Lucide 图标。基础组件采用 shadcn 的 Base UI 版本与 Tailwind CSS 4，配置位于 `components.json`。设计采用白色画布、浅灰侧栏、深色主操作、细边框和表格布局；颜色、字体、圆角与间距集中于 `src/styles.css`。字体通过 npm 依赖打包，不需要访问外部字体服务。
 
+组件源码在仓库内维护，不需要安装 `shadcn` CLI。现用 shadcn 4.21.1 的 Tailwind CSS 已原样保存在 `frontend/src/vendor/shadcn-tailwind.css`，MIT 许可、来源、摘要和更新流程见 [vendor 说明](../frontend/src/vendor/README.md)。2026-10-18 移除仅用于引入 CSS 的 CLI 依赖及其高危 glob 依赖链，见[修复计划与验证](dependency-fix-20261018.md)。后续引入组件生成工具前需审计依赖，不能为更新 CSS 重新安装未审计 CLI。
+
 ## 本地启动
 
 当前开发宿主机为 Windows，使用 PowerShell。需要 Node.js >=22.12 和 npm。首次安装使用锁文件：

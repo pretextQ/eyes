@@ -1,0 +1,2 @@
+# Preserve the upstream stylesheet byte-for-byte; see src/vendor/README.md.
+src/vendor/shadcn-tailwind.css
