@@ -211,6 +211,7 @@ def detail_budget(session, run_ids, *, include_history=True):
     total = 0
     statements = [
         select(func.count(CaseRun.id), func.sum(func.octet_length(cast(CaseVersion.content, Text))))
+        .select_from(CaseRun)
         .join(CaseVersion, CaseRun.case_version_id == CaseVersion.id)
         .where(CaseRun.id.in_(run_ids)),
         select(
@@ -221,6 +222,7 @@ def detail_budget(session, run_ids, *, include_history=True):
         for model, column in ((ScoreRun, ScoreRun.result), (Manifest, Manifest.content)):
             statements.append(
                 select(func.count(model.id), func.sum(func.octet_length(cast(column, Text))))
+                .select_from(model)
                 .join(Attempt)
                 .where(Attempt.case_run_id.in_(run_ids))
             )
