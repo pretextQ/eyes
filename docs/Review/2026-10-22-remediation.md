@@ -55,3 +55,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 达到 500 个满页后以 limit=1 探测下一条，仅存在第 100001 条才报超限；恰好 100000 条正常返回，持续满页异常仍有明确请求上限。
 
 检查：前端 lint、格式、TypeScript 检查、`git diff --check`；未进行浏览器运行验证。
+
+## L2：比较报告下载
+
+下载链接先挂载 DOM 再触发，finally 移除；Blob URL 延迟 10 秒回收，与既有产物下载保持一致。
+
+检查：相关文件 ESLint/Prettier、TypeScript 检查、`git diff --check`；未进行真实浏览器下载验证。

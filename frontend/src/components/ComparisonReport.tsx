@@ -116,8 +116,14 @@ export function ComparisonReportView({ report }: { report: ComparisonReport }) {
     const link = document.createElement("a");
     link.href = url;
     link.download = `eyes-comparison-${report.id}.json`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    link.style.display = "none";
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }
   }
   return (
     <div className="flex min-w-0 flex-col gap-6">
