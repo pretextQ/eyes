@@ -67,3 +67,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 目标/评分器和实验配置表单的本地 setter 改为 setTimeoutSeconds，避免遮蔽全局定时器，数值与提交语义不变。
 
 检查：相关文件 ESLint/Prettier、TypeScript 检查、`git diff --check`。
+
+## L4：框架 HTTP 错误 envelope
+
+为 Starlette HTTPException 添加统一契约响应，404/405 具有 schema_version 和 error.code/message，保留 Allow 等原始响应头及状态码。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`；未运行 API 请求验证。

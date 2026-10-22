@@ -8,6 +8,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from starlette.exceptions import HTTPException
 
 from eyes.server.api.dependencies import Database
 from eyes.server.api.middleware import RequestBoundary, validation_details
@@ -65,6 +66,22 @@ def create_app(settings: Settings | None = None):
                     "code": "invalid_request",
                     "message": "request failed contract validation",
                     "details": validation_details(exc.errors()),
+                },
+            },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_error(request, exc):
+        return JSONResponse(
+            status_code=exc.status_code,
+            headers=exc.headers,
+            content={
+                "schema_version": "1.0",
+                "error": {
+                    "code": {404: "not_found", 405: "method_not_allowed"}.get(
+                        exc.status_code, "http_error"
+                    ),
+                    "message": str(exc.detail),
                 },
             },
         )
