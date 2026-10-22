@@ -231,11 +231,10 @@ def create_app(
         try:
             with store.transaction() as db:
                 run = store.get(db, context.run_id)
-                if run.result:
+                if run.result or run.status == "cancel_requested":
                     return
-                if run.status != "cancel_requested":
-                    run.status = "running"
-                    store.update(db, run)
+                run.status = "running"
+                store.update(db, run)
             value = execute(task, context)
             if hasattr(value, "__await__"):
                 value = asyncio.run(value)
@@ -408,6 +407,22 @@ def create_app(
             raise ServiceError(422, "unsupported_capability")
         with store.transaction() as db:
             run = store.get(db, run_id)
+            if run.status in {"accepted", "queued"}:
+                # This transaction serializes against invoke's running transition.
+                # No backend work has been dispatched, so stop is confirmed locally.
+                run.status = "cancelled"
+                run.result = AgentResult(
+                    protocol_version="1.0",
+                    run_id=run_id,
+                    status="cancelled",
+                    output=None,
+                    error=None,
+                    stopped_confirmed=True,
+                    completed_at=datetime.now(UTC),
+                    cleanup_status="succeeded",
+                    evidence=AgentEvidence(status="sealed", dropped_events=0),
+                )
+                store.update(db, run)
             if run.status not in TERMINAL_STATES:
                 if run.status != "unknown":
                     run.status = "cancel_requested"
