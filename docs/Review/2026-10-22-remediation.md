@@ -121,3 +121,9 @@ Runner 已确认评分和恢复日志默认保留 7 天后回收，未确认/隔
 既有 CI 的规范/格式检查加入 integrations，不增加测试、依赖或新的 job。23 个集成 Python 文件已通过相同检查。
 
 检查：`ruff check src migrations integrations`、`ruff format --check src migrations integrations`、`git diff --check`。
+
+## 架构观察：代理上传限制
+
+nginx 请求上限从 8 MiB 对齐后端默认产物上限 32 MiB；控制 API 的独立 JSON 8 MiB 限制继续生效。自定义更大产物上限时仍需同步修改代理配置。
+
+检查：配置核对、`git diff --check`；未运行实际大文件上传。
