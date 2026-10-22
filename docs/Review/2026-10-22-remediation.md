@@ -61,3 +61,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 下载链接先挂载 DOM 再触发，finally 移除；Blob URL 延迟 10 秒回收，与既有产物下载保持一致。
 
 检查：相关文件 ESLint/Prettier、TypeScript 检查、`git diff --check`；未进行真实浏览器下载验证。
+
+## L3：超时表单 setter 命名
+
+目标/评分器和实验配置表单的本地 setter 改为 setTimeoutSeconds，避免遮蔽全局定时器，数值与提交语义不变。
+
+检查：相关文件 ESLint/Prettier、TypeScript 检查、`git diff --check`。

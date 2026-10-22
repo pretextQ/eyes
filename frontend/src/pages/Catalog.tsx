@@ -380,7 +380,7 @@ function PublishDialog({
   const [digest, setDigest] = useState("");
   const [requiredEvidence, setRequiredEvidence] = useState(["output"]);
   const [numeric, setNumeric] = useState("null");
-  const [timeout, setTimeout] = useState(60);
+  const [timeout, setTimeoutSeconds] = useState(60);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   async function readFile(file?: File) {
@@ -618,7 +618,9 @@ function PublishDialog({
                       min={1}
                       max={86400}
                       value={timeout}
-                      onChange={(e) => setTimeout(Number(e.target.value))}
+                      onChange={(e) =>
+                        setTimeoutSeconds(Number(e.target.value))
+                      }
                     />
                   </Field>
                 </div>

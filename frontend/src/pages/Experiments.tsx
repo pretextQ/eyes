@@ -542,7 +542,7 @@ export function CreateExperiment({
   const [concurrency, setConcurrency] = useState(
     source?.snapshot.request.concurrency || 1,
   );
-  const [timeout, setTimeout] = useState(
+  const [timeout, setTimeoutSeconds] = useState(
     source?.snapshot.request.timeout_seconds || 300,
   );
   const [repetitions, setRepetitions] = useState(
@@ -729,7 +729,7 @@ export function CreateExperiment({
                 min={1}
                 max={86400}
                 value={timeout}
-                onChange={(e) => setTimeout(Number(e.target.value))}
+                onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
               />
             </Field>
             <Field label="每用例重复次数">
