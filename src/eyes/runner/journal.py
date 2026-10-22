@@ -3,11 +3,11 @@
 import json
 import logging
 
+from eyes.common.files import write_json
 from eyes.contracts.base import explicit_versions, read_stored_contract
 from eyes.contracts.scorer import ScoreAssignment
 from eyes.contracts.target import ExecutionInput
 from eyes.contracts.work import ClaimedWork, ExecutionSubmission, ScoreSubmission
-from eyes.runner.files import write_json
 
 logger = logging.getLogger(__name__)
 

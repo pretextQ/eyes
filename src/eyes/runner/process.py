@@ -4,7 +4,7 @@ import signal
 import sys
 from uuid import uuid4
 
-from eyes.runner.files import json_bytes
+from eyes.common.files import json_bytes
 
 
 class WorkerError(Exception):

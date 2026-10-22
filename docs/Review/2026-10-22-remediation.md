@@ -133,3 +133,9 @@ nginx 请求上限从 8 MiB 对齐后端默认产物上限 32 MiB；控制 API �
 readiness/备份恢复共用的 SCHEMA_REVISION 从实际 Alembic 单一 head 计算，移除手工常量。源码读取仓库迁移，wheel 打包迁移版本，Docker 在安装前复制迁移；无迁移或多 head 将明确失败。
 
 检查：ruff、Python 编译、`alembic heads`、离线迁移 SQL 和 wheel 构建；未连接数据库执行迁移。
+
+## 架构观察：公共工具的反向依赖
+
+文件持久化/脱敏/密钥解析工具移到 eyes.common.files，后端观测、SDK、评分器和 Runner 从公共模块导入；HTTP 适配器直接使用公共契约的 origin 校验。保留 eyes.runner.files 兼容导出，旧接入不因模块移动断裂。新代码不再反向加载 Runner 配置或其包级运行环境。
+
+检查：ruff（含 integrations）、Python 编译、CLI 帮助、wheel 构建；未运行真实接入。rules 等源码导入行改变会影响实现摘要，需保留旧冻结插件，使用新代码时重新获取摘要并发布新评分器版本；不重写历史摘要。

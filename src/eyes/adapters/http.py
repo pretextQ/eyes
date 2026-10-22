@@ -6,7 +6,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from eyes.contracts.target import ExecutionResult
-from eyes.runner.config import origin
+from eyes.contracts.target import http_origin as origin
 
 
 class SecretHeader(BaseModel):

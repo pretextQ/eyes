@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
 
-from eyes.runner.files import redact
+from eyes.common.files import redact
 from eyes.server.domain import DomainError, digest, public_record
 from eyes.server.storage.models import ObservationSource, ObservedEvent, ObservedRun
 

@@ -14,8 +14,8 @@ from opentelemetry.sdk.trace.export import SpanProcessor
 from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 from opentelemetry.trace import Link, SpanContext, TraceFlags
 
+from eyes.common.files import json_bytes, redact, write_json
 from eyes.contracts.evidence import ExecutionEvent
-from eyes.runner.files import json_bytes, redact, write_json
 
 
 class AssignedIds(RandomIdGenerator):

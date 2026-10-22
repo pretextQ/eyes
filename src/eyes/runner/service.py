@@ -8,6 +8,7 @@ from uuid import UUID
 import httpx
 
 from eyes.adapters.python import PythonAdapter
+from eyes.common.files import error_text, file_digest, redact, resolve_secrets, write_json
 from eyes.contracts.base import read_stored_contract
 from eyes.contracts.evidence import ArtifactMetadata, ExecutionEvent
 from eyes.contracts.scorer import ScoreAssignment, ScoreInput, ScoreOutput
@@ -15,7 +16,6 @@ from eyes.contracts.target import ExecutionInput, ExecutionResult
 from eyes.contracts.work import ClaimedWork
 from eyes.runner import journal, reconciliation
 from eyes.runner.client import ApiError, ControlClient
-from eyes.runner.files import error_text, file_digest, redact, resolve_secrets, write_json
 from eyes.runner.outbox import Outbox, OutboxCapacityError
 from eyes.runner.process import ProcessWorker, WorkerError
 
@@ -611,7 +611,7 @@ class RunnerService:
                     or hashlib.sha256(content).hexdigest() != metadata.sha256
                 ):
                     raise ValueError("scoring artifact failed integrity verification")
-                from eyes.runner.files import atomic_write
+                from eyes.common.files import atomic_write
 
                 path = directory / "workspace" / "evidence" / identifier
                 atomic_write(path, content)

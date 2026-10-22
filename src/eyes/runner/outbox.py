@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import httpx
 
+from eyes.common.files import atomic_write, json_bytes, write_json
 from eyes.contracts.base import explicit_versions, read_stored_contract
 from eyes.contracts.evidence import ArtifactMetadata, EventBatch, EvidenceClose
 from eyes.contracts.work import (
@@ -20,7 +21,6 @@ from eyes.contracts.work import (
 )
 from eyes.runner import journal
 from eyes.runner.client import ApiError
-from eyes.runner.files import atomic_write, json_bytes, write_json
 
 logger = logging.getLogger(__name__)
 

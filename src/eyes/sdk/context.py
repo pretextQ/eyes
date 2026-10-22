@@ -5,7 +5,7 @@ from pathlib import Path
 from types import MappingProxyType
 from uuid import uuid4
 
-from eyes.runner.files import atomic_write, write_json
+from eyes.common.files import atomic_write, write_json
 
 
 class AgentContext:

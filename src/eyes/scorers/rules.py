@@ -3,9 +3,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from eyes.adapters.http import pointer
+from eyes.common.files import json_bytes
 from eyes.contracts.base import Payload
 from eyes.contracts.scorer import ScoreOutput
-from eyes.runner.files import json_bytes
 
 
 class Check(BaseModel):

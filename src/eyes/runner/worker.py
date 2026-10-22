@@ -14,10 +14,10 @@ from pathlib import Path
 from eyes.adapters.agent_http import AgentHttpAdapter
 from eyes.adapters.http import HttpAdapter
 from eyes.adapters.python import PythonAdapter, invoke, resolve
+from eyes.common.files import error_text, file_digest, json_bytes, redact, write_json
 from eyes.contracts.scorer import ScoreInput, ScoreOutput
 from eyes.contracts.target import ExecutionInput
 from eyes.runner.config import Binding, RunnerConfig
-from eyes.runner.files import error_text, file_digest, json_bytes, redact, write_json
 from eyes.scorers import rules
 from eyes.sdk.context import AgentContext, ScoreContext
 from eyes.sdk.recorder import Recorder

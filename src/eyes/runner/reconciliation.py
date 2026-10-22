@@ -9,13 +9,13 @@ from urllib.parse import quote
 import httpx
 
 from eyes.adapters.agent_http import AgentHttpAdapter, target_capabilities
+from eyes.common.files import redact, resolve_secrets, write_json
 from eyes.contracts.agent_protocol import AgentCapabilities, AgentRun
 from eyes.contracts.base import read_stored_contract
 from eyes.contracts.target import TargetPublish, http_origin
 from eyes.contracts.work import ReconciliationAssignment
 from eyes.runner import journal
 from eyes.runner.client import ApiError
-from eyes.runner.files import redact, resolve_secrets, write_json
 from eyes.runner.outbox import OutboxCapacityError
 
 logger = logging.getLogger(__name__)
