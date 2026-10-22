@@ -5,6 +5,7 @@ allow_insecure_http = false
 token_env = "EYES_RUNNER_TOKEN"
 name = "host-runner"
 state_dir = "data/runner"
+local_retention_days = 7 # Acknowledged scoring/query journals; unresolved work is retained.
 execution_slots = 1
 score_slots = 1
 allowed_http_origins = ["http://127.0.0.1:9000"]

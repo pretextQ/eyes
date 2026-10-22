@@ -38,6 +38,8 @@ uv run eyes-runner --config runner.toml run
 
 所有路径相对于配置文件。模板复制到项目根目录后，默认状态目录为 `data/runner`。容器中的 `localhost` 指容器自身；宿主机 Runner 的地址按实际 API 和 Agent 网络设置。当前 Compose 部署控制端，Runner 在目标宿主机独立运行。
 
+本地评分轨迹和查询/证据恢复日志在服务端确认后默认保留 7 天，可用 `local_retention_days` 调整。评分工作区在结果确认后清理；正常执行仍等待证据封存确认才清理。unknown、隔离、损坏及待发送/拒收材料不会按年龄自动删除，需要维护者核对。
+
 ## 2. 通用 HTTP 接入
 
 HTTP 适配器只声明 `task` 观测范围：任务输入、输出、HTTP 调用边界、异常和耗时。它不解析外部服务内部轨迹、SSE 或任意框架的流式协议。需要内部模型和工具观测时，使用下面的本地 Python SDK 接入。

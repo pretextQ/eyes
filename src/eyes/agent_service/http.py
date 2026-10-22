@@ -9,11 +9,12 @@ import fcntl
 import hashlib
 import hmac
 import json
+import logging
 import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager, contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 from uuid import UUID, uuid4
@@ -67,6 +68,9 @@ class Store:
                     run TEXT, sequence INTEGER, event TEXT NOT NULL,
                     PRIMARY KEY(run, sequence), FOREIGN KEY(run) REFERENCES runs(id));
             """)
+            if "uploaded_at" not in {row[1] for row in db.execute("PRAGMA table_info(resources)")}:
+                db.execute("ALTER TABLE resources ADD COLUMN uploaded_at TEXT")
+                db.execute("UPDATE resources SET uploaded_at=?", (datetime.now(UTC).isoformat(),))
         self.path.chmod(0o600)
 
     @contextmanager
@@ -95,6 +99,31 @@ class Store:
         run.observed_at = datetime.now(UTC)
         AgentRun.model_validate(run.model_dump())
         db.execute("UPDATE runs SET snapshot=? WHERE id=?", (encoded(run), str(run.run_id)))
+
+    def prune(self, retention_seconds, active):
+        cutoff = (datetime.now(UTC) - timedelta(seconds=retention_seconds)).isoformat()
+        with self.transaction() as db:
+            rows = db.execute(
+                "SELECT id FROM runs WHERE json_extract(snapshot,'$.status') IN "
+                "('succeeded','failed','cancelled','timed_out') "
+                "AND json_extract(snapshot,'$.result.stopped_confirmed')=1 "
+                "AND julianday(json_extract(snapshot,'$.result.completed_at')) < julianday(?) "
+                "LIMIT 100",
+                (cutoff,),
+            ).fetchall()
+            for (run_id,) in rows:
+                if UUID(run_id) in active:
+                    continue
+                for table in ("events", "artifacts"):
+                    db.execute(f"DELETE FROM {table} WHERE run=?", (run_id,))
+                db.execute("DELETE FROM runs WHERE id=?", (run_id,))
+            db.execute(
+                "DELETE FROM resources WHERE id IN (SELECT resource.id FROM resources resource "
+                "WHERE julianday(resource.uploaded_at) < julianday(?) AND NOT EXISTS ("
+                "SELECT 1 FROM runs, json_each(runs.task,'$.resources') ref "
+                "WHERE json_extract(ref.value,'$.resource_id')=resource.id) LIMIT 100)",
+                (cutoff,),
+            )
 
 
 class RunContext:
@@ -266,9 +295,23 @@ def create_app(
                     if not run.result:
                         run.status, run.result = "unknown", unknown(run.run_id, "service_restarted")
                         store.update(db, run)
+
+            async def maintain():
+                while True:
+                    with contexts_lock:
+                        active = set(contexts)
+                    try:
+                        store.prune(capabilities.terminal_retention_seconds, active)
+                    except sqlite3.Error:
+                        logging.getLogger(__name__).error("agent_retention_failed")
+                    await asyncio.sleep(60)
+
+            maintenance = asyncio.create_task(maintain())
             try:
                 yield
             finally:
+                maintenance.cancel()
+                await asyncio.gather(maintenance, return_exceptions=True)
                 pool.shutdown(wait=True)
 
     app = FastAPI(lifespan=lifespan)
@@ -517,9 +560,13 @@ def create_app(
                     raise ServiceError(409, "idempotency_conflict")
             else:
                 db.execute(
-                    "INSERT INTO resources VALUES(?,?,?)",
-                    (str(resource_id), encoded(resource), data),
+                    "INSERT INTO resources(id,metadata,content,uploaded_at) VALUES(?,?,?,?)",
+                    (str(resource_id), encoded(resource), data, datetime.now(UTC).isoformat()),
                 )
+            db.execute(
+                "UPDATE resources SET uploaded_at=? WHERE id=?",
+                (datetime.now(UTC).isoformat(), str(resource_id)),
+            )
         return resource
 
     @app.get("/agent/v1/runs/{run_id}/artifacts/{artifact_id}", dependencies=auth)

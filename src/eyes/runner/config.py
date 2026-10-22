@@ -37,6 +37,7 @@ class RunnerConfig(BaseModel):
     token_env: str = "EYES_RUNNER_TOKEN"
     name: str = Field(default_factory=socket.gethostname)
     state_dir: Path = Path("data/runner")
+    local_retention_days: int = Field(default=7, ge=1, le=36500)
     execution_slots: int = Field(default=1, ge=0, le=100)
     score_slots: int = Field(default=1, ge=0, le=100)
     recovery_only: bool = False

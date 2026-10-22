@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import httpx
@@ -722,6 +722,7 @@ class RunnerService:
                 )
 
     def reap(self):
+        cutoff = (datetime.now(UTC) - timedelta(days=self.config.local_retention_days)).timestamp()
         for directory in self.work_dir.iterdir():
             if (directory / "ack.json").exists() and not any(
                 (directory / name).exists() for name in ["quarantine.json", "corrupt.json"]
@@ -736,11 +737,35 @@ class RunnerService:
                     journal.corrupt(directory, source, error)
                 except OSError as error:
                     logger.warning("journal_reap_disk_error file=%s errno=%s", source, error.errno)
+        for name in ("reconciliation", "evidence-recovery"):
+            root = (self.config.state_dir / name).resolve()
+            for ack in root.glob("*/ack.json"):
+                directory = ack.parent
+                try:
+                    if (
+                        directory.is_symlink()
+                        or directory.resolve().parent != root
+                        or (directory / "corrupt.json").exists()
+                        or any(directory.glob("pending.*"))
+                        or ack.stat().st_mtime >= cutoff
+                    ):
+                        continue
+                    shutil.rmtree(directory)
+                except OSError as error:
+                    logger.warning("recovery_reap_disk_error file=%s errno=%s", ack, error.errno)
 
     def reap_work(self, directory, work):
         # Retain scoring traces locally until the operator's retention job.
         if work["kind"] == "score":
             shutil.rmtree(directory / "workspace", ignore_errors=True)
+            cutoff = (
+                datetime.now(UTC) - timedelta(days=self.config.local_retention_days)
+            ).timestamp()
+            if (directory / "ack.json").stat().st_mtime < cutoff:
+                if directory.is_symlink() or directory.resolve().parent != self.work_dir.resolve():
+                    raise ValueError("work retention path escapes Runner state")
+                if not any(self.outbox.evidence(work["work_item_id"])):
+                    shutil.rmtree(directory)
             return
         if (directory / "evidence-ack.json").exists():
             shutil.rmtree(directory)
