@@ -24,7 +24,7 @@ def begin_admission(session, transaction, connection, settings):
     # API transactions acquire this BEFORE any producer, attempt or scheduling
     # lock. All workers must run the same configuration. READ COMMITTED sees the
     # previous holder's commit before recording the baseline.
-    if settings.project_event_content_bytes:
+    if settings.project_event_content_bytes and not transaction.nested:
         connection.exec_driver_sql("SELECT pg_advisory_xact_lock(74003)")
         session.info["capacity_baseline"] = event_usage(connection)
 
