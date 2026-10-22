@@ -2,6 +2,8 @@
 
 按用户要求，每个独立修复在检查后单独提交并推送。基线为 `11e93ba`，Windows / PowerShell；用户明确要求沿用现有检查，不新增测试。原始报告保持原文，本文件记录复核与处理结果。
 
+状态：源码处理已完成并逐项推送 origin/main。原报告 20 项中 19 项包含代码修复，M9 经复核保持既有正确语义；另处理 4 项架构/部署观察及 2 项复核补充，共 25 个独立变更提交，最后单独提交本汇总。下列静态/构建检查通过不代表真实并发、恢复或容量验收通过。
+
 ## H1：密钥引用格式
 
 目标和评分器的公共契约统一限制合法 `env:NAME`（完整引用最多 260 字符），发布前拒绝明文和非法变量名；Runner 复用相同格式校验，仍执行环境白名单及平台令牌隔离。重新导出控制契约并更新接入/历史版本处理说明。不修改历史快照或摘要。
@@ -143,3 +145,66 @@ readiness/备份恢复共用的 SCHEMA_REVISION 从实际 Alembic 单一 head �
 ## L5 复核补充：代理别名
 
 补齐 /api/docs、/api/redoc、/api/openapi.json 及 /redoc 的限制，避免通过通用 /api 转发重新访问文档。配置核对及 git diff --check 通过；未运行 nginx 请求验证。
+
+## M9：复核后保持 unknown 语义
+
+原报告将“明确 4xx”直接视为已知执行失败不符合现有公共边界。Runner 的 intended 仅在控制端 running 进度提交成功后置 true，启动前控制请求失败已经归 failed；执行派发后，通用 HTTP 目标的 4xx、Worker 异常或控制链路错误都不能证明远端没有副作用。只有未派发或进程范围执行得到停止确认时才可明确失败，其他情况保留 unknown/额度并核对。此项无业务代码修改，不将未知执行自动改成失败或重新执行。
+
+## 其他复核结论
+
+- H3 引用的事件/清单列表原本已有分页，修复针对累计量、封存及评分正文加载。
+- M2 的同步 collect 当前均在一个事件循环执行，未找到并发重入证据；修复实际存在的后台异常静默退出。
+- M6 的可信 Python 评分器是可扩展本地别名，允许先发布、后注册匹配 Runner；不以“暂时无人可领”判为非法。
+- `6929b6d` 是 2026-10-14 交付基线，不是每次维护后的实时 HEAD，保留其历史含义。
+- 原报告第四节声称 build 通过、第七节声称未运行 build，无法据此确定原执行事实。本轮已重新运行并明确记录构建结果。
+- data 内私有材料已由 gitignore/dockerignore 排除，不读取或提交其中的凭据；既有 `.agent-teams/` 未跟踪目录保持原状。
+- 用户明确不新增测试，本轮没有增加测试资产或 test job。
+
+## 本轮整体验证
+
+| 检查 | 实际结果 |
+| --- | --- |
+| `uv run --no-sync ruff check src migrations integrations` | 通过 |
+| `uv run --no-sync ruff format --check src migrations integrations` | 113 文件通过 |
+| `uv run --no-sync python -m compileall -q src migrations integrations` | 通过 |
+| `python -m eyes.contracts.schema` | 导出成功，与更新后的受控文件一致 |
+| `uv run --no-sync eyes --help` | 通过，包含明文连接显式选项 |
+| `uv run --no-sync alembic heads` | `0007_cancellation_audit (head)` |
+| `uv run --no-sync alembic upgrade head --sql` | 0001～0007 离线生成成功；仅指定无密码的离线占位 URL，未连接数据库 |
+| `uv build --wheel --out-dir data/review-20261022-dist` | 通过，归档包含全部迁移版本 |
+| `uv lock --check --default-index https://pypi.org/simple` | 31 包通过，锁文件无变更；本机镜像源差异未写入仓库 |
+| `npm run lint` / `npm run format:check` | 通过 |
+| `npm run build`（含 tsc） | 通过，2476 modules，Vite 构建 16.13 秒 |
+| `git diff --check` | 通过 |
+
+构建 wheel 和离线 SQL 位于 gitignored data 路径。Docker daemon 未启动，因此本轮没有执行 PostgreSQL 迁移升降级、API/Runner/Agent 服务请求、nginx -t、浏览器下载/CSP、真实取消竞态、配额并发/保存点、备份恢复、磁盘故障、长期容量或性能压测。上述运行边界均保留为待复验，不沿用历史验收冒充本轮通过。
+
+## 提交对应
+
+| 问题 | 已推送提交 |
+| --- | --- |
+| H1 | `a44763d` |
+| H4 | `a6dc9ef` |
+| H2 | `ed7c3cb` |
+| H3 | `6b4341d` |
+| M4 | `316b26b` |
+| M5 | `24f1294` |
+| M2 | `ab6f4c9` |
+| M6 | `dbf3a1b` |
+| L1 | `634f056` |
+| L2 | `4c1a140` |
+| L3 | `ec9bf0b` |
+| L4 | `cd2e0d8` |
+| L5 | `b161c97`，代理别名补充 `daf5018` |
+| L6 | `3badc98` |
+| M8 | `01d21c2` |
+| M3 | `091f90f` |
+| M10 | `d785f9d` |
+| M1 | `86bef9a` |
+| M7 | `b824d31`，显式 SQL 连接补充 `3000a79` |
+| integrations CI | `755922f` |
+| nginx 产物上限 | `73e0cdf` |
+| 自动迁移 head | `90b50aa` |
+| 公共工具分层 | `b5f2a46` |
+
+升级前核对必填数据库地址、非回环明文控制连接的显式配置、事件/详情限额和本地保留期。修改评分器源码会改变实现摘要，保持旧环境处理旧冻结任务，使用新源码时重新发布评分器版本；既有评分、版本和摘要没有改写。
