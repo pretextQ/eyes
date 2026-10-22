@@ -2,6 +2,8 @@ import json
 
 import httpx
 
+from eyes.contracts.target import validate_control_url
+
 
 def response_code(value):
     error = value.get("error") if isinstance(value, dict) else None
@@ -21,7 +23,16 @@ class ApiError(Exception):
 
 
 class ControlClient:
-    def __init__(self, url: str, token: str, timeout: float, max_bytes=8 * 1024 * 1024):
+    def __init__(
+        self,
+        url: str,
+        token: str,
+        timeout: float,
+        max_bytes=8 * 1024 * 1024,
+        *,
+        allow_insecure_http: bool = False,
+    ):
+        validate_control_url(url, allow_insecure_http=allow_insecure_http)
         self.max_bytes = max_bytes
         self.client = httpx.AsyncClient(
             base_url=url.rstrip("/") + "/",

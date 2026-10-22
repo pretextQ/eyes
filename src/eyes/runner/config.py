@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from eyes.contracts.target import http_origin as origin
+from eyes.contracts.target import validate_control_url
 
 
 class Binding(BaseModel):
@@ -32,6 +33,7 @@ class Binding(BaseModel):
 class RunnerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     server_url: str = "http://127.0.0.1:8000"
+    allow_insecure_http: bool = False
     token_env: str = "EYES_RUNNER_TOKEN"
     name: str = Field(default_factory=socket.gethostname)
     state_dir: Path = Path("data/runner")
@@ -58,7 +60,7 @@ class RunnerConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_config(self):
-        origin(self.server_url)
+        validate_control_url(self.server_url, allow_insecure_http=self.allow_insecure_http)
         self.allowed_http_origins = [origin(item) for item in self.allowed_http_origins]
         if not self.execution_slots and not self.score_slots and not self.recovery_only:
             raise ValueError("at least one execution or score slot is required")

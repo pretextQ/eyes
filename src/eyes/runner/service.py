@@ -117,7 +117,12 @@ class Lease:
 class RunnerService:
     def __init__(self, config, token):
         self.config = config
-        self.client = ControlClient(config.server_url, token, config.api_timeout_seconds)
+        self.client = ControlClient(
+            config.server_url,
+            token,
+            config.api_timeout_seconds,
+            allow_insecure_http=config.allow_insecure_http,
+        )
         self.outbox = Outbox(
             config.state_dir / "outbox", config.outbox_bytes, config.server_url + "\n" + token
         )

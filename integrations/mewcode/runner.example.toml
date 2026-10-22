@@ -1,6 +1,7 @@
 # Direct Python binding, run inside this Windows host's Linux container.
 # Paths refer to the built MewCode runtime image; adjust for actual mounts.
 server_url = "http://host.docker.internal:18044"
+allow_insecure_http = true # Explicitly trust this local Docker-to-host connection.
 name = "mewcode-linux-runner"
 state_dir = "/app/data/mewcode-python/runner"
 execution_slots = 1

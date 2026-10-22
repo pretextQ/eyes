@@ -13,3 +13,9 @@
 取消入口在同一持久化写事务中将 accepted/queued 转成明确未启动的 cancelled；与 invoke 的 running 转换串行。invoke 遇到终态或 cancel_requested 不再调用 execute。已经进入 running 的后端继续使用真实取消回调和停止确认，不伪造终态。
 
 检查：ruff 规范/格式、`python -m compileall -q src/eyes/agent_service`、`git diff --check`。未进行真实并发运行验证；后端启动/取消协调责任已在运行时文档明确。
+
+## H2：控制面令牌传输
+
+CLI、Runner 配置及 ControlClient 默认拒绝非回环 HTTP，发送令牌前校验。可信 Docker/私有网络通过显式 `--allow-insecure-http` / `allow_insecure_http` 选择；更新本机 Docker 示例及升级说明。没有按 DNS 解析结果自动信任远程域名。
+
+检查：ruff 规范/格式、CLI `--help`、Python 编译、`git diff --check`；未验证实际 TLS/容器通信。

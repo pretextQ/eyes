@@ -12,7 +12,7 @@ from eyes.contracts.base import explicit_versions
 from eyes.contracts.comparison import ComparisonCreate
 from eyes.contracts.dataset import CaseDefinition, DatasetImport
 from eyes.contracts.scorer import ScorerPublish
-from eyes.contracts.target import TargetPublish, http_origin
+from eyes.contracts.target import TargetPublish, validate_control_url
 from eyes.contracts.work import ExperimentBatchCreate, ExperimentCreate
 
 EXIT = {"pass": 0, "fail": 1, "inconclusive": 2}
@@ -27,6 +27,11 @@ class Parser(argparse.ArgumentParser):
 def main():
     parser = Parser(description="Eyes public API and CI client (JSON output)")
     parser.add_argument("--url", default=os.environ.get("EYES_URL", "http://127.0.0.1:8000"))
+    parser.add_argument(
+        "--allow-insecure-http",
+        action="store_true",
+        help="allow a cleartext control connection on an explicitly trusted network",
+    )
     parser.add_argument("--token-env", default="EYES_TOKEN")
     parser.add_argument("--timeout", type=float, default=30)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -99,7 +104,7 @@ def main():
                 output.write(content)
             print(json.dumps({"schema_version": "1.0", "migrated_records": len(migrated)}))
             return
-        http_origin(args.url)
+        validate_control_url(args.url, allow_insecure_http=args.allow_insecure_http)
         if args.timeout <= 0:
             raise ValueError("timeout must be positive")
         token = os.environ.get(args.token_env)

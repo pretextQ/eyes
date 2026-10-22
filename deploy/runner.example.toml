@@ -1,5 +1,7 @@
 # Copy to runner.toml in the project root, then adapt addresses and local aliases.
 server_url = "http://127.0.0.1:8000"
+# For a trusted Docker/private network only; remote connections otherwise require HTTPS.
+allow_insecure_http = false
 token_env = "EYES_RUNNER_TOKEN"
 name = "host-runner"
 state_dir = "data/runner"

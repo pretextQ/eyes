@@ -1,4 +1,5 @@
 from datetime import datetime
+from ipaddress import ip_address
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -22,6 +23,19 @@ def http_origin(url: str) -> str:
     if ":" in hostname:
         hostname = f"[{hostname}]"
     return f"{parsed.scheme}://{hostname}:{port}"
+
+
+def validate_control_url(url: str, *, allow_insecure_http: bool = False) -> None:
+    http_origin(url)
+    parsed = urlsplit(url)
+    if parsed.query or parsed.fragment:
+        raise ValueError("control API URL cannot contain query or fragment")
+    try:
+        loopback = ip_address(parsed.hostname).is_loopback
+    except ValueError:
+        loopback = parsed.hostname.lower() == "localhost"
+    if parsed.scheme == "http" and not loopback and not allow_insecure_http:
+        raise ValueError("remote control API requires HTTPS; insecure HTTP needs explicit opt-in")
 
 
 class TargetCapabilities(Contract):

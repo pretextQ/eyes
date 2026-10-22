@@ -233,6 +233,8 @@ uv run eyes-runner --config runner.toml run
 
 开发者 CLI 使用 `EYES_TOKEN` 提供项目令牌，默认连接 `http://127.0.0.1:8000`；可用 `--url` 指定 API。
 
+控制连接默认只允许 HTTPS 或回环 HTTP。受控本机 Docker/私有网络如需明文连接，CLI 必须显式添加全局选项 `--allow-insecure-http`，Runner TOML 必须设置 `allow_insecure_http = true`；该选项允许令牌明文传输，部署者应仅在明确可信的网络使用。旧 Runner 配置使用 `host.docker.internal` 等非回环 HTTP 地址时，升级前需显式配置此选项或改用 HTTPS。
+
 ```sh
 uv run eyes --help
 uv run eyes compare --file comparison.json --key release-comparison
