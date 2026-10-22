@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from eyes.server.domain import DomainError
-from eyes.server.operations.capacity import begin_admission, finish_admission
+from eyes.server.operations.capacity import begin_admission, capture_admission, finish_admission
 from eyes.server.storage.models import Credential
 
 bearer = HTTPBearer(auto_error=False)
@@ -26,13 +26,15 @@ def db_session(request: Request):
                     "SELECT pg_advisory_xact_lock_shared(74000)"
                 ),
             )
-            event.listen(
-                session,
-                "after_begin",
-                lambda session, transaction, connection: begin_admission(
-                    session, transaction, connection, request.app.state.settings
-                ),
-            )
+            if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+                event.listen(
+                    session,
+                    "after_begin",
+                    lambda session, transaction, connection: begin_admission(
+                        session, transaction, connection, request.app.state.settings
+                    ),
+                )
+                event.listen(session, "before_flush", capture_admission)
             yield session
             finish_admission(session, request.app.state.settings)
     except OperationalError as exc:

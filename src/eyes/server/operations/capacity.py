@@ -6,18 +6,21 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 
 from eyes.server.domain import DomainError
+from eyes.server.storage.models import Event, ObservedEvent
 
 USAGE_SQL = """
-SELECT project_id, sum(bytes)::bigint AS bytes FROM (
-    SELECT project_id, octet_length(content::text) AS bytes FROM events
+SELECT coalesce(sum(bytes), 0)::bigint AS bytes FROM (
+    SELECT octet_length(e.content::text) AS bytes FROM events e
+    JOIN attempts a ON a.id=e.attempt_id WHERE a.project_id=CAST(:project AS uuid)
     UNION ALL
-    SELECT project_id, octet_length(content::text) AS bytes FROM observed_events
-) contents GROUP BY project_id
+    SELECT octet_length(content::text) AS bytes FROM observed_events
+    WHERE project_id=CAST(:project AS uuid)
+) contents
 """
 
 
-def event_usage(connection):
-    return {str(row.project_id): row.bytes for row in connection.execute(text(USAGE_SQL))}
+def event_usage(connection, project_id):
+    return connection.scalar(text(USAGE_SQL), {"project": str(project_id)})
 
 
 def begin_admission(session, transaction, connection, settings):
@@ -26,7 +29,21 @@ def begin_admission(session, transaction, connection, settings):
     # previous holder's commit before recording the baseline.
     if settings.project_event_content_bytes and not transaction.nested:
         connection.exec_driver_sql("SELECT pg_advisory_xact_lock(74003)")
-        session.info["capacity_baseline"] = event_usage(connection)
+        session.info["capacity_baseline"] = {}
+
+
+def capture_admission(session, flush_context, instances):
+    baseline = session.info.get("capacity_baseline")
+    if baseline is None:
+        return
+    # Capture before SQL is flushed, once per affected project and root transaction.
+    projects = {
+        str(record.project_id)
+        for record in session.new | session.dirty | session.deleted
+        if isinstance(record, Event | ObservedEvent)
+    }
+    for project in sorted(projects - baseline.keys()):
+        baseline[project] = event_usage(session.connection(), project)
 
 
 def finish_admission(session, settings):
@@ -34,9 +51,8 @@ def finish_admission(session, settings):
     if baseline is None:
         return
     session.flush()
-    current = event_usage(session.connection())
-    for project, used in current.items():
-        previous = baseline.get(project, 0)
+    for project, previous in baseline.items():
+        used = event_usage(session.connection(), project)
         # Already over limit after enabling: allow duplicates and reductions.
         if used > previous and used > settings.project_event_content_bytes:
             raise DomainError(
@@ -83,7 +99,7 @@ def volume_status(root, minimum):
 
 
 def status(session, settings, project_id):
-    used = event_usage(session.connection()).get(str(project_id), 0)
+    used = event_usage(session.connection(), project_id)
     limit = settings.project_event_content_bytes
     content = {
         "scope": "project_event_content",
