@@ -87,6 +87,11 @@ export class Api {
       all.push(...result.items);
       if (result.items.length < 200) return all;
     }
+    const extra = await this.request<{ items: T[] }>(
+      `${path}?limit=1&offset=${all.length}`,
+      { signal },
+    );
+    if (extra.items.length === 0) return all;
     throw new ApiError(0, "结果超过 100000 条，已停止加载；请缩小查询范围。");
   }
   async catalog(kind: CatalogKind, signal?: AbortSignal): Promise<Version[]> {

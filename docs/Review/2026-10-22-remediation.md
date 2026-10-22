@@ -49,3 +49,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 发布时拒绝未实现的 adapter、缺失 Python Agent 别名、无效通用 HTTP 配置/URL/密钥映射及能力不匹配，避免永远不可领取的目标。可信 Python 评分器插件名仍是 Runner 的本地可扩展别名；允许在 Runner 注册前发布，因此缺少在线匹配 Runner 本身不是非法插件，也不自动失败或重跑。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未运行实际发布/领取请求。
+
+## L1：恰好 100000 条误报
+
+达到 500 个满页后以 limit=1 探测下一条，仅存在第 100001 条才报超限；恰好 100000 条正常返回，持续满页异常仍有明确请求上限。
+
+检查：前端 lint、格式、TypeScript 检查、`git diff --check`；未进行浏览器运行验证。
