@@ -43,3 +43,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 证据泵逐轮捕获并记录异常类型，继续重试；保留源文件和 outbox，不覆盖业务结果，转存失败数量可见。报告的 collect 并发竞态未获源码支持：当前 collect 为同步函数，调用均在同一个 asyncio 事件循环，没有内部 await 或线程调度；未添加无依据的锁。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未执行磁盘故障注入。
+
+## M6：不支持的目标与插件排队
+
+发布时拒绝未实现的 adapter、缺失 Python Agent 别名、无效通用 HTTP 配置/URL/密钥映射及能力不匹配，避免永远不可领取的目标。可信 Python 评分器插件名仍是 Runner 的本地可扩展别名；允许在 Runner 注册前发布，因此缺少在线匹配 Runner 本身不是非法插件，也不自动失败或重跑。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`；未运行实际发布/领取请求。

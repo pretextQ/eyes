@@ -48,6 +48,35 @@ def reject_inline_secrets(value, path="config"):
 
 def publish(session: Session, project_id: UUID, request: TargetPublish | ScorerPublish):
     reject_inline_secrets(request.config)
+    if isinstance(request, TargetPublish):
+        adapter = request.capabilities.adapter
+        if adapter not in {"http", "agent_http", "python"}:
+            raise DomainError(422, "unsupported_adapter", "target adapter is not implemented")
+        if adapter == "python":
+            alias = request.config.get("agent")
+            if not isinstance(alias, str) or not 1 <= len(alias) <= 120:
+                raise DomainError(422, "invalid_agent_alias", "configure a Python Agent alias")
+        if adapter == "http":
+            from eyes.adapters.http import HttpConfig
+            from eyes.contracts.target import http_origin
+
+            try:
+                config = HttpConfig.model_validate(request.config)
+                for url in (config.url, config.cancel_url, config.reconcile_url):
+                    if url:
+                        http_origin(url)
+                if (
+                    (request.capabilities.cancellation and not config.cancel_url)
+                    or (request.capabilities.reconciliation and not config.reconcile_url)
+                    or set(request.capabilities.observation) != {"task"}
+                    or any(
+                        header.secret_ref not in request.secret_refs
+                        for header in config.secret_headers
+                    )
+                ):
+                    raise ValueError("HTTP configuration does not match declared capabilities")
+            except ValueError:
+                raise DomainError(422, "http_config", "invalid HTTP target configuration") from None
     if isinstance(request, TargetPublish) and request.capabilities.adapter == "agent_http":
         from eyes.adapters.agent_http import AgentHttpConfig, target_capabilities
 
