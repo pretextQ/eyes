@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from uuid import UUID, uuid4, uuid5
 
-from sqlalchemy import Text, cast, func, select, text
+from sqlalchemy import Text, cast, func, or_, select, text, tuple_
 from sqlalchemy.orm import Session
 
 from eyes.contracts.agent_protocol import AgentEvent
@@ -161,7 +161,74 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
     receipts = []
     changed = set()
     usage = {aid: event_usage(session, aid) for aid in attempts}
-    for event in batch.events:
+    previous_by_key = {
+        (record.producer_id, record.event_id): record
+        for record in session.scalars(
+            select(Event).where(
+                Event.project_id == credential.project_id,
+                tuple_(Event.producer_id, Event.event_id).in_(
+                    [(event.producer_id, event.event_id) for event in batch.events]
+                ),
+            )
+        )
+    }
+    native_inputs = {}
+    for index, event in enumerate(batch.events):
+        if (event.producer_id, event.event_id) not in previous_by_key and (
+            event.type == "agent.event" and event.source == "target_trace"
+        ):
+            try:
+                native_inputs[index] = AgentEvent.model_validate(event.data)
+            except ValueError:
+                raise DomainError(
+                    422, "invalid_agent_event", "invalid native Agent event"
+                ) from None
+    native_ids, native_sequences = {}, set()
+    if native_inputs:
+        rows = session.scalars(
+            select(Event).where(
+                Event.project_id == credential.project_id,
+                Event.content["type"].as_string() == "agent.event",
+                Event.content["source"].as_string() == "target_trace",
+                or_(
+                    tuple_(
+                        Event.attempt_id,
+                        Event.content["data"]["run_id"].as_string(),
+                        Event.content["data"]["event_id"].as_string(),
+                    ).in_(
+                        [
+                            (
+                                batch.events[index].attempt_id,
+                                str(native.run_id),
+                                str(native.event_id),
+                            )
+                            for index, native in native_inputs.items()
+                        ]
+                    ),
+                    tuple_(
+                        Event.attempt_id,
+                        Event.content["data"]["run_id"].as_string(),
+                        Event.content["data"]["sequence"].as_string(),
+                    ).in_(
+                        [
+                            (
+                                batch.events[index].attempt_id,
+                                str(native.run_id),
+                                str(native.sequence),
+                            )
+                            for index, native in native_inputs.items()
+                        ]
+                    ),
+                ),
+            )
+        )
+        for record in rows:
+            child = record.content["data"]
+            native_ids.setdefault(
+                (record.attempt_id, child["run_id"], child["event_id"]), []
+            ).append(record)
+            native_sequences.add((record.attempt_id, child["run_id"], child["sequence"]))
+    for index, event in enumerate(batch.events):
         attempt = attempts[event.attempt_id]
         if attempt.evidence_expired_at:
             raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
@@ -172,32 +239,15 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
         raw_content = event.model_dump(mode="json")
         content_digest = digest(raw_content)
         content = redact(raw_content)
-        previous = session.scalar(
-            select(Event).where(
-                Event.project_id == credential.project_id,
-                Event.producer_id == event.producer_id,
-                Event.event_id == event.event_id,
-            )
-        )
+        previous = previous_by_key.get((event.producer_id, event.event_id))
+        native = native_inputs.get(index)
         if previous is None and event.type == "agent.event" and event.source == "target_trace":
-            try:
-                native = AgentEvent.model_validate(event.data)
-            except ValueError:
-                raise DomainError(
-                    422, "invalid_agent_event", "invalid native Agent event"
-                ) from None
             if attempt.remote_operation_id and str(native.run_id) != attempt.remote_operation_id:
                 raise DomainError(409, "identity_mismatch", "event belongs to another Agent run")
             # Native IDs survive a different Runner/envelope after process loss.
             # Reuse the original record, including its original trace and timestamp.
-            candidates = session.scalars(
-                select(Event).where(
-                    Event.attempt_id == attempt.id,
-                    Event.content["type"].as_string() == "agent.event",
-                    Event.content["data"]["run_id"].as_string() == str(native.run_id),
-                    Event.content["data"]["event_id"].as_string() == str(native.event_id),
-                )
-            ).all()
+            native_key = (attempt.id, str(native.run_id), str(native.event_id))
+            candidates = native_ids.get(native_key, [])
             if candidates:
                 if any(digest(r.content["data"]) != digest(content["data"]) for r in candidates):
                     raise DomainError(409, "event_conflict", "native event has different content")
@@ -211,16 +261,7 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
                     }
                 )
                 continue
-            if session.scalar(
-                select(Event.id)
-                .where(
-                    Event.attempt_id == attempt.id,
-                    Event.content["type"].as_string() == "agent.event",
-                    Event.content["data"]["run_id"].as_string() == str(native.run_id),
-                    Event.content["data"]["sequence"].as_integer() == native.sequence,
-                )
-                .limit(1)
-            ):
+            if (attempt.id, str(native.run_id), native.sequence) in native_sequences:
                 raise DomainError(409, "sequence_conflict", "native sequence has another event")
         if previous:
             if previous.digest != content_digest:
@@ -235,6 +276,8 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
         else:
             reserve_event(usage[event.attempt_id], content)
             record = Event(
+                id=uuid4(),
+                created_at=now(),
                 project_id=credential.project_id,
                 attempt_id=event.attempt_id,
                 producer_id=event.producer_id,
@@ -243,7 +286,10 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
                 content=content,
             )
             session.add(record)
-            session.flush()
+            previous_by_key[(event.producer_id, event.event_id)] = record
+            if native is not None:
+                native_ids.setdefault(native_key, []).append(record)
+                native_sequences.add((attempt.id, str(native.run_id), native.sequence))
             changed.add(event.attempt_id)
         receipts.append(
             {
@@ -253,7 +299,8 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
                 "duplicate": previous is not None,
             }
         )
-    for aid in changed:
+    session.flush()
+    for aid in sorted(changed, key=str):
         if attempts[aid].evidence_status != "collecting":
             seal(session, attempts[aid])
     return {"schema_version": "1.0", "receipts": receipts}
