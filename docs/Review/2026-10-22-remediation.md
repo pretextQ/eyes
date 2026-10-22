@@ -139,3 +139,7 @@ readiness/备份恢复共用的 SCHEMA_REVISION 从实际 Alembic 单一 head �
 文件持久化/脱敏/密钥解析工具移到 eyes.common.files，后端观测、SDK、评分器和 Runner 从公共模块导入；HTTP 适配器直接使用公共契约的 origin 校验。保留 eyes.runner.files 兼容导出，旧接入不因模块移动断裂。新代码不再反向加载 Runner 配置或其包级运行环境。
 
 检查：ruff（含 integrations）、Python 编译、CLI 帮助、wheel 构建；未运行真实接入。rules 等源码导入行改变会影响实现摘要，需保留旧冻结插件，使用新代码时重新获取摘要并发布新评分器版本；不重写历史摘要。
+
+## L5 复核补充：代理别名
+
+补齐 /api/docs、/api/redoc、/api/openapi.json 及 /redoc 的限制，避免通过通用 /api 转发重新访问文档。配置核对及 git diff --check 通过；未运行 nginx 请求验证。
