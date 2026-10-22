@@ -11,7 +11,7 @@ from eyes.contracts.base import LEGACY_SCHEMA_SUNSET
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EYES_", env_file=".env", extra="ignore")
 
-    database_url: SecretStr = SecretStr("postgresql+psycopg://eyes:eyes@127.0.0.1:5432/eyes")
+    database_url: SecretStr
     artifact_root: Path = Path("data/artifacts")
     max_request_bytes: int = Field(default=8 * 1024 * 1024, ge=1024)
     max_score_input_bytes: int = Field(default=32 * 1024 * 1024, ge=4096, le=128 * 1024 * 1024)

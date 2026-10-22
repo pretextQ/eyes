@@ -158,6 +158,8 @@ Copy-Item .env.example .env
 
 编辑 `.env` 的 `EYES_DATABASE_URL`，连接专用 PostgreSQL 数据库。迁移和 bootstrap 可在 Windows PowerShell 执行：
 
+`EYES_DATABASE_URL` 为必填项，服务不内置默认数据库账号或密码；缺失配置时会在连接数据库之前拒绝启动。Compose 显式传入的连接地址保持有效。
+
 ```powershell
 uv run alembic upgrade head
 uv run eyes-admin bootstrap --name default

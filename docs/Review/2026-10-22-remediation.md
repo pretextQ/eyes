@@ -79,3 +79,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 nginx 不再代理 /docs 和 /openapi.json；回环控制 API 的开发文档仍可直接访问。HTML、assets 和代理响应统一设置 CSP，仅允许本源脚本/连接，禁用对象和页面嵌入；保留 React/xyflow 所需的内联样式。
 
 检查：配置逐段核对、`git diff --check`；Docker daemon 未启动，未运行 nginx -t 或浏览器 CSP 验证。
+
+## L6：默认数据库凭据
+
+移除 Settings 内置 eyes:eyes 数据库地址，要求显式 EYES_DATABASE_URL（环境或私有 .env）。Compose 已强制提供数据库密码；开发模板需自行更换示例密码。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`；未连接数据库。
