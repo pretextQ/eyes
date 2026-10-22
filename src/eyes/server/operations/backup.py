@@ -1,6 +1,7 @@
 """Consistent database/evidence backups and restore into an empty destination."""
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -172,8 +173,16 @@ def restore(sessions, settings, source, *, container=None, bin_dir=None):
     staging = Path(tempfile.mkdtemp(prefix=".eyes-restore-", dir=root.parent))
     try:
         for item in inventory:
-            shutil.copyfile(source / "artifacts" / item["key"], staging / item["key"])
-            (staging / item["key"]).chmod(0o600)
+            target = staging / item["key"]
+            shutil.copyfile(source / "artifacts" / item["key"], target)
+            target.chmod(0o600)
+            with target.open("rb") as stream:
+                os.fsync(stream.fileno())
+        descriptor = os.open(staging, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
         with sessions() as session, session.begin():
             maintenance_lock(session, exclusive=True)
             tables = session.scalar(
@@ -204,10 +213,7 @@ def restore(sessions, settings, source, *, container=None, bin_dir=None):
                     stdin=stream,
                     stdout=subprocess.DEVNULL,
                 )
-            if root.exists():
-                root.rmdir()
-            os.replace(staging, root)
-            inspected = audit(session, root)
+            inspected = audit(session, staging)
             if inspected["status"] != "ok":
                 raise ValueError("restored storage audit failed; keep services stopped")
             # Restored leases must not authenticate old Runner processes. Preserve
@@ -219,12 +225,27 @@ def restore(sessions, settings, source, *, container=None, bin_dir=None):
             for work in session.scalars(select(WorkItem).where(WorkItem.status == "claimed")):
                 work.lease_expires_at = now()
             recovery = sweep(session, settings)
+            session.flush()
+            # Publish only after database/file consistency and recovery preparation.
+            if root.exists():
+                root.rmdir()
+            os.replace(staging, root)
+            descriptor = os.open(root.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
         return {
             "status": "complete",
             "audit": inspected,
             "recovery": recovery,
             "runner_credentials": "revoked; reconcile unknown executions, then issue new tokens",
         }
-    finally:
+    except BaseException:
         if staging.exists():
-            shutil.rmtree(staging)
+            # pg_restore committed independently. Preserve bytes needed to recover
+            # that database instead of leaving it without its evidence files.
+            logging.getLogger(__name__).error(
+                "restore_incomplete staging=%s; keep services stopped", staging
+            )
+        raise

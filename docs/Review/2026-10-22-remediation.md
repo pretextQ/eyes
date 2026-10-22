@@ -31,3 +31,9 @@ CLI、Runner 配置及 ControlClient 默认拒绝非回环 HTTP，发送令牌�
 after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不再重新采样并覆盖根事务基线。取消批次的逐成员保存点保持原有回滚语义。
 
 检查：ruff 规范/格式、`git diff --check`；未执行 PostgreSQL 保存点运行验证。
+
+## M5：恢复产物发布顺序与持久化
+
+恢复复制后逐文件和 staging 目录 fsync；先对 staging 与恢复后的数据库进行一致性审计，再准备 Runner 撤销/租约恢复，最后发布产物目录并 fsync 父目录。失败时保留 staging 并记录其路径，避免 pg_restore 已独立提交后丢失配套证据。恢复失败仍必须保持服务停止并人工核对。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`；未执行真实备份恢复或断电验证。
