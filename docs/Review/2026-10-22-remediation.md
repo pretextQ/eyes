@@ -73,3 +73,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 为 Starlette HTTPException 添加统一契约响应，404/405 具有 schema_version 和 error.code/message，保留 Allow 等原始响应头及状态码。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未运行 API 请求验证。
+
+## L5：Web 代理文档与 CSP
+
+nginx 不再代理 /docs 和 /openapi.json；回环控制 API 的开发文档仍可直接访问。HTML、assets 和代理响应统一设置 CSP，仅允许本源脚本/连接，禁用对象和页面嵌入；保留 React/xyflow 所需的内联样式。
+
+检查：配置逐段核对、`git diff --check`；Docker daemon 未启动，未运行 nginx -t 或浏览器 CSP 验证。
