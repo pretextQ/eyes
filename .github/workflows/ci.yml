@@ -35,10 +35,10 @@ jobs:
         run: uv sync --frozen
 
       - name: Check Python code
-        run: uv run --no-sync ruff check src migrations
+        run: uv run --no-sync ruff check src migrations integrations
 
       - name: Check Python formatting
-        run: uv run --no-sync ruff format --check src migrations
+        run: uv run --no-sync ruff format --check src migrations integrations
 
   migrations:
     name: Migration checks

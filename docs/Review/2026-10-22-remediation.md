@@ -115,3 +115,9 @@ Runner 已确认评分和恢复日志默认保留 7 天后回收，未确认/隔
 实验汇总使用数据库分组/窗口查询，保持首个成功 Attempt、最早评分、N/A 和全部分母语义，不加载执行输出、评分理由或证据。用例详情在加载前按数据库统计检查 16 MiB JSON/记录预算，超限明确返回 413 detail_too_large；可用 include_history=false 获取基本执行，再分页读取事件/清单/新增的 scores 端点。默认响应形状和历史选择不变，不静默裁剪。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未执行 PostgreSQL 汇总对照或大数据压测。
+
+## 架构观察：集成目录 CI
+
+既有 CI 的规范/格式检查加入 integrations，不增加测试、依赖或新的 job。23 个集成 Python 文件已通过相同检查。
+
+检查：`ruff check src migrations integrations`、`ruff format --check src migrations integrations`、`git diff --check`。
