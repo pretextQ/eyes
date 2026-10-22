@@ -85,3 +85,9 @@ nginx 不再代理 /docs 和 /openapi.json；回环控制 API 的开发文档仍
 移除 Settings 内置 eyes:eyes 数据库地址，要求显式 EYES_DATABASE_URL（环境或私有 .env）。Compose 已强制提供数据库密码；开发模板需自行更换示例密码。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未连接数据库。
+
+## M8：观测详情重复轮询
+
+增加只读 summary 端点，观测页每 2 秒只轮询元数据；事件数量/过期状态变化或用户增加加载范围时才获取事件分页。晚到乱序事件同样增加事件数并触发重读；完成、心跳和失联状态由轻量元数据持续更新。错误可见，过期立即隐藏正文。
+
+检查：ruff、相关文件 ESLint/Prettier、TypeScript、`git diff --check`；未验证浏览器网络请求或长轨迹性能。

@@ -451,8 +451,24 @@ export function ObservationRunPage() {
   const { id } = useParams();
   const { api } = useConnection();
   const [limit, setLimit] = useState(200);
+  const metadata = useQuery<ObservedRun>({
+    queryKey: ["observed-run-summary", id],
+    queryFn: ({ signal }) =>
+      api!.request<ObservedRun>(`/v1/observation/runs/${id}/summary`, {
+        signal,
+      }),
+    enabled: !!api && !!id,
+    refetchInterval: 2000,
+  });
   const query = useQuery<RunDetail>({
-    queryKey: ["observed-run", id, limit],
+    gcTime: 0,
+    queryKey: [
+      "observed-run",
+      id,
+      limit,
+      metadata.data?.metrics.events,
+      metadata.data?.expired_at,
+    ],
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === id ? previous : undefined,
     queryFn: async ({ signal }) => {
@@ -471,16 +487,22 @@ export function ObservationRunPage() {
       }
       return { ...first!, events };
     },
-    enabled: !!api && !!id,
-    refetchInterval: 2000,
+    enabled: !!api && !!id && !!metadata.data,
   });
   if (!api) return <Disconnected />;
+  if (metadata.error && !metadata.data)
+    return (
+      <ErrorNotice
+        error={metadata.error}
+        retry={() => void metadata.refetch()}
+      />
+    );
   if (query.isPending) return <Loading label="正在读取执行链路" />;
   if (!query.data)
     return (
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
     );
-  const run = query.data;
+  const run = { ...query.data, ...metadata.data };
   const groups = new Map<number, EventRecord[]>();
   for (const event of run.events) {
     const number = event.content.turn || 0;
@@ -517,8 +539,14 @@ export function ObservationRunPage() {
           </Button>
         }
       />
-      {query.error && (
-        <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {(query.error || metadata.error) && (
+        <ErrorNotice
+          error={query.error || metadata.error}
+          retry={() => {
+            void metadata.refetch();
+            void query.refetch();
+          }}
+        />
       )}
       <div className="observation-status">
         <Status value={run.status} />

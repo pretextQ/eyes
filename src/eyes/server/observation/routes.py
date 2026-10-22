@@ -116,6 +116,14 @@ def runs(
     return {"schema_version": "1.0", "items": [service.summary(run) for run in values]}
 
 
+@router.get("/runs/{run_id}/summary")
+def run_summary(run_id: UUID, session: Database, user: Reader):
+    return {
+        "schema_version": "1.0",
+        **service.summary(scoped(session, ObservedRun, run_id, user.project_id)),
+    }
+
+
 @router.get("/runs/{run_id}")
 def run_detail(
     run_id: UUID, session: Database, user: Reader, limit: Limit = 200, offset: Offset = 0
