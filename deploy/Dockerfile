@@ -5,9 +5,9 @@ WORKDIR /app
 ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY migrations ./migrations
 RUN uv sync --frozen --no-dev
 COPY alembic.ini ./
-COPY migrations ./migrations
 RUN useradd --create-home --uid 10001 eyes && mkdir -p /app/data/artifacts \
     && chown -R eyes:eyes /app/data && chmod 0700 /app/data/artifacts
 ENV PATH="/app/.venv/bin:$PATH"

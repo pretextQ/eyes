@@ -127,3 +127,9 @@ Runner 已确认评分和恢复日志默认保留 7 天后回收，未确认/隔
 nginx 请求上限从 8 MiB 对齐后端默认产物上限 32 MiB；控制 API 的独立 JSON 8 MiB 限制继续生效。自定义更大产物上限时仍需同步修改代理配置。
 
 检查：配置核对、`git diff --check`；未运行实际大文件上传。
+
+## 架构观察：迁移 head 自动读取
+
+readiness/备份恢复共用的 SCHEMA_REVISION 从实际 Alembic 单一 head 计算，移除手工常量。源码读取仓库迁移，wheel 打包迁移版本，Docker 在安装前复制迁移；无迁移或多 head 将明确失败。
+
+检查：ruff、Python 编译、`alembic heads`、离线迁移 SQL 和 wheel 构建；未连接数据库执行迁移。

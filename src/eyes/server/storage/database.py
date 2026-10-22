@@ -1,9 +1,23 @@
+from pathlib import Path
+
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from eyes.server.config import Settings
 
-SCHEMA_REVISION = "0007_cancellation_audit"
+
+def schema_revision():
+    source = Path(__file__).resolve().parents[4] / "migrations"
+    bundled = Path(__file__).with_name("migrations")
+    directory = source if (source / "versions").is_dir() else bundled
+    revision = ScriptDirectory(str(directory)).get_current_head()
+    if revision is None:
+        raise RuntimeError("service requires a single packaged Alembic head")
+    return revision
+
+
+SCHEMA_REVISION = schema_revision()
 
 
 def database(settings: Settings):
