@@ -705,8 +705,21 @@ class RunnerService:
     async def pump_evidence(self, directory, work):
         while True:
             await asyncio.sleep(min(self.config.poll_seconds, 2))
-            self.collect(directory, work)
-            await self.outbox.flush(self.client)
+            try:
+                gaps = self.collect(directory, work)
+                if gaps:
+                    logger.warning(
+                        "evidence_transfer_pending work=%s files=%s", work["work_item_id"], gaps
+                    )
+                await self.outbox.flush(self.client)
+            except Exception as error:
+                # Source files/outbox entries survive; keep retrying without
+                # allowing an unobserved background failure to stop all uploads.
+                logger.error(
+                    "evidence_pump_failure work=%s type=%s",
+                    work["work_item_id"],
+                    type(error).__name__,
+                )
 
     def reap(self):
         for directory in self.work_dir.iterdir():

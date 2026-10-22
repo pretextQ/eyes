@@ -37,3 +37,9 @@ after_begin 的容量初始化仅在根事务运行；嵌套事务/SAVEPOINT 不
 恢复复制后逐文件和 staging 目录 fsync；先对 staging 与恢复后的数据库进行一致性审计，再准备 Runner 撤销/租约恢复，最后发布产物目录并 fsync 父目录。失败时保留 staging 并记录其路径，避免 pg_restore 已独立提交后丢失配套证据。恢复失败仍必须保持服务停止并人工核对。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未执行真实备份恢复或断电验证。
+
+## M2：后台证据泵异常
+
+证据泵逐轮捕获并记录异常类型，继续重试；保留源文件和 outbox，不覆盖业务结果，转存失败数量可见。报告的 collect 并发竞态未获源码支持：当前 collect 为同步函数，调用均在同一个 asyncio 事件循环，没有内部 await 或线程调度；未添加无依据的锁。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`；未执行磁盘故障注入。
