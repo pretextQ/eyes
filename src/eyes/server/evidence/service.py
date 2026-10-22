@@ -1,12 +1,13 @@
 import errno
 import hashlib
+import json
 import logging
 import os
 import tempfile
 from pathlib import Path
 from uuid import UUID, uuid4, uuid5
 
-from sqlalchemy import func, select, text
+from sqlalchemy import Text, cast, func, select, text
 from sqlalchemy.orm import Session
 
 from eyes.contracts.agent_protocol import AgentEvent
@@ -26,6 +27,27 @@ from eyes.server.storage.models import (
     WorkItem,
     now,
 )
+
+MAX_ATTEMPT_EVENTS = 10000
+MAX_ATTEMPT_EVENT_BYTES = 16 * 1024 * 1024
+
+
+def event_usage(session, attempt_id):
+    count, size = session.execute(
+        select(
+            func.count(Event.id),
+            func.coalesce(func.sum(func.octet_length(cast(Event.content, Text))), 0),
+        ).where(Event.attempt_id == attempt_id)
+    ).one()
+    return [count, size]
+
+
+def reserve_event(usage, content):
+    size = len(json.dumps(content, ensure_ascii=False, allow_nan=False).encode())
+    if usage[0] >= MAX_ATTEMPT_EVENTS or usage[1] + size > MAX_ATTEMPT_EVENT_BYTES:
+        raise DomainError(413, "attempt_event_limit", "attempt event count or byte limit exceeded")
+    usage[0] += 1
+    usage[1] += size
 
 
 def redact(value):
@@ -70,19 +92,28 @@ def seal(session: Session, attempt: Attempt) -> Manifest:
     if attempt.evidence_expired_at:
         raise DomainError(410, "evidence_expired", "expired evidence cannot be republished")
     run = session.get(CaseRun, attempt.case_run_id)
-    events = session.scalars(
-        select(Event).where(Event.attempt_id == attempt.id).order_by(Event.created_at, Event.id)
-    ).all()
-    artifacts = session.scalars(
-        select(Artifact)
+    event_ids = list(
+        session.scalars(
+            select(Event.id)
+            .where(Event.attempt_id == attempt.id)
+            .order_by(Event.created_at, Event.id)
+            .limit(MAX_ATTEMPT_EVENTS + 1)
+        )
+    )
+    truncated = len(event_ids) > MAX_ATTEMPT_EVENTS
+    event_ids = event_ids[:MAX_ATTEMPT_EVENTS]
+    if truncated:
+        attempt.evidence_status = "partial"
+    artifact_ids = session.scalars(
+        select(Artifact.id)
         .where(Artifact.attempt_id == attempt.id, Artifact.status == "ready")
         .order_by(Artifact.created_at, Artifact.id)
     ).all()
     references = [f"case:{run.case_version_id}:input", f"case:{run.case_version_id}:expectations"]
     if attempt.result and attempt.result.get("output") is not None:
         references.append(f"attempt:{attempt.id}:output")
-    references.extend(f"event:{event.id}" for event in events)
-    references.extend(f"artifact:{artifact.id}" for artifact in artifacts)
+    references.extend(f"event:{identifier}" for identifier in event_ids)
+    references.extend(f"artifact:{identifier}" for identifier in artifact_ids)
     previous_version = (
         session.scalar(select(func.max(Manifest.version)).where(Manifest.attempt_id == attempt.id))
         or 0
@@ -91,8 +122,8 @@ def seal(session: Session, attempt: Attempt) -> Manifest:
         "schema_version": "1.0",
         "status": attempt.evidence_status,
         "references": references,
-        "event_ids": [str(e.id) for e in events],
-        "artifact_ids": [str(a.id) for a in artifacts],
+        "event_ids": [str(identifier) for identifier in event_ids],
+        "artifact_ids": [str(identifier) for identifier in artifact_ids],
         "dropped_events": (attempt.result or {}).get("dropped_events"),
         "coverage": "declared producer boundaries only",
         "input": session.get(CaseVersion, run.case_version_id).content["input"],
@@ -100,6 +131,12 @@ def seal(session: Session, attempt: Attempt) -> Manifest:
         "result": attempt.result,
         "evidence_details": (attempt.result or {}).get("evidence_details", {}),
     }
+    if truncated:
+        content["evidence_details"] = {
+            **content["evidence_details"],
+            "manifest_event_limit": MAX_ATTEMPT_EVENTS,
+            "events_omitted": True,
+        }
     manifest = Manifest(
         attempt_id=attempt.id, version=previous_version + 1, content=content, digest=digest(content)
     )
@@ -123,6 +160,7 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
     }
     receipts = []
     changed = set()
+    usage = {aid: event_usage(session, aid) for aid in attempts}
     for event in batch.events:
         attempt = attempts[event.attempt_id]
         if attempt.evidence_expired_at:
@@ -195,6 +233,7 @@ def ingest(session: Session, credential: Credential, batch: EventBatch):
                 raise DomainError(409, "event_conflict", "event identifier has different content")
             record = previous
         else:
+            reserve_event(usage[event.attempt_id], content)
             record = Event(
                 project_id=credential.project_id,
                 attempt_id=event.attempt_id,
@@ -224,7 +263,27 @@ def view(session: Session, manifest: Manifest):
     if manifest.expired_at:
         raise DomainError(410, "evidence_expired", "evidence payloads have expired")
     content = manifest.content
-    events = [session.get(Event, UUID(eid)).content for eid in content["event_ids"]]
+    if len(content["event_ids"]) > MAX_ATTEMPT_EVENTS:
+        raise DomainError(413, "score_input_too_large", "manifest exceeds event count limit")
+    identifiers = [UUID(eid) for eid in content["event_ids"]]
+    count, size = session.execute(
+        select(
+            func.count(Event.id),
+            func.coalesce(func.sum(func.octet_length(cast(Event.content, Text))), 0),
+        ).where(Event.id.in_(identifiers), Event.attempt_id == manifest.attempt_id)
+    ).one()
+    if count != len(identifiers):
+        raise DomainError(410, "evidence_unavailable", "manifest event is unavailable")
+    if size > MAX_ATTEMPT_EVENT_BYTES:
+        raise DomainError(413, "score_input_too_large", "manifest exceeds event byte limit")
+    records = dict(
+        session.execute(
+            select(Event.id, Event.content).where(
+                Event.id.in_(identifiers), Event.attempt_id == manifest.attempt_id
+            )
+        ).all()
+    )
+    events = [records[identifier] for identifier in identifiers]
     artifacts = [public_record(session.get(Artifact, UUID(aid))) for aid in content["artifact_ids"]]
     return {
         "schema_version": "1.0",

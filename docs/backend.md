@@ -208,7 +208,7 @@ ScorerVersion 冻结插件标识、实现摘要、配置、证据要求、超时
 
 产物以 Attempt 和完整元数据的摘要确定稳定 UUID，同内容登记重传复用已有记录；先以名称、大小和 SHA-256 登记为 pending，再向服务端指定的 UUID 上传二进制内容。服务端验证大小和摘要，写临时文件、fsync、发布后才登记 ready。原始文件名不参与存储路径，下载采用附件形式。文件已发布但事务未提交时可重传同一 pending 上传；`eyes-ops maintain` 提供未登记文件、遗留临时文件和长期 pending 的预览与回收，执行前保护活动工作和证据等待。
 
-目标与评分器配置拒绝已知密钥字段及 URL 内嵌凭据，改用 `secret_refs` 保存运行环境引用。执行结果和事件递归掩码已知敏感字段。自由文本、用例输入和二进制产物需要生产者在上传前脱敏；当前没有通用秘密识别器。JSON 请求默认上限 8 MiB，产物默认 32 MiB。保留与删除策略由 `eyes-ops` 执行，默认不按年龄删除完整证据；范围见 [平台说明](platform.md)。
+目标与评分器配置拒绝已知密钥字段及 URL 内嵌凭据，改用 `secret_refs` 保存运行环境引用。执行结果和事件递归掩码已知敏感字段。自由文本、用例输入和二进制产物需要生产者在上传前脱敏；当前没有通用秘密识别器。JSON 请求默认上限 8 MiB，产物默认 32 MiB。每个 Attempt 累计最多接收 10000 条事件及 16 MiB 事件 JSON 正文，普通上传与恢复补传共用额度，在 Attempt 锁内检查；重复事件不重复占额，超额返回 413 `attempt_event_limit`，Runner 保留拒收事实。封存只查询事件标识；超额历史轨迹的新清单明确为 partial 并标明省略，原始事件仍可分页读取。评分在加载事件正文前检查数量和累计字节，超额旧清单返回 `score_input_too_large`，不改写既有清单/评分。保留与删除策略由 `eyes-ops` 执行，默认不按年龄删除完整证据；范围见 [平台说明](platform.md)。
 
 API 使用 OTel SDK 创建实际 HTTP 请求 span，接收 W3C Trace Context，并返回 `X-Eyes-Trace-Id`。设置 `EYES_TRACE_CONSOLE_EXPORT=true` 可将这些 span 输出到控制台。Attempt 和 ScoreRun 各有独立 trace context，Runner 创建实际执行根 span，评分根通过 OTel Link 关联执行。执行 span 进入证据接口，评分 trace 当前保留在本机。当前没有 OTLP exporter、查询后端或完整 Agent 内部链路证明。
 

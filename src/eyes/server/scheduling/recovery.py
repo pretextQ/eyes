@@ -247,6 +247,9 @@ def events(session, credential, work_id, request):
         and page.items[0].sequence <= state["last_sequence"]
     ):
         raise DomainError(409, "sequence_conflict", "event pages are not in stream order")
+    usage = evidence.event_usage(session, attempt.id)
+    if usage[0] > evidence.MAX_ATTEMPT_EVENTS or usage[1] > evidence.MAX_ATTEMPT_EVENT_BYTES:
+        raise DomainError(413, "attempt_event_limit", "existing attempt exceeds event limits")
     records = session.scalars(select(Event).where(Event.attempt_id == attempt.id)).all()
     native = {}
     sequences = {}
@@ -290,6 +293,7 @@ def events(session, credential, work_id, request):
             data=value,
         )
         content = envelope.model_dump(mode="json")
+        evidence.reserve_event(usage, content)
         session.add(
             Event(
                 project_id=work.project_id,

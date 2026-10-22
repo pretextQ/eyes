@@ -19,3 +19,9 @@
 CLI、Runner 配置及 ControlClient 默认拒绝非回环 HTTP，发送令牌前校验。可信 Docker/私有网络通过显式 `--allow-insecure-http` / `allow_insecure_http` 选择；更新本机 Docker 示例及升级说明。没有按 DNS 解析结果自动信任远程域名。
 
 检查：ruff 规范/格式、CLI `--help`、Python 编译、`git diff --check`；未验证实际 TLS/容器通信。
+
+## H3：单 Attempt 事件与评分读取边界
+
+普通摄入和未知执行的证据恢复均限制单 Attempt 10000 条/16 MiB 事件正文，去重后计额，既有 Attempt 行锁保护并发；拒收保留明确 413。封存改为只读取事件/产物 ID；超出新数量限制的历史轨迹生成明确 partial 的有界新清单。评分先在数据库聚合检查清单事件字节，再批量读取正文，保留原顺序。事件/清单列表原本已有分页，无需重复改造。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`。未执行 PostgreSQL 并发/内存压测；16 MiB 为逻辑 JSON 正文限制，不代表数据库物理磁盘上限。
