@@ -60,7 +60,7 @@ function CaseWorkspace({ id, runId }: { id: string; runId: string }) {
     queryKey: ["case-runs", id, page],
     queryFn: ({ signal }) =>
       api!.request<{ items: CaseRun[] }>(
-        `/v1/experiments/${id}/case-runs?limit=51&offset=${page * 50}`,
+        `/v1/experiments/${id}/case-runs?include_history=false&limit=51&offset=${page * 50}`,
         { signal },
       ),
     enabled: !!api,

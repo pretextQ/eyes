@@ -109,3 +109,9 @@ Runner 已确认评分和恢复日志默认保留 7 天后回收，未确认/隔
 按批次预取 producer/event 去重记录与原生事件 ID/序号冲突记录，在内存同步维护本批次新记录，最后统一 flush；避免每条事件都查询和写入往返。保持 producer 命名空间、Attempt 行锁和稳定锁序，不牺牲并发去重安全。
 
 检查：ruff 规范/格式、Python 编译、`git diff --check`；未进行 PostgreSQL 批量摄入、冲突并发或吞吐验证。
+
+## M7：汇总与详情无界加载
+
+实验汇总使用数据库分组/窗口查询，保持首个成功 Attempt、最早评分、N/A 和全部分母语义，不加载执行输出、评分理由或证据。用例详情在加载前按数据库统计检查 16 MiB JSON/记录预算，超限明确返回 413 detail_too_large；可用 include_history=false 获取基本执行，再分页读取事件/清单/新增的 scores 端点。默认响应形状和历史选择不变，不静默裁剪。
+
+检查：ruff 规范/格式、Python 编译、`git diff --check`；未执行 PostgreSQL 汇总对照或大数据压测。

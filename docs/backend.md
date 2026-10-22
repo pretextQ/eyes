@@ -1,5 +1,7 @@
 # 控制后端开发说明
 
+2026-10-22 读取边界：实验 `/results` 在数据库内聚合并保持既有分母/首个成功尝试规则。用例列表和单用例详情按 16 MiB 正文及记录开销预算预检，超限返回 413 `detail_too_large`；缩小分页，或添加 `include_history=false` 先读取基本执行。评分、清单、事件分别通过 `/v1/attempts/{id}/scores`、`/manifests`、`/events` 以 limit/offset 分页读取，评分按 created_at/id 升序，清单按 version 升序。默认仍包含历史字段；不会默默丢弃旧评分或清单。
+
 当前实现 Eyes 的控制后端基础及配套 Runner。Agent 端入口、HTTP 协议、SDK 与评分器说明见 [接入文档](agent-integration.md)。源码按 AGENT.md 的模块边界组织；HTTP 路由负责认证和协议转换，领域模块负责校验、状态及事务。当前 Windows/MewCode 基础闭环证据见 [验证记录](mewcode-validation.md)，M1 尚未完整验收。
 
 2026-10-17 完成一轮不改变运行语义的修复：重新导出控制契约（补齐 `CancellationRequest`、`ReconciliationEvidence`、`RecoveryEventSubmission` 等）、对齐迁移 head 文档，并在 Docker/Linux + PostgreSQL 18.6 上复验迁移与 API 冒烟，见[验证记录](fix-verification-20261017.md)。

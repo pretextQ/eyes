@@ -254,19 +254,32 @@ def get_results(experiment_id: UUID, session: Database, user: Reader):
 
 @router.get("/experiments/{experiment_id}/case-runs")
 def get_case_runs(
-    experiment_id: UUID, session: Database, user: Reader, limit: Limit = 50, offset: Offset = 0
+    experiment_id: UUID,
+    session: Database,
+    user: Reader,
+    limit: Limit = 50,
+    offset: Offset = 0,
+    include_history: bool = True,
 ):
     from eyes.server.experiments import service
 
     experiment = scoped(session, Experiment, experiment_id, user.project_id)
     return {
         "schema_version": "1.0",
-        "items": service.run_details(session, experiment, limit, offset),
+        "items": service.run_details(
+            session, experiment, limit, offset, include_history=include_history
+        ),
     }
 
 
 @router.get("/experiments/{experiment_id}/case-runs/{case_run_id}")
-def get_case_run(experiment_id: UUID, case_run_id: UUID, session: Database, user: Reader):
+def get_case_run(
+    experiment_id: UUID,
+    case_run_id: UUID,
+    session: Database,
+    user: Reader,
+    include_history: bool = True,
+):
     from eyes.server.experiments import service
 
     experiment = scoped(session, Experiment, experiment_id, user.project_id)
@@ -275,7 +288,10 @@ def get_case_run(experiment_id: UUID, case_run_id: UUID, session: Database, user
     )
     if run is None:
         raise DomainError(404, "not_found", "case run does not belong to this experiment")
-    return {"schema_version": "1.0", **service.run_detail(session, run)}
+    return {
+        "schema_version": "1.0",
+        **service.run_detail(session, run, include_history=include_history),
+    }
 
 
 @router.post("/experiments/{experiment_id}/cancel")
@@ -474,6 +490,22 @@ def get_attempt(attempt_id: UUID, session: Database, user: Reader):
             )
         ],
     }
+
+
+@router.get("/attempts/{attempt_id}/scores")
+def get_scores(
+    attempt_id: UUID, session: Database, user: Reader, limit: Limit = 50, offset: Offset = 0
+):
+    scoped(session, Attempt, attempt_id, user.project_id)
+    return collection(
+        session.scalars(
+            select(ScoreRun)
+            .where(ScoreRun.attempt_id == attempt_id)
+            .order_by(ScoreRun.created_at, ScoreRun.id)
+            .limit(limit)
+            .offset(offset)
+        )
+    )
 
 
 @router.post("/events")
