@@ -1,9 +1,9 @@
 import logging
 from contextvars import ContextVar
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, JsonValue, ValidationInfo, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationInfo, model_validator
 
 SCHEMA_VERSION = "1.0"
 LEGACY_SCHEMA_SUNSET = datetime(2026, 11, 1, tzinfo=UTC)
@@ -85,3 +85,6 @@ def explicit_versions(model, value, *, source):
 
 
 type Payload = dict[str, JsonValue]
+type SecretReference = Annotated[
+    str, Field(pattern=r"^env:[A-Za-z_][A-Za-z0-9_]*$", max_length=260)
+]

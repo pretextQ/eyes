@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from eyes.contracts.base import Contract, Payload
+from eyes.contracts.base import Contract, Payload, SecretReference
 
 
 def http_origin(url: str) -> str:
@@ -39,7 +39,7 @@ class TargetPublish(Contract):
     external_version: str | None = Field(default=None, max_length=200)
     capabilities: TargetCapabilities
     config: Payload = Field(default_factory=dict)
-    secret_refs: dict[str, str] = Field(default_factory=dict)
+    secret_refs: dict[str, SecretReference] = Field(default_factory=dict)
     concurrency_limit: int = Field(default=1, ge=1, le=1000)
 
     @model_validator(mode="after")

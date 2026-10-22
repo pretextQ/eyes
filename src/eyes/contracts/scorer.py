@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from eyes.contracts.base import Contract, Payload
+from eyes.contracts.base import Contract, Payload, SecretReference
 
 
 class ScoreSemantics(Contract):
@@ -28,7 +28,7 @@ class ScorerPublish(Contract):
     plugin: str = Field(min_length=1, max_length=120)
     implementation_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     config: Payload = Field(default_factory=dict)
-    secret_refs: dict[str, str] = Field(default_factory=dict)
+    secret_refs: dict[str, SecretReference] = Field(default_factory=dict)
     required_evidence: list[Literal["input", "output", "events", "artifacts", "sealed"]] = Field(
         default_factory=lambda: ["output"]
     )

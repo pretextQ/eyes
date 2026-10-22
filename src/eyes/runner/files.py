@@ -4,7 +4,11 @@ import os
 import tempfile
 from pathlib import Path
 
-from eyes.contracts.base import SENSITIVE_KEYS, Payload
+from pydantic import TypeAdapter
+
+from eyes.contracts.base import SENSITIVE_KEYS, Payload, SecretReference
+
+SECRET_REFERENCE = TypeAdapter(SecretReference)
 
 
 def json_bytes(value) -> bytes:
@@ -67,8 +71,10 @@ def error_text(error: BaseException, secrets=(), limit=1800) -> str:
 def resolve_secrets(refs: dict[str, str], allowed: list[str], token_env: str) -> Payload:
     resolved = {}
     for name, reference in refs.items():
-        if not reference.startswith("env:"):
-            raise ValueError("secret references must have env:NAME form")
+        try:
+            reference = SECRET_REFERENCE.validate_python(reference)
+        except ValueError:
+            raise ValueError("secret references must have env:NAME form") from None
         variable = reference[4:]
         if variable == token_env or variable not in allowed:
             raise ValueError(f"secret environment variable is not authorized: {variable}")

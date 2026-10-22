@@ -2340,7 +2340,7 @@
         },
         "secret_refs": {
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/$defs/SecretReference"
           },
           "title": "Secret Refs",
           "type": "object"
@@ -2386,6 +2386,11 @@
       ],
       "title": "ScorerPublish",
       "type": "object"
+    },
+    "SecretReference": {
+      "maxLength": 260,
+      "pattern": "^env:[A-Za-z_][A-Za-z0-9_]*$",
+      "type": "string"
     },
     "TargetCapabilities": {
       "additionalProperties": false,
@@ -2483,7 +2488,7 @@
         },
         "secret_refs": {
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/$defs/SecretReference"
           },
           "title": "Secret Refs",
           "type": "object"
