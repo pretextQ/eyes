@@ -2,7 +2,7 @@
 
 整理日期：2026-10-24（Asia/Shanghai）。本次只整理后续实施事项，没有修改产品代码或新增运行验收。
 
-参考 [juemimgcd/eyes 的公开版本 ccb303b](https://github.com/juemimgcd/eyes/tree/ccb303bcba3017a9d37efcc7420242c26d0894ca)，并对照本地源码基线 `b0701c0`。两边早期实现基本一致，下面的优点多数已经具备；实施时先核实现状，只补真实缺口，不将已有功能重新列为未实现。本清单是维护阶段的后续优化，不改变 [PLAN](PLAN.md) 中的交付结论或原始验收边界。
+本清单依据项目源码基线 `b0701c0` 整理。下面的设计多数已经具备；实施时先核实现状，只补真实缺口，不将已有功能重新列为未实现。本清单是维护阶段的后续优化，不改变 [PLAN](PLAN.md) 中的交付结论或原始验收边界。
 
 ## 实施环境约束
 
@@ -11,7 +11,7 @@
 - 当前 API/Runner 尚未完整支持原生 Windows。若后续要求所有组件脱离容器原生运行，应单列兼容性任务，核对目录同步、文件锁、子进程树清理与资源限制；本清单不据文档修改宣称兼容。
 - 后续命令以 PowerShell 为入口；明确区分宿主机路径、容器路径及网络地址。只有明确标注容器内执行的命令才使用 POSIX 语法。
 - 浏览器验收使用当前 Windows 可用的 Edge、Chrome 或内置浏览器，覆盖桌面与窄屏。不依赖 Safari 或其他操作系统的验证结果。
-- 外部仓库的 Deta/Zeta、macOS 路径和运行记录仅作设计参考；本项目使用现有 Windows 接入与已有真实材料，不直接移植其运行脚本或继承其验收结论。
+- 接入与验收使用本项目现有 Windows 配置和真实材料，命令、路径及运行结果均以当前环境为准。
 
 ## 已有优点与保留原则
 
@@ -59,7 +59,6 @@
 ### D-05：可选——减少前后端类型手工漂移
 
 - [ ] 评估从已有契约生成 TypeScript 类型的最小方案，优先覆盖实际发生过漂移的接口，再决定是否落地。
-- 来源：这是基于本次代码审阅提出的本地改进，并非对方已具备的设计。
 - 目的：后端字段、可空性、版本和状态变化时，尽早发现前端使用不一致。
 - 实施入口：[前端类型](../frontend/src/types.ts)、[API 客户端](../frontend/src/api.ts)、[控制契约导出](../src/eyes/contracts/schema.py)、[控制契约 Schema](control-contracts-v1.schema.json)。请求契约与实际响应分别确认，不能假定现有 Schema 覆盖全部 API 响应。
 - 完成条件：方案可在 Windows/PowerShell 重复执行，明确版本与生成来源；生成类型与页面展示模型分离；不以 TypeScript 类型断言冒充运行时校验；相关类型检查和构建通过。若新增工具，先核对依赖与锁文件，不重新引入已移除的未审计 CLI。
@@ -67,7 +66,6 @@
 ### D-06：可选——按职责拆分复杂前端页面
 
 - [ ] 仅在后续维护确有困难时，选一个实际需要修改的页面，提取可复用的请求逻辑、表单或展示组件。
-- 来源：这是现有设计的维护性补充，不是功能移植。
 - 目的：降低改动影响范围，使审阅和状态逻辑更易核对。
 - 实施入口：优先考虑 [批次](../frontend/src/pages/Batches.tsx)、[目录](../frontend/src/pages/Catalog.tsx) 或 [执行审阅](../frontend/src/pages/CaseWorkspace.tsx) 中当次要改的部分；沿用现有 UI 组件、设计 token、路由懒加载和 API 客户端。
 - 完成条件：只按职责拆分，不按文件行数机械拆分；路由、权限、缓存刷新、分页、历史选择及轮询行为保持；相关前端检查通过，并在 Windows 浏览器核对受影响流程。
@@ -79,9 +77,8 @@
 3. 按修改风险运行现有检查；文档变更核对内容与链接，前端变更使用现有 lint、format、类型检查/构建和相关 Windows 浏览器检查。涉及 API/Runner 时沿用本机 Docker Desktop 环境。
 4. 遵循 [AGENT.md](../AGENT.md)：未经用户当前明确要求，不新增或修改测试文件、用例、fixtures、mocks 或模拟证据；真实任务若涉及模型调用或外部操作，遵循当次已授权范围。
 5. 关闭事项时记录源码版本、Windows/容器环境、执行命令、实际结果和未覆盖边界，并更新本清单。文档整理、静态检查、浏览器核对和真实 Agent 验收分别记录。
-6. 不以增加 TypeScript 数量或改变 GitHub 语言占比为目标；保留已完成的协议运行时、unknown 恢复、观测保留、容量保护和取消审计，不用对方旧版本覆盖本地改进。
+6. 不以增加 TypeScript 数量或改变 GitHub 语言占比为目标；保留已完成的协议运行时、unknown 恢复、观测保留、容量保护和取消审计。
 
-## 参考
+## 相关文档
 
-- 对方版本的[观测设计](https://github.com/juemimgcd/eyes/blob/ccb303bcba3017a9d37efcc7420242c26d0894ca/docs/observation.md)、[执行审阅](https://github.com/juemimgcd/eyes/blob/ccb303bcba3017a9d37efcc7420242c26d0894ca/frontend/src/pages/CaseWorkspace.tsx)、[事件解释](https://github.com/juemimgcd/eyes/blob/ccb303bcba3017a9d37efcc7420242c26d0894ca/frontend/src/lib/observation-flow.ts)。
 - 本地约束与现状：[开发约定](../AGENT.md)、[架构](architecture.md)、[开发与验收计划](PLAN.md)、[前端说明](frontend.md)、[2026-10-22 维护记录](Review/2026-10-22-remediation.md)。
