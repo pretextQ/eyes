@@ -1,0 +1,87 @@
+# 设计优化待办（Windows）
+
+整理日期：2026-10-24（Asia/Shanghai）。本次只整理后续实施事项，没有修改产品代码或新增运行验收。
+
+参考 [juemimgcd/eyes 的公开版本 ccb303b](https://github.com/juemimgcd/eyes/tree/ccb303bcba3017a9d37efcc7420242c26d0894ca)，并对照本地源码基线 `b0701c0`。两边早期实现基本一致，下面的优点多数已经具备；实施时先核实现状，只补真实缺口，不将已有功能重新列为未实现。本清单是维护阶段的后续优化，不改变 [PLAN](PLAN.md) 中的交付结论或原始验收边界。
+
+## 实施环境约束
+
+- 项目仅在 Windows 系统上开发、操作、运行部署和验收，工作目录为 `D:\projects\eyes`，默认使用 PowerShell；不增加 macOS、独立 Linux 宿主机或 WSL 实施要求。
+- 沿用现有 Windows 本机部署：前端、CLI、Scheduler 和静态检查可原生执行；依赖 POSIX 能力的 API、Runner 仍在本机 Docker Desktop 的 Linux 容器内运行。容器属于当前 Windows 部署，不代表支持独立 Linux 部署的新增目标。
+- 当前 API/Runner 尚未完整支持原生 Windows。若后续要求所有组件脱离容器原生运行，应单列兼容性任务，核对目录同步、文件锁、子进程树清理与资源限制；本清单不据文档修改宣称兼容。
+- 后续命令以 PowerShell 为入口；明确区分宿主机路径、容器路径及网络地址。只有明确标注容器内执行的命令才使用 POSIX 语法。
+- 浏览器验收使用当前 Windows 可用的 Edge、Chrome 或内置浏览器，覆盖桌面与窄屏。不依赖 Safari 或其他操作系统的验证结果。
+- 外部仓库的 Deta/Zeta、macOS 路径和运行记录仅作设计参考；本项目使用现有 Windows 接入与已有真实材料，不直接移植其运行脚本或继承其验收结论。
+
+## 已有优点与保留原则
+
+| 设计 | 本地现状与价值 | 后续约束 |
+| --- | --- | --- |
+| 执行、评分、证据完整性分开 | 已有独立状态，能表达执行成功但质量失败或证据不足 | 不合并成单一“成功”；`sealed` 不表示任务质量通过 |
+| 主动评测与被动观测分开 | 已有实验/Runner 路径及独立 observation 路径 | 日常观测不要求创建测试集、评分器或实验 |
+| 独立执行审阅工作区 | 已有深链接、历史尝试、事件/产物及评分引用 | 保留返回筛选、历史选择和证据定位能力 |
+| 事件解释与画布展示分开 | `lib/observation-flow.ts` 与 `components/ObservationFlow.tsx` 已分工 | 画布调整不改变原事件事实；缺失与歧义保持可见 |
+| 固定版本、证据清单与回归报告 | 已有快照、历史评分和固定报告 | 补传、重评分不自动改写既有报告 |
+| 控制端、调度与 Runner 分工 | 已有公开 API、独立调度和 Runner | 业务规则留在后端；不因前端优化改变额度、取消和 unknown 语义 |
+
+## 待办与建议实施顺序
+
+复核后若某项已满足，记录已有依据即可关闭，不为清单制造代码改动。以下勾选框表示后续工作尚未完成，不表示其基础功能缺失。
+
+### D-01：统一状态展示的含义
+
+- [ ] 核对实验、批次、执行审阅和回归报告，补齐实际存在的文案或展示差异。
+- 目的：用户能区分执行结果、评分运行状态、质量结论、证据完整性和取消请求。
+- 实施入口：[执行审阅](../frontend/src/pages/CaseWorkspace.tsx)、[实验](../frontend/src/pages/Experiment.tsx)、[批次](../frontend/src/pages/Batches.tsx)、[报告](../frontend/src/components/ComparisonReport.tsx)。优先复用现有展示组件，不引入新状态机。
+- 完成条件：执行成功但评分失败、证据不足、unknown、仅请求取消等已有材料按各自事实展示；缺失值不显示为零或通过；报告分母可解释。无对应真实材料的分支记录为未验证。
+
+### D-02：让使用引导清楚呈现两条路径
+
+- [ ] 核对 Web 引导与文档，补齐“日常观测”和“批量评测”各自的最低准备、入口和启动顺序。
+- 目的：只想观察 Agent 的用户能直接接入；需要评分的用户能找到完整评测流程。
+- 实施入口：[引导页](../frontend/src/pages/Guide.tsx)、[前端说明](frontend.md)、[观测说明](observation.md)、[本机接入](../integrations/mewcode/README.md)。保持现有导航与视觉体系。
+- 完成条件：Windows 用户可按对应路径操作；纯观测不要求 Runner/实验，批量评测明确要求匹配 Runner；示例区分 PowerShell 与容器内执行，不出现依赖其他宿主机的步骤。
+
+### D-03：保留审阅工作区的连续操作体验
+
+- [ ] 复核列表 → 执行审阅 → 历史尝试/评分引用 → 返回列表的完整路径，仅修复发现的断点。
+- 目的：查看多条失败记录时保留上下文，能从结论追到原始证据。
+- 实施入口：[执行审阅](../frontend/src/pages/CaseWorkspace.tsx)、[事件浏览](../frontend/src/components/EventExplorer.tsx)、[实验列表](../frontend/src/pages/Experiments.tsx)。已有能力包括返回筛选和轮询保留历史尝试，不重复实现。
+- 完成条件：Windows 浏览器中深链接可打开，返回保留原筛选/分页，轮询不覆盖用户仍有效的历史选择，评分引用定位到对应证据；过期、缺失和无权限有明确状态；桌面和窄屏均可操作。
+
+### D-04：保持流程图解释可信并稳定交互
+
+- [ ] 复核配对规则与画布交互边界；有改动需求时，分别修改事件解释层和展示层。
+- 目的：流程图更易读，同时保留缺失、重复标识、分页未加载和失联等事实。
+- 实施入口：[事件解释](../frontend/src/lib/observation-flow.ts)、[流程图](../frontend/src/components/ObservationFlow.tsx)、[观测页面](../frontend/src/pages/Observation.tsx)。继续使用现有 React Flow/Dagre，不另建绘图系统。
+- 完成条件：不按文本猜测调用关系，不将顺序连线解释为因果/并发，不将失联解释为停止；轮询与分页保留视角和所选节点，节点详情能展开原事件，键盘及窄屏可用。复用已有真实记录核对，未覆盖组合单独记录。
+
+### D-05：可选——减少前后端类型手工漂移
+
+- [ ] 评估从已有契约生成 TypeScript 类型的最小方案，优先覆盖实际发生过漂移的接口，再决定是否落地。
+- 来源：这是基于本次代码审阅提出的本地改进，并非对方已具备的设计。
+- 目的：后端字段、可空性、版本和状态变化时，尽早发现前端使用不一致。
+- 实施入口：[前端类型](../frontend/src/types.ts)、[API 客户端](../frontend/src/api.ts)、[控制契约导出](../src/eyes/contracts/schema.py)、[控制契约 Schema](control-contracts-v1.schema.json)。请求契约与实际响应分别确认，不能假定现有 Schema 覆盖全部 API 响应。
+- 完成条件：方案可在 Windows/PowerShell 重复执行，明确版本与生成来源；生成类型与页面展示模型分离；不以 TypeScript 类型断言冒充运行时校验；相关类型检查和构建通过。若新增工具，先核对依赖与锁文件，不重新引入已移除的未审计 CLI。
+
+### D-06：可选——按职责拆分复杂前端页面
+
+- [ ] 仅在后续维护确有困难时，选一个实际需要修改的页面，提取可复用的请求逻辑、表单或展示组件。
+- 来源：这是现有设计的维护性补充，不是功能移植。
+- 目的：降低改动影响范围，使审阅和状态逻辑更易核对。
+- 实施入口：优先考虑 [批次](../frontend/src/pages/Batches.tsx)、[目录](../frontend/src/pages/Catalog.tsx) 或 [执行审阅](../frontend/src/pages/CaseWorkspace.tsx) 中当次要改的部分；沿用现有 UI 组件、设计 token、路由懒加载和 API 客户端。
+- 完成条件：只按职责拆分，不按文件行数机械拆分；路由、权限、缓存刷新、分页、历史选择及轮询行为保持；相关前端检查通过，并在 Windows 浏览器核对受影响流程。
+
+## 实施与关闭方式
+
+1. 建议先处理 D-01、D-02，再按实际体验缺口处理 D-03、D-04。D-05、D-06 为可选维护项，不作为当前交付阻塞。
+2. 每次只选明确范围，先看当前源码及已有修复/验收记录。已有问题已关闭时直接引用依据，避免重新引入旧实现。
+3. 按修改风险运行现有检查；文档变更核对内容与链接，前端变更使用现有 lint、format、类型检查/构建和相关 Windows 浏览器检查。涉及 API/Runner 时沿用本机 Docker Desktop 环境。
+4. 遵循 [AGENT.md](../AGENT.md)：未经用户当前明确要求，不新增或修改测试文件、用例、fixtures、mocks 或模拟证据；真实任务若涉及模型调用或外部操作，遵循当次已授权范围。
+5. 关闭事项时记录源码版本、Windows/容器环境、执行命令、实际结果和未覆盖边界，并更新本清单。文档整理、静态检查、浏览器核对和真实 Agent 验收分别记录。
+6. 不以增加 TypeScript 数量或改变 GitHub 语言占比为目标；保留已完成的协议运行时、unknown 恢复、观测保留、容量保护和取消审计，不用对方旧版本覆盖本地改进。
+
+## 参考
+
+- 对方版本的[观测设计](https://github.com/juemimgcd/eyes/blob/ccb303bcba3017a9d37efcc7420242c26d0894ca/docs/observation.md)、[执行审阅](https://github.com/juemimgcd/eyes/blob/ccb303bcba3017a9d37efcc7420242c26d0894ca/frontend/src/pages/CaseWorkspace.tsx)、[事件解释](https://github.com/juemimgcd/eyes/blob/ccb303bcba3017a9d37efcc7420242c26d0894ca/frontend/src/lib/observation-flow.ts)。
+- 本地约束与现状：[开发约定](../AGENT.md)、[架构](architecture.md)、[开发与验收计划](PLAN.md)、[前端说明](frontend.md)、[2026-10-22 维护记录](Review/2026-10-22-remediation.md)。
