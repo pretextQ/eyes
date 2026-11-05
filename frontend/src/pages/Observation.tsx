@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -460,6 +460,19 @@ export function ObservationRunPage() {
     enabled: !!api && !!id,
     refetchInterval: 2000,
   });
+  // Events already downloaded for this run. Every new event used to restart the
+  // loop at offset 0 and re-download every loaded page, so a long run cost close
+  // to O(n^2) bytes. Pages are now appended once and only the tail after the last
+  // loaded offset is fetched. The cache is keyed by run so switching runs starts
+  // over, and it is committed only when no newer request has superseded it.
+  const pages = useRef<{
+    runId: string | undefined;
+    events: EventRecord[];
+    offset: number;
+    hasMore: boolean;
+    meta: RunDetail | null;
+  }>({ runId: undefined, events: [], offset: 0, hasMore: true, meta: null });
+  const generation = useRef(0);
   const query = useQuery<RunDetail>({
     gcTime: 0,
     queryKey: [
@@ -472,20 +485,45 @@ export function ObservationRunPage() {
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === id ? previous : undefined,
     queryFn: async ({ signal }) => {
-      let first: RunDetail | undefined;
+      if (pages.current.runId !== id)
+        pages.current = {
+          runId: id,
+          events: [],
+          offset: 0,
+          hasMore: true,
+          meta: null,
+        };
+      const base = pages.current;
+      const request = ++generation.current;
       const events: EventRecord[] = [];
-      for (let offset = 0; offset < limit; offset += 200) {
+      let offset = base.offset;
+      let hasMore = base.hasMore;
+      let meta = base.meta;
+      while (offset < limit) {
         const value = await api!.request<RunDetail>(
           `/v1/observation/runs/${id}?limit=200&offset=${offset}`,
           { signal },
         );
-        if (value.expired_at) return value;
-        first ??= value;
+        if (value.expired_at) {
+          pages.current = {
+            runId: id,
+            events: [],
+            offset: 0,
+            hasMore: false,
+            meta: value,
+          };
+          return value;
+        }
+        meta ??= value;
         events.push(...value.events);
-        first.has_more = value.has_more;
-        if (!value.has_more) break;
+        offset += value.events.length;
+        hasMore = value.has_more;
+        if (!value.has_more || !value.events.length) break;
       }
-      return { ...first!, events };
+      const merged = [...base.events, ...events];
+      if (generation.current === request)
+        pages.current = { runId: id, events: merged, offset, hasMore, meta };
+      return { ...(meta ?? base.meta)!, events: merged, has_more: hasMore };
     },
     enabled: !!api && !!id && !!metadata.data,
   });
