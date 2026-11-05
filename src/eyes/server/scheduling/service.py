@@ -408,9 +408,17 @@ def progress(
 def refresh_experiment(session: Session, experiment_id: UUID):
     session.flush()
     experiment = session.get(Experiment, experiment_id)
-    states = session.scalars(
-        select(WorkItem.status).where(WorkItem.experiment_id == experiment_id)
-    ).all()
+    # Grouping keeps the per-status counts in the database instead of loading one
+    # string per work item; a large experiment no longer materialises its whole
+    # status column in Python on every completion. ix_work_items_experiment makes
+    # this read index-only.
+    states = dict(
+        session.execute(
+            select(WorkItem.status, func.count())
+            .where(WorkItem.experiment_id == experiment_id)
+            .group_by(WorkItem.status)
+        ).all()
+    )
     waiting = session.scalar(
         select(EvidenceWait.id)
         .join(Attempt)
@@ -418,11 +426,11 @@ def refresh_experiment(session: Session, experiment_id: UUID):
         .where(CaseRun.experiment_id == experiment_id, EvidenceWait.status == "waiting")
         .limit(1)
     )
-    if waiting or any(state in {"queued", "claimed"} for state in states):
+    if waiting or states.get("queued") or states.get("claimed"):
         if experiment.status != "cancel_requested":
-            experiment.status = "running" if waiting or "claimed" in states else "queued"
+            experiment.status = "running" if waiting or states.get("claimed") else "queued"
     else:
-        experiment.status = "completed_with_unresolved" if "unknown" in states else "completed"
+        experiment.status = "completed_with_unresolved" if states.get("unknown") else "completed"
 
 
 def finish(

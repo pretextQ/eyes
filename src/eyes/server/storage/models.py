@@ -281,6 +281,8 @@ class WorkItem(Record):
         ),
         Index("ix_work_queue", "project_id", "kind", "status", "created_at", "id"),
         Index("ix_work_reservations", "kind", "reserved", "target_scope_id", "experiment_id"),
+        Index("ix_work_items_experiment", "experiment_id", "status"),
+        Index("ix_work_items_attempt", "attempt_id"),
     )
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"))
     experiment_id: Mapped[UUID] = mapped_column(ForeignKey("experiments.id"))
