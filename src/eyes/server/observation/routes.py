@@ -128,6 +128,14 @@ def run_summary(run_id: UUID, session: Database, user: Reader):
 def run_detail(
     run_id: UUID, session: Database, user: Reader, limit: Limit = 200, offset: Offset = 0
 ):
+    # The row lock is required for a consistent read, not for writing. Retention
+    # clears event content and sets run.expired_at in one transaction while
+    # holding the run row with SKIP LOCKED, so an unlocked read could return an
+    # unexpired run together with already-cleared events and present erased
+    # content as live evidence. Holding the row makes retention skip this run
+    # until the read commits. The cost is that this read serializes with
+    # ingestion of the same run, which also locks it; readers are bounded by
+    # the page limit below.
     run = scoped(session, ObservedRun, run_id, user.project_id, lock=True)
     if run.expired_at:
         return {

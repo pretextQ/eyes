@@ -94,6 +94,8 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps 
 
 任务标记提交后，API 详情立即返回 `evidence_status=expired`、expired_at、expiration_summary、空 events、has_more=false；项目列表仍保留任务摘要。不存在/跨项目保持 404；原已过期 run 重传返回 410 observation_expired，不重新接收正文。Web 列表标明“观测内容已过期”，详情移除任务正文与流程图，历史统计不能作为当前完整证据。分批未排空的数据库正文暂存不对 API 暴露；已被客户端下载的副本不能远程撤回。
 
+`GET /v1/observation/runs/{id}` 读取 run 行时取行锁，这是读取一致性所需而非写入：清理在同一事务内清空事件 content 并写 `expired_at`，无锁读取可能拿到“尚未过期”的 run 与已清空事件，把被清除的正文显示成有效证据；持有该行会让清理以 `SKIP LOCKED` 跳过此 run 直到读取提交。代价是该读取会与同一 run 的事件接收串行化，接收侧同样对该行加锁；单次读取受分页上限约束。不要为降低争用去掉该锁，除非改为“先判 `expired_at` 再取事件”的等价方案。
+
 自动执行：在 deploy/.env 同时写保留天数和项目 UUID，显式启用既有 profile：
 
 ```powershell
