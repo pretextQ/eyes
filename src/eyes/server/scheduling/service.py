@@ -638,11 +638,18 @@ def sweep(session: Session, settings: Settings):
                 <= current_time
             )
             if expired or submission_deadline <= current_time or cancelled:
+                # Keep status "error": an unconfirmed stop is an error diagnosis, not
+                # a skip. Only the reason separates an unconfirmed cancellation from
+                # an expired lease or submission window, which are different faults.
                 score.status = "error"
                 score.result = ScoreOutput(
                     schema_version="1.0",
                     status="error",
-                    reason="score lease lost or submission window ended",
+                    reason=(
+                        "scoring cancelled; stop was not confirmed before the grace deadline"
+                        if cancelled
+                        else "score lease lost or submission window ended"
+                    ),
                 ).model_dump(mode="json")
                 work.status = "completed"
                 work.reserved = False
