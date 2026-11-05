@@ -294,7 +294,12 @@ def claim(session: Session, credential: Credential, request: WorkClaim, settings
                     manifest_id=score.manifest_id,
                     deadline=score.deadline,
                 ).model_dump(mode="json")
-            experiment.status = "running"
+            # A cancellation request outranks the fact that this work item was still
+            # queued when it arrived: a rescore or score retry can enqueue work after
+            # the experiment was cancelled, and claiming it must not erase the
+            # recorded request. refresh_experiment keeps the same guard.
+            if experiment.status != "cancel_requested":
+                experiment.status = "running"
             session.flush()
             return {
                 "schema_version": "1.0",
