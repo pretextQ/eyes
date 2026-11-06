@@ -54,4 +54,4 @@ PostgreSQL trigger 拒绝审计 UPDATE/DELETE；应用无修改/删除接口，�
 
 升级前停写、备份数据库与证据卷，再迁移 head 0007，一起重启控制端/Scheduler。历史取消不能凭当前状态补造操作者/时间/理由，新表从实际新请求开始记录。当前服务 readiness 要求 0007；非空审计表的 downgrade 拒绝，降级需恢复取消审计产生前的备份，不能把历史丢弃当作无损迁移。
 
-`eyes-ops backup` 完整 dump 包含审计和不可变 trigger；同版 restore 恢复所有审计 ID/时间/理由/结果，不重记为新取消。旧 0005/0006 备份允许用当前 restore 恢复到空数据库/独立空证据目录；原完整性与 Runner 撤销/未知占额恢复规则保持，随后必须 `alembic upgrade head` 再启动 API。更旧/未知/未来 revision 拒绝；早期备份也不会被补造取消历史。POSIX 备份同步路径仍在本机 Linux 容器运行，Windows 原生备份支持未完成。
+`eyes-ops backup` 完整 dump 包含审计和不可变 trigger。恢复会保留备份里的审计 ID、时间、理由和结果。当前版本及旧 0005、0006、0007 备份可恢复到空数据库和独立空证据目录，随后先运行 `alembic upgrade head`，再启动 API。原完整性、Runner 撤销和未知占额恢复规则保持。更旧、未知和未来 revision 会被拒绝。POSIX 备份同步路径仍在本机 Linux 容器运行，Windows 原生备份支持未完成。

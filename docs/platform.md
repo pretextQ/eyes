@@ -36,7 +36,7 @@ Web 使用既有查询机制，每15秒前台刷新，隐藏页面暂停容量�
 
 边界：存储锁不约束数据库、日志或外部进程写同一文件系统，块/元数据估算不是文件系统硬配额。不保护宿主机 Docker 磁盘镜像增长、数据库全部对象、WAL/日志/备份、Runner/exporter 缓冲、其他存储实现或直接写库；仍需部署层磁盘管理。不宣称防止所有磁盘耗尽。真实结果与未验收分支见[容量验收](capacity-protection-20261013.md)。
 
-状态同步：2026-10-14。本文主体描述 `0002_platform` 引入的平台功能，当前迁移 head 为 `0007_cancellation_audit`，新增项目范围的观测正文保留与过期审计，见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化按用户决定不纳入当前验收，未来有真实可比材料时再验证；原始完整 Windows 运维验收仍有未覆盖项，当前进度见 [开发计划](PLAN.md)。
+本文主体描述 `0002_platform` 引入的平台功能。项目范围的观测正文保留与过期审计见[观测操作](observation.md#观测保留与清理)及[副本验收](observation-retention-20261013.md)。公开 API、开发者 CLI、运维 CLI 和 Web 固定报告已实现；历史评分选择、安全恢复指定必需项及两真实版本无变化回归已有证据，见 [Runner 可靠性](runner-reliability-20261011.md)与[部署/回归记录](deployment-regression-20261011.md)。真实改善/退化按用户决定不纳入当前验收，未来有真实可比材料时再验证；原始完整 Windows 运维验收仍有未覆盖项，当前进度见 [开发计划](PLAN.md)。
 
 ## 升级与兼容
 
@@ -50,13 +50,13 @@ uv run eyes-server
 uv run eyes-scheduler
 ```
 
-升级前停止控制端、调度器及维护进程，备份数据库和证据卷；升级后一起重启 API、Scheduler、Runner。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit`；0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。0007 增加实验/批次追加取消审计；当前 API 就绪检查要求 0007，并通过实际产物发布与读取路径检查证据卷，不能仅升级到旧 head 后运行当前服务。2026-10-17 在当前源码镜像与 PostgreSQL 18.6 隔离环境中重新执行 0001→0007 升级、降级、重放和 `alembic check`，并通过容器内 API 冒烟；使用新建隔离卷，未修改既有数据，见[验证记录](fix-verification-20261017.md)。
+升级前停止控制端、调度器及维护进程，备份数据库和证据卷。升级后一起部署同一版本的 API、Scheduler、Runner 和 Web。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit → 0008_work_indexes`。0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。0007 增加实验和批次的追加式取消审计，0008 增加工作项的实验和尝试索引。当前 API 就绪检查要求迁移到 head `0008_work_indexes`，并通过实际产物发布与读取路径检查证据卷。2026-10-17 的 0001→0007 升级、降级、重放、`alembic check` 和容器内 API 冒烟结果见[验证记录](fix-verification-20261017.md)。
 
 ### 观测迁移与备份恢复
 
 0006 迁移保留历史事件正文、digest 和 run 终态，历史明确终态按最后服务端接收时间保守回填；默认保留期 0 不清理。列变更及历史回填需要维护窗口，停止 API/exporter 写入和维护进程后先备份；两个索引使用 concurrent build，此迁移包含 autocommit 边界，失败不能假定所有 DDL 已回滚。失败时保持停写，检查已建列/索引和数据库日志，优先用升级前备份恢复独立空目标，再重跑完整迁移，不能盲目 stamp head。升级后运行 `alembic current`、`alembic check`、服务用户 audit 和 readiness。
 
-观测正文在 PostgreSQL，无额外观测文件卷，现有一致性数据库 dump 已覆盖 run/event、过期标识及摘要；数据库和实验证据卷仍按既有整体备份操作一起保留。恢复 0005 备份后先迁移到 0006，再启动新版 API；恢复含过期记录的 0006 备份只能得到过期摘要，不能靠重传或降级恢复正文。恢复可能重新引入旧备份中的正文与来源凭据：恢复后核对来源撤销状态和每项目保留配置，在开放 exporter/API 前明确是否继续清理；备份有独立保留期限，不因在线清理自动删除。
+观测正文在 PostgreSQL，无额外观测文件卷，现有一致性数据库 dump 已覆盖 run/event、过期标识及摘要；数据库和实验证据卷仍按既有整体备份操作一起保留。恢复旧备份后先运行 `alembic upgrade head`，再启动新版 API。恢复含过期记录的备份只会得到过期摘要，重传或降级无法找回正文。恢复可能重新引入旧备份中的正文与来源凭据：恢复后核对来源撤销状态和每项目保留配置，在开放 exporter/API 前明确是否继续清理；备份有独立保留期限，不因在线清理自动删除。
 
 0006 在没有观测过期记录时允许降到 0005，清理发生后**拒绝降级**，防止旧 API 将已清空的事件误显示为完整证据。需要旧版本完整内容时使用清理前备份恢复新的空目标；禁止通过删除过期标识、直接 stamp 或关闭触发器绕过。2026-10-13 在真实观测材料独立副本完成升/降/再升级与清理后拒绝降级，清理后 PostgreSQL dump 在独立空库恢复、观测全行摘要一致；这不是完整平台备份所有分支的新增验收，见[记录](observation-retention-20261013.md)。
 
@@ -218,11 +218,12 @@ uv run eyes-ops backup /secure/backups/eyes-20261003 --pg-container POSTGRES_CON
 
 ```sh
 uv run eyes-ops restore /secure/backups/eyes-20261003 --pg-container POSTGRES_CONTAINER_NAME
+uv run alembic upgrade head
 uv run eyes-ops audit
 uv run alembic current
 ```
 
-恢复会先校验 dump/文件摘要、使用单事务恢复数据库、发布证据目录，再做引用审计。恢复失败时保持服务停止，检查错误并使用新的空目标重试；数据库恢复与文件系统发布不是一个跨系统原子事务。
+恢复命令接受当前版本以及 0005、0006 和 0007 备份。它先校验 dump 和文件摘要，用单事务恢复数据库，审计引用后再发布证据目录。恢复失败时保持服务停止，检查错误并使用新的空目标重试。数据库恢复和文件系统发布各自提交。
 
 备份和恢复目录/文件采用私有权限；恢复内容归执行命令的操作系统用户所有。优先以 API 的服务用户执行恢复，并确保该用户可读备份、可写恢复目录的父目录。若必须以 root 恢复，在启动服务前将**仅恢复目标目录及其产物**的所有权交给实际 API 用户（当前 Compose 为 UID/GID 10001:10001），保持目录 0700、文件 0600；不要修改原证据卷或放宽为全员可读。root 的 audit 不能证明服务用户可读：交接后必须以 API 用户运行 audit，再检查 `/health/ready` 及使用授权读取令牌实际下载产物。
 
@@ -297,4 +298,4 @@ docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml up -d
 
 ## 取消审计保留与恢复
 
-取消审计采用 PostgreSQL 追加表，UPDATE/DELETE 被 trigger 拒绝，普通证据/观测维护不清除。对象/凭据删除不级联，默认长期随部署保留；不同独立操作的历史总量仍需监测。数据库备份包含所有父/子审计；当前 restore 兼容 0005/0006 旧备份，恢复到空目的地后必须先迁移到 0007，再启动 API；历史身份/时间不能回填猜测。完整规则见[取消审计](cancellation-audit.md#保留备份与删除)。
+取消审计采用 PostgreSQL 追加表，UPDATE/DELETE 被 trigger 拒绝，普通证据/观测维护不清除。对象/凭据删除不级联，默认长期随部署保留；不同独立操作的历史总量仍需监测。数据库备份包含所有父/子审计。当前 `eyes-ops restore` 兼容 0005、0006 和 0007 旧备份。恢复到空目的地后，先运行 `uv run alembic upgrade head` 升级到 `0008_work_indexes`，再启动 API。完整规则见[取消审计](cancellation-audit.md#保留备份与删除)。

@@ -145,6 +145,7 @@ def restore(sessions, settings, source, *, container=None, bin_dir=None):
         SCHEMA_REVISION,
         "0005_reconciliation",
         "0006_observation_retention",
+        "0007_cancellation_audit",
     }:
         raise ValueError("backup protocol or database revision does not match this service")
     dump = source / "database.dump"

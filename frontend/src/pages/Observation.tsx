@@ -460,20 +460,15 @@ export function ObservationRunPage() {
     enabled: !!api && !!id,
     refetchInterval: 2000,
   });
-  // Events already downloaded for this run. Every new event used to restart the
-  // loop at offset 0 and re-download every loaded page, so a long run cost close
-  // to O(n^2) bytes. Pages are now appended once and only the tail after the last
-  // loaded offset is fetched. The cache is keyed by run so switching runs starts
-  // over, and it is committed only when no newer request has superseded it.
+  // A late event can change the order after the first gap. Reuse only the
+  // contiguous prefix starting at sequence 1, where nothing can be inserted.
   const pages = useRef<{
     runId: string | undefined;
+    api: typeof api;
     events: EventRecord[];
-    offset: number;
-    hasMore: boolean;
-    meta: RunDetail | null;
-  }>({ runId: undefined, events: [], offset: 0, hasMore: true, meta: null });
+  } | null>(null);
   const generation = useRef(0);
-  const query = useQuery<RunDetail>({
+  const query = useQuery<Omit<RunDetail, "has_more">>({
     gcTime: 0,
     queryKey: [
       "observed-run",
@@ -485,45 +480,46 @@ export function ObservationRunPage() {
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === id ? previous : undefined,
     queryFn: async ({ signal }) => {
-      if (pages.current.runId !== id)
-        pages.current = {
-          runId: id,
-          events: [],
-          offset: 0,
-          hasMore: true,
-          meta: null,
-        };
       const base = pages.current;
       const request = ++generation.current;
-      const events: EventRecord[] = [];
-      let offset = base.offset;
-      let hasMore = base.hasMore;
-      let meta = base.meta;
-      while (offset < limit) {
+      let latest = metadata.data!;
+      const events =
+        !latest.expired_at && base && base.runId === id && base.api === api
+          ? base.events.slice(0, limit)
+          : [];
+      let contiguous = events.length;
+      while (
+        events.length < limit &&
+        events.length < (latest.metrics.events ?? 0) &&
+        !latest.expired_at
+      ) {
+        const size = Math.min(200, limit - events.length);
+        const after = events.at(-1)?.content.sequence ?? 0;
         const value = await api!.request<RunDetail>(
-          `/v1/observation/runs/${id}?limit=200&offset=${offset}`,
+          `/v1/observation/runs/${id}?limit=${size}&after_sequence=${after}`,
           { signal },
         );
+        latest = value;
         if (value.expired_at) {
-          pages.current = {
-            runId: id,
-            events: [],
-            offset: 0,
-            hasMore: false,
-            meta: value,
-          };
-          return value;
+          events.length = 0;
+          contiguous = 0;
+          break;
         }
-        meta ??= value;
-        events.push(...value.events);
-        offset += value.events.length;
-        hasMore = value.has_more;
+        for (const event of value.events) {
+          events.push(event);
+          if (event.content.sequence === contiguous + 1) contiguous += 1;
+        }
         if (!value.has_more || !value.events.length) break;
       }
-      const merged = [...base.events, ...events];
+      signal.throwIfAborted();
       if (generation.current === request)
-        pages.current = { runId: id, events: merged, offset, hasMore, meta };
-      return { ...(meta ?? base.meta)!, events: merged, has_more: hasMore };
+        pages.current = {
+          runId: id,
+          api,
+          events:
+            contiguous === events.length ? events : events.slice(0, contiguous),
+        };
+      return { ...latest, events };
     },
     enabled: !!api && !!id && !!metadata.data,
   });
@@ -540,7 +536,21 @@ export function ObservationRunPage() {
     return (
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
     );
-  const run = { ...query.data, ...metadata.data };
+  const detail = query.data;
+  const summary = metadata.data ?? detail;
+  const current =
+    detail.expired_at ||
+    (!summary.expired_at &&
+      (detail.metrics.events ?? 0) > (summary.metrics.events ?? 0))
+      ? detail
+      : summary;
+  const events = current.expired_at ? [] : detail.events;
+  const run = {
+    ...current,
+    events,
+    has_more:
+      !current.expired_at && events.length < (current.metrics.events ?? 0),
+  };
   const groups = new Map<number, EventRecord[]>();
   for (const event of run.events) {
     const number = event.content.turn || 0;

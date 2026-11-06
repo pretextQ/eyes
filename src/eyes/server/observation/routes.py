@@ -126,7 +126,12 @@ def run_summary(run_id: UUID, session: Database, user: Reader):
 
 @router.get("/runs/{run_id}")
 def run_detail(
-    run_id: UUID, session: Database, user: Reader, limit: Limit = 200, offset: Offset = 0
+    run_id: UUID,
+    session: Database,
+    user: Reader,
+    limit: Limit = 200,
+    offset: Offset = 0,
+    after_sequence: Annotated[int | None, Query(ge=0)] = None,
 ):
     # The row lock is required for a consistent read, not for writing. Retention
     # clears event content and sets run.expired_at in one transaction while
@@ -144,18 +149,17 @@ def run_detail(
             "events": [],
             "has_more": False,
         }
+    query = select(ObservedEvent).where(ObservedEvent.run_id == run.id)
+    if after_sequence is not None:
+        query = query.where(ObservedEvent.sequence > after_sequence)
     events = session.scalars(
-        select(ObservedEvent)
-        .where(ObservedEvent.run_id == run.id)
-        .order_by(ObservedEvent.sequence)
-        .limit(limit)
-        .offset(offset)
+        query.order_by(ObservedEvent.sequence).limit(limit + 1).offset(offset)
     ).all()
     return {
         "schema_version": "1.0",
         **service.summary(run),
-        "events": [public_record(event) for event in events],
-        "has_more": offset + len(events) < run.metrics.get("events", 0),
+        "events": [public_record(event) for event in events[:limit]],
+        "has_more": len(events) > limit,
     }
 
 

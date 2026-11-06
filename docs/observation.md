@@ -48,6 +48,7 @@ trae 当前已实现 `python -m trae_agent.observe` 直接用户任务及独立 
 
 - 本机写入使用 `/v1/observation/local/events` 和 `/local/heartbeat`，携带 `X-Eyes-Local-Source` UUID 自动登记来源；停用后继续拒绝该来源，不自动重新启用。
 - 公开接口前缀 `/v1/observation`：管理者创建/停用 `sources`，项目读者查询 `runs` 和 `runs/{id}`；来源令牌写入 `events`、`heartbeat?run_id=...`。
+- 详情接口按事件序号升序分页。已有客户端可继续使用 `offset`。传入 `after_sequence` 时，先筛选序号大于该值的事件，再应用 `offset` 和 `limit`，`has_more` 表示筛选后还有下一页。晚到事件可以补入较小序号。Web 仅复用从 1 开始连续的已加载事件，并重新读取首个缺口之后的范围。
 - `ObservationBatch` 和 `ObservationEvent` 定义于 `src/eyes/contracts/observation.py`，协议版本为 `1.0`。批次携带 Agent 自有 run/session ID，事件携带 event_id、任务内 sequence、时间、类型、轮次、工具与 trace/span 关联。单批最多 50 条，单事件最大 64 KiB。
 - 服务端在 PostgreSQL 事务持久化后确认。同来源同 event_id 且内容一致的补传幂等；不同内容或序号冲突返回 409。观测任务不进入实验调度状态机。
 - `completed/failed/cancelled/limited` 来自 Agent 终态；运行中超过 30 秒没有上报/心跳时查询显示 `disconnected`，只代表失去观测，不代表任务停止。
@@ -94,7 +95,7 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps 
 
 任务标记提交后，API 详情立即返回 `evidence_status=expired`、expired_at、expiration_summary、空 events、has_more=false；项目列表仍保留任务摘要。不存在/跨项目保持 404；原已过期 run 重传返回 410 observation_expired，不重新接收正文。Web 列表标明“观测内容已过期”，详情移除任务正文与流程图，历史统计不能作为当前完整证据。分批未排空的数据库正文暂存不对 API 暴露；已被客户端下载的副本不能远程撤回。
 
-`GET /v1/observation/runs/{id}` 读取 run 行时取行锁，这是读取一致性所需而非写入：清理在同一事务内清空事件 content 并写 `expired_at`，无锁读取可能拿到“尚未过期”的 run 与已清空事件，把被清除的正文显示成有效证据；持有该行会让清理以 `SKIP LOCKED` 跳过此 run 直到读取提交。代价是该读取会与同一 run 的事件接收串行化，接收侧同样对该行加锁；单次读取受分页上限约束。不要为降低争用去掉该锁，除非改为“先判 `expired_at` 再取事件”的等价方案。
+`GET /v1/observation/runs/{id}` 对 run 行加锁，使 `expired_at` 和事件正文保持一致。清理以 `SKIP LOCKED` 跳过读请求锁定的 run，事件接收也会等待同一 run 的读请求结束。单次读取受分页上限约束。如果将来移除行锁，必须在同一个数据库快照中判断是否过期并读取事件，例如用一条 SQL 完成两项读取。在 PostgreSQL 的 `READ COMMITTED` 隔离级别下，清理可能在两条独立查询之间提交，导致详情同时返回未过期状态和已清空的事件。
 
 自动执行：在 deploy/.env 同时写保留天数和项目 UUID，显式启用既有 profile：
 

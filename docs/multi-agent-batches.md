@@ -57,7 +57,7 @@ eyes cancel-batch <batch-id>
 
 新迁移为 `0004_experiment_batches`，在 `0003_observation` 后增加批次表与可空的 `experiments.batch_id`。旧实验保持独立且可读取，不回填为批次，不覆盖历史快照。
 
-0004 是引入批次时的历史迁移编号；当前部署必须升级到 head `0007_cancellation_audit`，不能停在 0004 运行当前服务。后续普通 schema_version 严格要求与旧请求窗口见[版本迁移](contract-version-migration.md)，升级需核对控制端、Scheduler、Runner 的实际安装版本。
+0004 是引入批次时的历史迁移编号；当前部署必须升级到 head `0008_work_indexes`，不能停在 0004 运行当前服务。后续普通 schema_version 严格要求与旧请求窗口见[版本迁移](contract-version-migration.md)，升级需核对控制端、Scheduler、Runner 的实际安装版本。
 
 先按现有运维流程备份并停止控制端/调度器，再执行 `uv run alembic upgrade head`，随后以当前代码重启控制端和调度器。Runner 协议未变化，可以继续使用已有配置。API 就绪检查要求迁移达到当前 head。
 
