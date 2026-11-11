@@ -24,3 +24,11 @@ Windows PowerShell、本机 Docker Desktop Linux Engine 29.8.2、PostgreSQL 18.6
 4. PostgreSQL 确认两项工作均为 `completed`、占额已释放、令牌已清空，实验最终 `completed`，先前固定回归报告完整响应一致。临时 Runner 凭据已撤销。
 
 验证覆盖了取消后重评分入队再领取的实际事务顺序，以及两条未收到评分回执的路径。活动外部 Agent 停止确认和不同进程争用的完整时序仍待专项验收。`ruff check`、`ruff format --check` 通过。
+
+## 观测分页
+
+在 `9a4bd61` 上将 [历史保留验收](../observation-retention-20261013.md)的观测数据库 dump 恢复到独立 PostgreSQL 18.6 数据库，升级至 0008，启动 API。对一条真实 trae 记录读取全部 51 条事件，再以 `limit=20` 使用游标读取，得到 20、20、11 条，`has_more` 依次为 true、true、false。拼接后的事件 ID 及顺序与一次读全相同。`offset=20` 与 `after_sequence=20` 的单页一致，`after_sequence=20&offset=20` 返回同一尾页。序号 51 后返回空页；负数游标返回 422。
+
+同库中的一条真实过期记录仍返回摘要，带游标读取也返回空事件和 `has_more=false`。另一项目凭据访问该记录返回 404。原观测材料只读保留。
+
+前端 `npm run lint`、`npm run format:check`、`npm run build` 通过。浏览器工具因无法可靠识别 Chrome 当前网址停止。页面在轮询期间的增量请求、晚到序号补齐和窄屏交互仍待验证。
