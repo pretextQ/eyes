@@ -20,6 +20,11 @@ npm run dev
 
 开发与本地生产预览通过 Vite 将 `/api` 转发到 `http://127.0.0.1:8000`。后端地址不同时复制 `frontend/.env.example` 为 `frontend/.env.local`，配置 `EYES_API_PROXY_TARGET` 并重启开发服务。浏览器始终使用同源路径，前端不需要后端 CORS 变更。API 文档使用的 `/docs`、`/openapi.json` 和 `/v1` 也由代理转发。
 
+### 选择使用路径
+
+- **日常观测**从 [Windows Compose 启动](../README.md#docker-compose)开始。在 `/observe` 的“接入 Agent → 远程 Agent 接入”用 manage 令牌创建来源，再将可达的上报地址和来源令牌配置给实际 exporter。启动 Agent 的日常任务后，用项目 read 或 manage 令牌查询记录。无需测试集、评分器、实验或 Runner。见 [观测接入说明](observation.md#启动与接入)。
+- **批量评测**使用相同的控制平台，发布目标、测试集和评分器，按目标与评分器配置匹配的 Linux Runner 容器，再从 `/experiments` 创建实验。Python 评分器发布前先在该容器内运行 `eyes-runner --config runner.toml plugins` 获取摘要，发布后运行 `eyes-runner --config runner.toml run`，配置路径以实际挂载为准。两次真实版本运行后，从 `/comparison` 生成固定报告。见 [MewCode 回归步骤](mewcode-regression-20261111.md#重复执行与复查)。
+
 ## 页面与操作
 
 | 页面 | 路由 | 当前实现 |
@@ -34,7 +39,7 @@ npm run dev
 | 测试集 | `/datasets` | 文件或文本 JSONL 整体导入、服务端错误行详情、已发布用例检索 |
 | 评分口径 | `/scorers` | 发布规则/Python 插件配置、实现摘要、证据要求、数值语义和超时 |
 | 运行状态 | `/operations` | 后端就绪状态、队列分布、Runner 注册能力与最近心跳 |
-| 接入指南 | `/guide` | 启动与接入流程、权限/观测边界、API 文档链接 |
+| 接入指南 | `/guide` | Windows 启动、日常观测与批量评测入口、API 文档链接 |
 
 管理操作由后端鉴权；只读令牌提交管理操作时展示 403。数据视图覆盖未连接、加载、空数据、查询错误和部分数据不可用状态。正在提交的按钮禁用，失败后保留表单内容及错误详情。
 

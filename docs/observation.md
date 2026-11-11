@@ -14,7 +14,9 @@ trae 当前已实现 `python -m trae_agent.observe` 直接用户任务及独立 
 
 ## 启动与接入
 
-本机使用时，完成数据库迁移和项目初始化后运行 `uv run eyes-server`，在 Deta 中运行 `uv run --env-file .env deta -i`。Deta 默认连接 `http://127.0.0.1:8000`，不需要创建来源或填写令牌；首次事件自动登记本机来源。同一工作目录的来源标识保存在 `.deta/eyes/<配置摘要>/source-id`，只用于归组，不是认证凭据。
+Windows 上使用 [Compose](../README.md#docker-compose) 启动 Eyes 时，按下方的令牌接入流程创建来源。Agent 即使在同一台 Windows 主机，也使用从自身运行环境可达的上报地址。
+
+当 Deta 与通过 `uv run eyes-server` 启动的 API 共享 Linux 容器的回环接口时，完成数据库迁移和项目初始化后，在 Deta 中运行 `uv run --env-file .env deta -i`。Deta 默认连接 `http://127.0.0.1:8000`，首次事件自动登记本机来源。同一工作目录的来源标识保存在 `.deta/eyes/<配置摘要>/source-id`，只用于归组，不是认证凭据。
 
 本地 API 若使用其他端口，只需在 Deta `.env` 设置 `EYES_OBSERVATION_URL=http://127.0.0.1:8001`。完整正文采集仍需 `EYES_CAPTURE_BODY=true`；设置 `EYES_OBSERVATION_ENABLED=false` 关闭采集。Web 的项目连接权限保持原有认证。
 

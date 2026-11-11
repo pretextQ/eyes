@@ -1321,21 +1321,12 @@
   }
   .guide-layout {
     display: grid;
-    grid-template-columns: 1fr 245px;
+    grid-template-columns: minmax(0, 1fr) 245px;
     gap: 45px;
     padding-top: 6px;
   }
   .guide-content > section {
-    display: grid;
-    grid-template-columns: 30px 1fr;
-    gap: 18px;
     margin-bottom: 32px;
-  }
-  .guide-number {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--link-color);
-    padding-top: 4px;
   }
   .guide-content h2 {
     display: flex;
@@ -1354,6 +1345,7 @@
     margin-top: 14px;
   }
   .guide-content pre {
+    overflow-x: auto;
     border: 1px solid var(--line);
     background: var(--hover);
     border-radius: 6px;
@@ -1699,10 +1691,6 @@
     }
     .catalog-footnote svg {
       margin-top: 2px;
-    }
-    .guide-content > section {
-      gap: 9px;
-      grid-template-columns: 23px 1fr;
     }
     .guide-content h2 {
       font-size: 16px;

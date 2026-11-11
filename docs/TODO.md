@@ -43,6 +43,7 @@
 - 目的：只想观察 Agent 的用户能直接接入；需要评分的用户能找到完整评测流程。
 - 实施入口：[引导页](../frontend/src/pages/Guide.tsx)、[前端说明](frontend.md)、[观测说明](observation.md)、[本机接入](../integrations/mewcode/README.md)。保持现有导航与视觉体系。
 - 完成条件：Windows 用户可按对应路径操作；纯观测不要求 Runner/实验，批量评测明确要求匹配 Runner；示例区分 PowerShell 与容器内执行，不出现依赖其他宿主机的步骤。
+- 2026-11-11 已更新接入指南和 [Windows 使用路径](frontend.md#选择使用路径)。Compose 配置、前端 lint、格式、类型检查与构建通过，Vite 返回指南入口和页面模块。浏览器交互与窄屏核对待补。
 
 ### D-03：保留审阅工作区的连续操作体验
 
