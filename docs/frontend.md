@@ -39,7 +39,7 @@ npm run dev
 | 测试集 | `/datasets` | 文件或文本 JSONL 整体导入、服务端错误行详情、已发布用例检索 |
 | 评分口径 | `/scorers` | 发布规则/Python 插件配置、实现摘要、证据要求、数值语义和超时 |
 | 运行状态 | `/operations` | 后端就绪状态、队列分布、Runner 注册能力与最近心跳 |
-| 接入指南 | `/guide` | Windows 启动、日常观测与批量评测入口、API 文档链接 |
+| 接入指南 | `/guide` | Windows 启动、日常观测与批量评测入口 |
 
 管理操作由后端鉴权；只读令牌提交管理操作时展示 403。数据视图覆盖未连接、加载、空数据、查询错误和部分数据不可用状态。正在提交的按钮禁用，失败后保留表单内容及错误详情。
 
@@ -89,10 +89,6 @@ npm run preview
 
 两个缓存 location 显式保留 server 已声明的 nosniff / same-origin 安全头。实际 nginx 1.30.5 上 HTML、assets 200/304、assets 404 和代理均已核对，见[部署验证](deployment-regression-20261011.md#审查-1nginx-安全头)。该记录是本机隔离 nginx 部署，不代表完整 Compose 发布验收。
 
-Compose 已增加 `frontend` 服务：
+首次部署及初始化见[根 README](../README.md#docker-compose)。前端等待 API 健康后启动，本机访问 `http://127.0.0.1:8080/`。Runner 继续在目标环境独立运行。前端和 API 端口均限制在本机，端口可按部署配置调整。[后端说明](backend.md#compose)
 
-```sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml up --build -d
-```
-
-前端等待 API 健康后启动，本机访问 `http://127.0.0.1:8080/`。Runner 继续在目标环境独立运行。前端和 API 端口均限制在本机；部署说明与真实运行边界见 [后端说明](backend.md)。
+部署时从控制 API 端口直接打开 API 文档和 OpenAPI，默认地址为 `http://127.0.0.1:8000/docs` 和 `http://127.0.0.1:8000/openapi.json`。Compose 的 nginx 会拒绝控制台指南使用的两个 `/api` 文档链接。[交付审核](Review/2026-11-14-release-readiness.md#设计待办审核)

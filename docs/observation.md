@@ -14,7 +14,9 @@ trae 当前已实现 `python -m trae_agent.observe` 直接用户任务及独立 
 
 ## 启动与接入
 
-Windows 上使用 [Compose](../README.md#docker-compose) 启动 Eyes 时，按下方的令牌接入流程创建来源。Agent 即使在同一台 Windows 主机，也使用从自身运行环境可达的上报地址。
+Windows 上使用 Compose 启动 Eyes 后，在 **Agent 观测 → 接入 Agent → 远程 Agent 接入** 使用管理令牌创建来源。为 exporter 配置来源令牌和从 Agent 运行环境可达的上报地址，再用项目 read 或 manage 令牌查看观测。来源令牌只在创建时显示，授权范围为对应来源的上报。[Compose 快速开始](../README.md#docker-compose)
+
+以下免来源令牌流程仅适用于与本地 API 共用 Linux 容器回环接口的 Deta。
 
 当 Deta 与通过 `uv run eyes-server` 启动的 API 共享 Linux 容器的回环接口时，完成数据库迁移和项目初始化后，在 Deta 中运行 `uv run --env-file .env deta -i`。Deta 默认连接 `http://127.0.0.1:8000`，首次事件自动登记本机来源。同一工作目录的来源标识保存在 `.deta/eyes/<配置摘要>/source-id`，只用于归组，不是认证凭据。
 

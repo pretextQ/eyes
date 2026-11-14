@@ -1,6 +1,6 @@
 # MewCode 接入
 
-本项目在当前 Windows／PowerShell 开发，API 与 Runner 在本机 Docker Desktop Linux 容器中运行。MewCode 源码项目为 `D:\projects\MewCode`；Eyes 根目录的 `MewCode/` 保存验证记录。
+Eyes 在 Windows／PowerShell 下部署，API 与 Runner 在本机 Docker Desktop Linux 容器中运行。MewCode 需要单独的源码检出。下例使用 `D:\projects\MewCode`，请按本机位置调整。Eyes 根目录的 `MewCode/` 保存历史验证记录。[Eyes 快速开始](../../README.md#docker-compose)
 
 ## 三份核心文件
 
@@ -100,7 +100,9 @@ eyes-runner --config /app/data/mewcode-python/runner.toml run
 
 ## 本机重启与再次评测
 
-最新实际验证为 [2026-10-11 HTTP 记录](../../MewCode/2026-10-11-rerun/REPORT.md)：API 18060、Agent 19050、Web 18082、PostgreSQL 55440，私有配置位于 MewCode/2026-10-11-rerun/private。此环境使用 http-runner 配置，与上面的 Python 模板分别运行。
+日常按当前控制平台的 Compose 配置恢复服务，再启动对应的 Agent 和 Runner。真实版本对比的材料、冻结参数和 CLI 步骤见 [2026-11-11 回归复验](../../docs/mewcode-regression-20261111.md#重复执行与复查)。
+
+以下命令用于复现 [2026-10-11 HTTP 记录](../../MewCode/2026-10-11-rerun/REPORT.md)的历史环境，需要原有本机容器和私有配置。该轮使用 API 18060、Agent 19050、Web 18082、PostgreSQL 55440，配置位于 `MewCode/2026-10-11-rerun/private`。
 
 数据库按该次私有部署配置启动后，在 PowerShell 启动本次已有容器：
 
@@ -112,6 +114,6 @@ docker start eyes-mewcode-rerun-api eyes-mewcode-rerun-agent
 
 ## 验证边界
 
-[最新 HTTP 记录](../../MewCode/2026-10-11-rerun/REPORT.md)实际通过 3/3 执行、3/3 独立评分与 12/12 功能检查，并保留首次缓存安装不一致的 unknown。此前直接 Python 基础闭环见 [Windows/MewCode 记录](../../docs/mewcode-validation.md)。
+[2026-11-11 版本回归](../../docs/mewcode-regression-20261111.md)中，两侧各 3/3 执行和评分通过，固定报告可追溯，三个用例结果均无变化。[2026-10-11 HTTP 重跑](../../MewCode/2026-10-11-rerun/REPORT.md)记录 3/3 执行、3/3 独立评分和 12/12 功能检查，并保留首次缓存安装不一致的 unknown。直接 Python 基础闭环见 [Windows/MewCode 记录](../../docs/mewcode-validation.md)。
 
-本次整理三份接入文件不新增验收结论。完整告警服务、扩展工具、复杂仓库能力、安全隔离、活动崩溃恢复、双 Agent 并发及容量仍需相应验收。
+与 trae 的双目标定向并发和恢复已有验收记录。扩展工具、复杂仓库、完整活动故障矩阵及容量仍需对应材料。[双 Agent 验收](../../docs/dual-agent-acceptance-20261012.md) · [投入使用前审核](../../docs/Review/2026-11-14-release-readiness.md)

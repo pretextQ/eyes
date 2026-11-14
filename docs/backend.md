@@ -6,7 +6,7 @@
 
 2026-10-17 完成一轮不改变运行语义的修复：重新导出控制契约（补齐 `CancellationRequest`、`ReconciliationEvidence`、`RecoveryEventSubmission` 等）、对齐迁移 head 文档，并在 Docker/Linux + PostgreSQL 18.6 上复验迁移与 API 冒烟，见[验证记录](fix-verification-20261017.md)。
 
-当前约定范围已于 2026-10-14 交付完成，进入按需使用与维护；源码基线 `6929b6d`、迁移至 `0007_cancellation_audit`。取消审计与容量保护/API/CLI/Web 已完成对应范围实现和验收，见[当前计划](PLAN.md#当前交付状态与维护安排)与[容量 Web 验收](capacity-web-20261014.md)。本节原始 M1/M2/M4 等完整条件仍保留，当前范围完成不等于全部矩阵通过。
+当前支持单团队自托管、按需使用。数据库迁移头为 `0008_work_indexes`。最新交付审核覆盖空库启动、旧备份恢复、权限和停启，原始 M0～M4 的完整验收条件仍见开发计划。[交付审核](Review/2026-11-14-release-readiness.md) · [开发计划](PLAN.md#m0m4-验收状态)
 
 ## 当前实现与后续工作
 
@@ -23,7 +23,7 @@
 | Web 控制台 | React/TypeScript/Vite 页面及公开 API 操作已有实现，可创建/读取固定回归报告并显式选择历史评分；验证边界见 [前端说明](frontend.md) |
 | 回归与运维 | 固定回归报告、质量门槛、开发者 CLI、证据等待/封存、保留删除/文件回收、审计及备份恢复已有实现；用法见 [平台说明](platform.md) |
 
-当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行/评分/证据基础闭环。安全恢复指定必需项及评分读取的 API 中断、数据库 503、鉴权与租约故障已有真实子集证据，见 [Runner 可靠性验收](runner-reliability-20261011.md)。同一 Agent 两版本无变化回归已验证，真实改善/退化仍阻塞。完整真实证据备份恢复、干净控制 Compose、新环境 HTTP 和具名权限请求已通过相应范围。
+当前 Windows 环境已有 MewCode Python 与统一 HTTP 执行、评分和证据闭环。评分读取的 API 中断、数据库 503、鉴权及租约故障已有定向证据。同一 Agent 两个版本的比较报告已验证，真实改善与退化留待可比材料。[Runner 可靠性验收](runner-reliability-20261011.md) · [MewCode 回归复验](mewcode-regression-20261111.md)
 
 2026-10-12 已补齐 trae 被动观测的真实正向、离线补传、权限、Web 与按需重启；MewCode/trae 主动 HTTP 正常闭环、真实双目标并发、成员准备失败隔离和原操作定向核对也已通过。2026-10-13 新增独立原操作证据恢复：两个原故障 Attempt 无重跑补齐原事件/产物、新清单和明确清理事实，显式独立评分 2/2 pass；补传整体退出、过期租约续传和重复回执已复验，历史评分仍保留。远端取消/资源正向、完整故障/权限矩阵和其他生命周期分支仍待验证。已就绪组件的按需启停周期通过；24 小时及多日运行是未来可选验证。详见[本次源码修复与证据](evidence-recovery-20261013.md)、[历史独立复核](acceptance-followup-20261012.md)、[双 Agent 验收](dual-agent-acceptance-20261012.md)与[开发计划](PLAN.md)，不据此宣布 M0～M4 全部通过。
 
@@ -65,26 +65,13 @@ API 默认监听 `127.0.0.1:8000`。更改监听参数可在本机 Linux 容器�
 uv run uvicorn eyes.server.api.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-`/docs` 和 `/openapi.json` 提供接口说明。`/health/live` 检查进程；`/health/ready` 检查数据库连接和迁移版本，未就绪返回 503。就绪检查通过实际产物发布路径执行文件 fsync、原子替换、目录 fsync 和读取核对，finally 清理探测文件；失败返回 `503 artifact_store_unavailable`，相关部署行为仍待验收。
+控制 API 的 `/docs` 和 `/openapi.json` 提供接口说明。`/health/live` 检查进程，`/health/ready` 检查数据库连接和迁移版本。就绪检查沿实际产物发布路径执行文件同步、原子替换、目录同步和读取核对，最后清理探测文件。产物卷检查失败时返回 `503 artifact_store_unavailable`。[部署与恢复验证](Review/2026-11-14-release-readiness.md#本轮核对结果)
 
 ## Compose
 
-```powershell
-Copy-Item deploy/.env.example deploy/.env
-# Windows 上使用 .NET 加密随机数生成十六进制密码。
-[Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-```
+首次部署、就绪检查及项目初始化按根 README 执行。Compose 等待 PostgreSQL 健康后执行迁移，再启动 API 和 Scheduler。前端等待 API 就绪。PostgreSQL 18 的数据卷挂载在 `/var/lib/postgresql`，证据卷挂载在控制端 `/app/data/artifacts`。[Compose 快速开始](../README.md#docker-compose)
 
-将生成的十六进制密码写入 `deploy/.env` 的 `POSTGRES_PASSWORD`，然后运行：
-
-```sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml up --build -d
-docker compose --env-file deploy/.env -f deploy/compose.yaml exec api eyes-admin bootstrap --name default
-```
-
-Compose 等待 PostgreSQL 健康后执行迁移，再启动 API 和调度进程。相关依赖条件见 [Docker Compose 文档](https://docs.docker.com/compose/how-tos/startup-order)。PostgreSQL 18 的持久卷挂载在 `/var/lib/postgresql`，与 [官方镜像的目录约定](https://hub.docker.com/_/postgres)一致。
-
-数据库和 API 端口都只映射到本机。数据库与证据分别使用独立数据卷。当前 Compose 包含控制端和 Web 控制台，本机前端端口为 8080；Runner 在目标宿主机独立运行。完整 Compose 部署仍需在当前 Windows 环境验收。
+控制镜像的运行用户为 UID/GID `10001:10001`。新建证据卷根目录为 `0700`，产物文件为 `0600`。恢复已有证据卷时，按实际服务用户交接所有权，并核对服务用户审计、就绪状态和授权下载。Runner 单独部署在目标运行环境。[备份与恢复](platform.md#compose-命名卷的停写备份与恢复)
 
 ## 令牌及项目范围
 

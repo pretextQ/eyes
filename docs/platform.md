@@ -42,15 +42,9 @@ Web 使用既有查询机制，每15秒前台刷新，隐藏页面暂停容量�
 
 2026-10-11 普通公共契约要求显式 schema_version；本仓库客户端已更新，历史记录不改写，旧 outbox 由新 Runner 按原身份做传输投影。公共旧请求只有在明确开启、有固定截止时间的窗口内并带兼容头才支持。先升级生产端再切换严格 API；完整顺序及未验证项见[版本迁移说明](contract-version-migration.md)，该轮未新增数据库迁移。
 
-```sh
-uv sync --frozen
-uv run alembic upgrade head
-uv run eyes-server
-# 另一个终端
-uv run eyes-scheduler
-```
+升级前暂停写入端，停止 API、Scheduler 和维护进程并备份数据库和证据卷。更新源码后，使用原 Compose 项目和配置构建并等待服务就绪。API、Scheduler、Runner 和 Web 使用同一份交付版本。Runner 在目标环境单独更新。[停写备份](#compose-命名卷的停写备份与恢复) · [启动步骤](../README.md#docker-compose)
 
-升级前停止控制端、调度器及维护进程，备份数据库和证据卷。升级后一起部署同一版本的 API、Scheduler、Runner 和 Web。完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit → 0008_work_indexes`。0002 新增回归报告、证据等待记录、证据过期时间和评分取消时间，0003/0004 分别增加被动观测与实验批次，0005 增加未知任务查询租约和退避 JSONB 字段（历史缺省为空），0006 增加观测终态接收时间、过期标识、清理摘要及分批查询索引。0007 增加实验和批次的追加式取消审计，0008 增加工作项的实验和尝试索引。当前 API 就绪检查要求迁移到 head `0008_work_indexes`，并通过实际产物发布与读取路径检查证据卷。2026-10-17 的 0001→0007 升级、降级、重放、`alembic check` 和容器内 API 冒烟结果见[验证记录](fix-verification-20261017.md)。
+完整迁移链为 `0001_control_plane → 0002_platform → 0003_observation → 0004_experiment_batches → 0005_reconciliation → 0006_observation_retention → 0007_cancellation_audit → 0008_work_indexes`。`0008` 为工作项添加实验和尝试索引。当前 API 就绪检查要求数据库到达 `0008_work_indexes`，同时验证证据卷的实际发布与读取路径。[当前迁移复验](Review/2026-11-11-maintenance-validation.md#0008-迁移与旧备份恢复) · [历史迁移与 API 冒烟](fix-verification-20261017.md)
 
 ### 观测迁移与备份恢复
 
@@ -186,8 +180,8 @@ uv run eyes-ops maintain --attempt-id ATTEMPT_UUID --apply
 
 可由宿主机调度器定期执行 `maintain --apply`；也可在 Compose 显式启用维护进程：
 
-```sh
-docker compose -f deploy/compose.yaml --profile maintenance up -d
+```powershell
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile maintenance up -d maintenance
 ```
 
 维护进程每小时执行一次；默认保留期 0 不会按年龄清除完整证据，但会清理符合条件的过期 pending 和孤立文件。
@@ -241,60 +235,86 @@ Compose 包含 PostgreSQL、一次性迁移、API、Scheduler、Web 及可选维
 
 ### Compose 命名卷的停写备份与恢复
 
-Docker Desktop 的命名卷不直接暴露为宿主机目录。前面的 `eyes-ops backup --pg-container` 适用于宿主机能读取同一证据目录的部署；默认 Compose 命名卷使用下面的停写流程。不要把空的宿主机目录冒充证据卷。
+默认 Compose 将数据库和实验证据放在 Docker 管理的命名卷里。下面的 PowerShell 7.4+ 流程通过 `docker compose cp` 复制卷内数据。将备份保存到有访问权限控制的独立目录。开始前，确认当前 Compose 项目名和配置，核对活动及 unknown 任务，暂停 Runner、exporter 及其他 API 写入端。
 
-先停止目标宿主机 Runner，再在项目根目录执行；保持原 Compose 项目名和环境配置：
+**备份。** 在项目根目录运行，先将示例备份路径换成尚不存在的实际目录。备份命令需要已有的 API 和 PostgreSQL 容器。
 
-```sh
-set -e
-EYES_BACKUP_DIR=/secure/backups/eyes-compose-20261003
-mkdir -m 700 "$EYES_BACKUP_DIR"
-docker compose -f deploy/compose.yaml stop frontend api scheduler maintenance
-docker compose -f deploy/compose.yaml run --rm --no-deps api eyes-ops audit
-docker compose -f deploy/compose.yaml exec -T postgres \
-  pg_dump -U eyes -d eyes --format=custom --no-owner --no-privileges \
-  > "$EYES_BACKUP_DIR/database.dump"
-docker compose -f deploy/compose.yaml cp api:/app/data/artifacts "$EYES_BACKUP_DIR/artifacts"
-docker compose -f deploy/compose.yaml exec -T postgres \
-  psql -U eyes -d eyes -Atc 'SELECT version_num FROM alembic_version' \
-  > "$EYES_BACKUP_DIR/database-revision.txt"
-(cd "$EYES_BACKUP_DIR" && shasum -a 256 database.dump > database.sha256)
-# 确认上述命令均成功后恢复控制端；再由接入方恢复 Runner。
-docker compose -f deploy/compose.yaml up -d
+```powershell
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$backupDir = 'D:\backups\eyes-compose-backup'
+$composeArgs = @('--env-file', 'deploy/.env', '-f', 'deploy/compose.yaml')
+$dumpInContainer = '/tmp/eyes-' + [guid]::NewGuid().ToString('N') + '.dump'
+$dumpFile = Join-Path $backupDir 'database.dump'
+
+New-Item -ItemType Directory -Path $backupDir | Out-Null
+docker compose @composeArgs --profile maintenance stop frontend api scheduler maintenance
+docker compose @composeArgs run --rm --no-deps api eyes-ops audit
+
+docker compose @composeArgs exec -T postgres pg_dump -U eyes -d eyes --format=custom --no-owner --no-privileges --file $dumpInContainer
+docker compose @composeArgs cp "postgres:${dumpInContainer}" $dumpFile
+docker compose @composeArgs exec -T postgres rm -- $dumpInContainer
+docker compose @composeArgs cp 'api:/app/data/artifacts' $backupDir
+docker compose @composeArgs exec -T postgres psql -v ON_ERROR_STOP=1 -U eyes -d eyes -Atc 'SELECT version_num FROM alembic_version' |
+    Set-Content -LiteralPath (Join-Path $backupDir 'database-revision.txt')
+(Get-FileHash -LiteralPath $dumpFile -Algorithm SHA256).Hash |
+    Set-Content -LiteralPath (Join-Path $backupDir 'database.sha256')
 ```
 
-证据文件的摘要保存在数据库元数据内，恢复后的 `audit` 会逐项复核。备份期间所有写入端必须保持停止；不要同时运行另一个连接同库的 API、Scheduler 或维护命令。
+确认命令全部成功，再用原 Compose 配置执行 `docker compose @composeArgs up --wait` 恢复控制端。原先启用了维护服务时，沿用其 profile。最后恢复接入端。
 
-恢复使用**新的 Compose 项目和空卷**。设置 `EYES_RESTORE_PROJECT`、密码和不冲突的宿主机端口；镜像需与备份数据库版本匹配。以下命令不会删除旧项目的卷：
+**恢复。** 使用新的 Compose 项目和空卷。将 `deploy/.env.example` 复制到 Git 忽略的 `data/eyes-restore.env`，配置 PostgreSQL 密码和互不冲突的回环端口。将下面的备份目录改为实际路径。先核对 dump 摘要，再启动新的 PostgreSQL。将备份的内容复制到证据卷，交给 API 服务用户后执行迁移和审计。
 
-```sh
-set -e
-EYES_BACKUP_DIR=/secure/backups/eyes-compose-20261003
-EYES_RESTORE_PROJECT=eyes-restored
-(cd "$EYES_BACKUP_DIR" && shasum -a 256 -c database.sha256)
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml up -d --wait postgres
-# postgres healthy 后恢复，尚不启动 API、Scheduler 或 Runner。
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml exec -T postgres \
-  pg_restore -U eyes -d eyes --single-transaction --exit-on-error --no-owner --no-privileges \
-  < "$EYES_BACKUP_DIR/database.dump"
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml create api
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml cp \
-  "$EYES_BACKUP_DIR/artifacts/." api:/app/data/artifacts
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml run --rm --no-deps --user root api \
-  chown -R 10001:10001 /app/data/artifacts
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml run --rm --no-deps api eyes-ops audit
-# 撤销旧 Runner 身份，使恢复前的进程不能提交；过期租约由 Scheduler 核对。
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml exec -T postgres \
-  psql -v ON_ERROR_STOP=1 -U eyes -d eyes -c \
-  "BEGIN; UPDATE credentials SET revoked=true WHERE role='runner'; UPDATE work_items SET lease_expires_at=CURRENT_TIMESTAMP WHERE status='claimed'; COMMIT;"
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml run --rm --no-deps scheduler eyes-scheduler --once
-docker compose -p "$EYES_RESTORE_PROJECT" -f deploy/compose.yaml up -d
+```powershell
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$backupDir = 'D:\backups\eyes-compose-backup'
+$restoreArgs = @('-p', 'eyes-restored', '--env-file', 'data/eyes-restore.env', '-f', 'deploy/compose.yaml')
+$dumpInContainer = '/tmp/eyes-restore-' + [guid]::NewGuid().ToString('N') + '.dump'
+$dumpFile = Join-Path $backupDir 'database.dump'
+$artifactDir = Join-Path $backupDir 'artifacts'
+$expectedHash = (Get-Content -LiteralPath (Join-Path $backupDir 'database.sha256') -Raw).Trim()
+if ((Get-FileHash -LiteralPath $dumpFile -Algorithm SHA256).Hash -ne $expectedHash) {
+    throw 'Database dump hash mismatch'
+}
+if (!(Test-Path -LiteralPath $artifactDir -PathType Container)) {
+    throw 'Artifact backup directory is missing'
+}
+
+docker compose @restoreArgs up --wait postgres
+$existingTables = docker compose @restoreArgs exec -T postgres psql -v ON_ERROR_STOP=1 -U eyes -d eyes -Atc "SELECT count(*) FROM pg_tables WHERE schemaname='public'"
+if ([int]$existingTables -ne 0) {
+    throw 'Restore requires an empty database'
+}
+docker compose @restoreArgs create api
+docker compose @restoreArgs run --rm --no-deps --user root api sh -c 'test -z "$(ls -A /app/data/artifacts)"'
+
+docker compose @restoreArgs cp $dumpFile "postgres:${dumpInContainer}"
+docker compose @restoreArgs exec -T postgres pg_restore -U eyes -d eyes --single-transaction --exit-on-error --no-owner --no-privileges $dumpInContainer
+docker compose @restoreArgs exec -T postgres rm -- $dumpInContainer
+
+docker compose @restoreArgs cp (Join-Path $artifactDir '.') 'api:/app/data/artifacts'
+docker compose @restoreArgs run --rm --no-deps --user root api chown -R 10001:10001 /app/data/artifacts
+docker compose @restoreArgs run --rm --no-deps api alembic upgrade head
+docker compose @restoreArgs run --rm --no-deps api alembic check
+docker compose @restoreArgs run --rm --no-deps api eyes-ops audit
 ```
 
-恢复后核对 unknown 工作，再签发新 Runner 令牌。降级迁移不会恢复已清除的证据载荷；要恢复旧版本完整数据，使用升级前的备份。
+启动前撤销恢复出来的旧 Runner 凭据，让旧活动租约进入核对。以下命令仅在刚恢复的隔离项目上执行。
 
+```powershell
+docker compose @restoreArgs exec -T postgres psql -v ON_ERROR_STOP=1 -U eyes -d eyes -c "BEGIN; UPDATE credentials SET revoked=true WHERE role='runner'; UPDATE work_items SET lease_expires_at=CURRENT_TIMESTAMP WHERE status='claimed'; COMMIT;"
+docker compose @restoreArgs run --rm --no-deps scheduler eyes-scheduler --once
+docker compose @restoreArgs up --wait
+```
 
-统一 agent_http 未知任务自动核对、人工 resolve 边界及 0005 升降级要求见[恢复操作](unknown-recovery.md)。初始实现轮次的 Docker/API/Agent 阻塞已保留为历史；之后独立 PostgreSQL 实际迁移和指定安全恢复必需项分别完成验证，见[兼容验收](contract-compatibility-validation.md)及[Runner 可靠性](runner-reliability-20261011.md)。它们不代替本节完整证据备份恢复或完整故障矩阵。
+使用恢复环境的实际 API 端口检查 readiness，并用授权令牌下载备份中的产物比对 SHA-256。核对 unknown 工作和观测来源的凭据状态后，再签发新 Runner 令牌并恢复写入。[恢复实测](Review/2026-11-14-release-readiness.md#本轮核对结果) · [未知任务核对](unknown-recovery.md)
+
+2026-11-14 用历史证据副本执行上述 PowerShell 备份和恢复流程，恢复服务达到 `0008_work_indexes`，审计核对了 27 份产物、49 份清单和 16 条评分。
+
+降级迁移无法找回已清理的证据正文。需要旧版本完整数据时，将升级前备份恢复到新的空目标。
+
+统一 Agent HTTP 未知任务自动核对、人工 resolve 边界及 `0005` 升降级要求见[恢复操作](unknown-recovery.md)。旧客户端与 Runner 故障验证见[兼容验收](contract-compatibility-validation.md)和[Runner 可靠性验收](runner-reliability-20261011.md)。
 
 ## 取消审计保留与恢复
 
